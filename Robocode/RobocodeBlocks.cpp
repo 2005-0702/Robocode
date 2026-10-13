@@ -5,12 +5,15 @@
 #include <string>
 #include <wrl.h>
 #include "WebView2.h"
+#include "Block.h"
+#include "RobotMove.h"
 
 using Microsoft::WRL::Callback;
 using Microsoft::WRL::ComPtr;
 
 static ComPtr<ICoreWebView2Controller> g_controller;  // WebView2 の「入れ物」（大きさや表示を管理）
 static ComPtr<ICoreWebView2> g_webview;               // WebView2 本体（ページの表示や読み込み）
+static BlockRegistry g_registry;   // ブロックの登録簿（アプリ全体で1つ）
 
 // ------------------------------------------------------------
 // web フォルダを探す
@@ -38,6 +41,24 @@ static std::wstring FindWebFolder() {
         dir = dir.substr(0, pos);  // 1つ上のフォルダへ
     }
     return L"";
+}
+
+// UTF-8の文字列を、WebView2で使うワイド文字列に変換する
+static std::wstring Utf8ToWide(const std::string& s) {
+    if (s.empty()) return L"";
+    int len = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), nullptr, 0);
+    std::wstring w(len, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), &w[0], len);
+    return w;
+}
+
+// ブロック定義とツールボックスをBlocklyへ送る
+static void SendBlocksToBlockly(ICoreWebView2* webview) {
+    json msg;
+    msg["kind"] = "blocks";
+    msg["definitions"] = g_registry.definitions();
+    msg["toolbox"] = g_registry.toolbox();
+    webview->PostWebMessageAsJson(Utf8ToWide(msg.dump()).c_str());
 }
 
 // ウィンドウの大きさに WebView2 を合わせる
@@ -87,6 +108,13 @@ static void InitWebView(HWND hWnd) {
                                     L"app.local", webFolder.c_str(),
                                     COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW);
                             }
+                            EventRegistrationToken navToken;
+                            g_webview->add_NavigationCompleted(
+                                Callback<ICoreWebView2NavigationCompletedEventHandler>(
+                                    [](ICoreWebView2* sender, ICoreWebView2NavigationCompletedEventArgs*) -> HRESULT {
+                                        SendBlocksToBlockly(sender);
+                                        return S_OK;
+                                    }).Get(), &navToken);
 
                             g_webview->Navigate(L"https://app.local/index.html");
                             return S_OK;
@@ -114,6 +142,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 }
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ LPWSTR, _In_ int nCmdShow) {
+    
+    registerRobotMoveBlocks(g_registry);
+
     // WebView2 を使うための準備
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
