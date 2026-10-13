@@ -79,10 +79,15 @@
       ]
     };
 
-    const workspace = Blockly.inject("blocklyDiv", {
-      toolbox: toolbox,
-      trashcan: true,
-      zoom: { controls: true, wheel: true }
+      const workspace = Blockly.inject('blocklyDiv', {
+          toolbox: { kind: 'categoryToolbox', contents: [] }
+      });
+    window.chrome.webview.addEventListener('message', (event) => {
+        const msg = event.data;
+        if (msg.kind === 'blocks') {
+            Blockly.defineBlocksWithJsonArray(msg.definitions);
+            workspace.updateToolbox(msg.toolbox);
+        }
     });
   </script>
 </body>
