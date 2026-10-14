@@ -20,7 +20,6 @@ int main() {
 
     // ---- ブロックを登録する ----
     BlockRegistry registry;
-    registerRobotMoveBlocks(registry);
     // 新しいブロックのファイルを作ったら、ここに1行足す
     //   例: registerRobotGunBlocks(registry);
 
