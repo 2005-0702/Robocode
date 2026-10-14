@@ -145,6 +145,7 @@
     <ClCompile Include="RobocodeBlocks.cpp" />
     <ClCompile Include="RobocodeBlocksCore.cpp" />
     <ClCompile Include="RobotAttack.cpp" />
+    <ClCompile Include="RobotColor.cpp" />
     <ClCompile Include="RobotControl.cpp" />
     <ClCompile Include="RobotEvent.cpp" />
     <ClCompile Include="RobotMove.cpp" />

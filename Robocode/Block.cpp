@@ -16,6 +16,7 @@ static int categoryColour(const std::string& category) {
         {"レーダー", 120},
         {"イベント",  45},
         {"値",       290},
+        {"色",        20},  
     };
     auto it = colours.find(category);
     return it != colours.end() ? it->second : 160;   // 未登録のカテゴリは緑っぽい色
