@@ -27,5 +27,4 @@ public:
     std::string generate(const json& block, Generator& gen, int indent) const override;
 };
 
-// このファイルのブロックをまとめて登録する（main などから1回呼ぶ）
-void registerRobotMoveBlocks(BlockRegistry& registry);
+
