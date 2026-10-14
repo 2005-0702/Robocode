@@ -7,9 +7,11 @@
 #include <wrl.h>
 #include "WebView2.h"
 #include "RobocodeBlocks.h"   // ブロックの仕組み（ROBOCODE_BLOCKS で書いたブロックは自動で登録される）
+#include <nlohmann/json.hpp>  // Blockly とやり取りする JSON を読み書きする
 
 using Microsoft::WRL::Callback;
 using Microsoft::WRL::ComPtr;
+using json = nlohmann::json;
 
 static ComPtr<ICoreWebView2Controller> g_controller;  // WebView2 の「入れ物」（大きさや表示を管理）
 static ComPtr<ICoreWebView2> g_webview;               // WebView2 本体（ページの表示や読み込み）
@@ -51,11 +53,62 @@ static std::wstring Utf8ToWide(const std::string& s) {
     return w;
 }
 
+// WebView2 のワイド文字列を、UTF-8 の文字列に変換する
+static std::string WideToUtf8(const std::wstring& w) {
+    if (w.empty()) return "";
+    int len = WideCharToMultiByte(CP_UTF8, 0, w.c_str(), (int)w.size(), nullptr, 0, nullptr, nullptr);
+    std::string s(len, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, w.c_str(), (int)w.size(), &s[0], len, nullptr, nullptr);
+    return s;
+}
+
 // ブロック定義とツールボックスをBlocklyへ送る
 //   送る形：{ "kind": "blocks", "setup": { "blocks": [...], "toolbox": {...}, "problems": [...] } }
 static void SendBlocksToBlockly(ICoreWebView2* webview) {
     std::string msg = "{\"kind\":\"blocks\",\"setup\":" + rb::GetBlocklySetupJson() + "}";
     webview->PostWebMessageAsJson(Utf8ToWide(msg).c_str());
+}
+
+// エラー・注意の一覧を JSON にする
+static json MessagesToJson(const std::vector<rb::Message>& list) {
+    json array = json::array();
+    for (const auto& m : list) {
+        array.push_back({{"blockId", m.blockId}, {"label", m.blockLabel}, {"text", m.text}});
+    }
+    return array;
+}
+
+// ------------------------------------------------------------
+// Blockly から届いたメッセージを処理して、返事の JSON を返す（返事がないときは ""）
+//   届く形：{ "kind": "convert", "name": "MyRobot", "workspace": { ...ブロックのデータ... } }
+//   返す形：{ "kind": "java", "ok": true, "java": "...", "errors": [...], "warnings": [...] }
+// ------------------------------------------------------------
+static std::string HandleMessageFromBlockly(const std::string& text) {
+    json msg = json::parse(text, nullptr, false);
+    if (msg.is_discarded() || !msg.is_object()) return "";
+
+    const std::string kind = msg.value("kind", "");
+
+    // 「Java を作る」ボタン
+    if (kind == "convert") {
+        const std::string name = msg.value("name", "");
+        const std::string workspace = msg.contains("workspace") ? msg["workspace"].dump() : "{}";
+
+        rb::JavaResult result = rb::ConvertToJava(workspace, name);
+
+        // TODO（#4 の担当）：result.ok のとき、ここで Java を保存して javac でコンパイルする
+        //   例）SaveJavaFile(name, result.java);  CompileRobot(name, ...);
+
+        json reply;
+        reply["kind"] = "java";
+        reply["ok"] = result.ok;
+        reply["java"] = result.java;
+        reply["errors"] = MessagesToJson(result.errors);
+        reply["warnings"] = MessagesToJson(result.warnings);
+        return reply.dump(-1, ' ', false, json::error_handler_t::replace);
+    }
+
+    return "";
 }
 
 // ウィンドウの大きさに WebView2 を合わせる
@@ -112,6 +165,22 @@ static void InitWebView(HWND hWnd) {
                                         SendBlocksToBlockly(sender);
                                         return S_OK;
                                     }).Get(), &navToken);
+
+                            // Blockly からメッセージが届いたら処理して、返事を送り返す
+                            EventRegistrationToken msgToken;
+                            g_webview->add_WebMessageReceived(
+                                Callback<ICoreWebView2WebMessageReceivedEventHandler>(
+                                    [](ICoreWebView2* sender, ICoreWebView2WebMessageReceivedEventArgs* args) -> HRESULT {
+                                        LPWSTR raw = nullptr;
+                                        if (SUCCEEDED(args->get_WebMessageAsJson(&raw)) && raw != nullptr) {
+                                            std::string reply = HandleMessageFromBlockly(WideToUtf8(raw));
+                                            CoTaskMemFree(raw);
+                                            if (!reply.empty()) {
+                                                sender->PostWebMessageAsJson(Utf8ToWide(reply).c_str());
+                                            }
+                                        }
+                                        return S_OK;
+                                    }).Get(), &msgToken);
 
                             g_webview->Navigate(L"https://app.local/index.html");
                             return S_OK;

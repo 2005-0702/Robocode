@@ -14,4 +14,6 @@ ROBOCODE_BLOCKS(RobotAttack)
         }
             })
         .java("fire({POWER})");                           // 作られるJava（{POWER} に入力した数字が入る）
+
+
 }
