@@ -135,15 +135,17 @@
     <ClInclude Include="Block.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Resource.h" />
-    <ClInclude Include="RobotMove.h" />
+    <ClInclude Include="RobocodeBlocks.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Block.cpp" />
+    <ClCompile Include="GetGameInfo.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="RobocodeBlocks.cpp" />
     <ClCompile Include="RobocodeBlocksCore.cpp" />
-    <ClCompile Include="RobotEvent.cpp" />
+    <ClCompile Include="RobotAttack.cpp" />
+    <ClCompile Include="RobotControl.cpp" />
     <ClCompile Include="RobotMove.cpp" />
   </ItemGroup>
   <ItemGroup>
