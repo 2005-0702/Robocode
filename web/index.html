@@ -132,6 +132,41 @@
       white-space: pre;
     }
 
+    /* カテゴリを左の枠いっぱいに広げて並べる（カテゴリが増えると、1つ分の高さが小さくなる） */
+    .blocklyToolboxDiv > .blocklyToolboxContents {
+      flex-wrap: nowrap;      /* 入りきらなくても横に折り返さない（そのときはスクロール） */
+      height: 100%;
+    }
+    .blocklyToolboxDiv > .blocklyToolboxContents > .blocklyToolboxCategory {
+      flex: 1 1 0;            /* 高さを等分する */
+      min-height: 34px;       /* これより小さくはしない（入りきらなければスクロール） */
+      display: flex;
+      flex-direction: column;
+    }
+    .blocklyToolboxDiv > .blocklyToolboxContents > .blocklyToolboxCategory > .blocklyTreeRow {
+      flex: 1 1 auto;
+      height: auto;
+      min-height: 30px;
+      margin-bottom: 0;
+      display: flex;
+      align-items: center;    /* カテゴリ名を上下のまん中に */
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .blocklyToolboxDiv .blocklyTreeLabel {
+      font-size: 15px;
+    }
+
+    /* 元に戻す・やり直すボタン */
+    #toolbar button.icon {
+      font-size: 18px;
+      padding: 2px 10px;
+      line-height: 1;
+    }
+    #toolbar button.icon:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+
     /* ブロックの検索 */
     #searchBox {
       width: 140px !important;
@@ -160,6 +195,12 @@
 
     <span class="sep"></span>
 
+    <!-- 元に戻す・やり直す -->
+    <button id="undoButton" class="sub icon" title="元に戻す（Ctrl + Z）" disabled>↶</button>
+    <button id="redoButton" class="sub icon" title="やり直す（Ctrl + Y）" disabled>↷</button>
+
+    <span class="sep"></span>
+
     <!-- ブロックを名前で探す -->
     <input id="searchBox" type="search" placeholder="🔍 ブロックを検索"
            title="ブロックの名前の一部を入れると、当てはまるブロックが出てきます（Esc で閉じる）">
@@ -184,7 +225,7 @@
   <div id="blocklyDiv"></div>
 
   <div id="resultPanel">
-    <div id="status">ブロックを組んで「Java を作る」を押してください（Shift + ドラッグで囲んで Delete でまとめて消す／Ctrl + D で複製）</div>
+    <div id="status">ブロックを組んで「Java を作る」を押してください（Shift + ドラッグで囲んで Delete でまとめて消す／Ctrl + D で複製／Ctrl + Z・Ctrl + Y で戻す・やり直す）</div>
     <div id="messages"></div>
     <div id="javaHeader">
       <span>できた Java</span>
@@ -835,6 +876,39 @@
       e.preventDefault();
       e.stopPropagation();
       duplicateBlocks();
+    }, true);
+
+    // ------------------------------------------------------------
+    // 元に戻す（Ctrl + Z）・やり直す（Ctrl + Y）
+    //   上のバーの ↶ ↷ ボタンでも同じことができる。
+    //   戻せるもの・やり直せるものがないときは、ボタンが薄くなる。
+    // ------------------------------------------------------------
+    function undoRedo(redo) {
+      clearBoxSelection();             // 消えたブロックを選んだままにしないため
+      workspace.undo(redo);            // false：元に戻す　true：やり直す
+      updateUndoButtons();
+    }
+
+    function updateUndoButtons() {
+      document.getElementById('undoButton').disabled = workspace.getUndoStack().length === 0;
+      document.getElementById('redoButton').disabled = workspace.getRedoStack().length === 0;
+    }
+
+    document.getElementById('undoButton').addEventListener('click', () => undoRedo(false));
+    document.getElementById('redoButton').addEventListener('click', () => undoRedo(true));
+    workspace.addChangeListener(() => updateUndoButtons());
+
+    document.addEventListener('keydown', (e) => {
+      if (!e.ctrlKey) return;
+      const key = e.key.toLowerCase();
+      const isUndo = key === 'z' && !e.shiftKey;
+      const isRedo = key === 'y' || (key === 'z' && e.shiftKey);
+      if (!isUndo && !isRedo) return;
+      const tag = (document.activeElement && document.activeElement.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;   // 入力欄では、文字の「元に戻す」をそのまま使う
+      e.preventDefault();
+      e.stopPropagation();   // Blockly にもともとある Ctrl+Z / Ctrl+Y と二重に動かないようにする
+      undoRedo(isRedo);
     }, true);
 
     // 上の帯に結果を表示する
