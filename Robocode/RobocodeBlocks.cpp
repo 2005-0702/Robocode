@@ -3,11 +3,13 @@
 
 #define NOMINMAX
 #include <windows.h>
+#include <memory>
 #include <string>
 #include <wrl.h>
 #include "WebView2.h"
 #include "RobocodeBlocks.h"   // ブロックの仕組み（ROBOCODE_BLOCKS で書いたブロックは自動で登録される）
 #include "RobotBuilder.h"     // Java の保存と javac でのコンパイル
+#include "WorkFile.h"         // 作品（組んだブロック）の保存と読み込み
 #include <nlohmann/json.hpp>  // Blockly とやり取りする JSON を読み書きする
 
 using Microsoft::WRL::Callback;
@@ -17,6 +19,11 @@ using json = nlohmann::json;
 static ComPtr<ICoreWebView2Controller> g_controller;  // WebView2 の「入れ物」（大きさや表示を管理）
 static ComPtr<ICoreWebView2> g_webview;               // WebView2 本体（ページの表示や読み込み）
 static HWND g_hWnd = nullptr;                          // アプリのウィンドウ（ダイアログを出すときに使う）
+
+// Blockly から届いたメッセージを、あとでウィンドウ側で処理するための合図
+//   WebView2 のイベントの中でダイアログ（保存・開く画面など）を出すと、例外になることがあるので、
+//   いったんウィンドウに預けて、イベントが終わってから処理する
+static const UINT WM_APP_BLOCKLY_MESSAGE = WM_APP + 1;
 
 // ------------------------------------------------------------
 // web フォルダを探す
@@ -84,9 +91,19 @@ static json MessagesToJson(const std::vector<rb::Message>& list) {
 // Blockly から届いたメッセージを処理して、返事の JSON を返す（返事がないときは ""）
 //
 //   「Java を作る」ボタン
-//     届く形：{ "kind": "convert", "name": "MyRobot", "workspace": { ...ブロックのデータ... } }
+//     届く形：{ "kind": "convert", "name": "MyRobot", "package": "student", "workspace": {...} }
 //     返す形：{ "kind": "java", "ok": true, "java": "...", "errors": [...], "warnings": [...],
 //               "build": { "ok": true, "message": "...", "detail": "...", "javaPath": "..." } }
+//
+//   「保存」「別名で保存」ボタン
+//     届く形：{ "kind": "save", "path": "（上書きするときだけ）", "name": "MyRobot",
+//               "package": "student", "workspace": {...} }
+//     返す形：{ "kind": "saved", "ok": true, "canceled": false, "path": "...", "error": "" }
+//
+//   「開く」ボタン
+//     届く形：{ "kind": "open" }
+//     返す形：{ "kind": "opened", "ok": true, "canceled": false, "path": "...", "error": "",
+//               "work": { "robotName": "...", "package": "...", "workspace": {...} } }
 //
 //   「Robocode の場所」ボタン
 //     届く形：{ "kind": "chooseFolder" }
@@ -102,10 +119,21 @@ static std::string HandleMessageFromBlockly(const std::string& text) {
     // 「Java を作る」ボタン
     if (kind == "convert") {
         const std::string name = msg.value("name", "");
+        const std::string packageName = msg.value("package", "student");
         const std::string workspace = msg.contains("workspace") ? msg["workspace"].dump() : "{}";
 
+        // 0. 名前のチェック（だめなら Java を作らずに理由を返す）
+        std::string nameError = CheckPackageName(packageName);
+        if (nameError.empty()) nameError = CheckRobotName(name);
+
         // 1. ブロックを Java にする
-        rb::JavaResult result = rb::ConvertToJava(workspace, name);
+        rb::JavaResult result = rb::ConvertToJava(workspace, name, packageName);
+        if (!nameError.empty()) {
+            rb::Message m;
+            m.text = nameError;
+            result.errors.insert(result.errors.begin(), m);
+            result.ok = false;
+        }
 
         reply["kind"] = "java";
         reply["ok"] = result.ok;
@@ -123,13 +151,53 @@ static std::string HandleMessageFromBlockly(const std::string& text) {
                 build["detail"] = "";
                 build["javaPath"] = "";
             } else {
-                BuildResult b = BuildRobot(folder, name, result.java);
+                BuildResult b = BuildRobot(folder, packageName, name, result.java);
                 build["ok"] = b.ok;
                 build["message"] = b.message;
                 build["detail"] = b.detail;
                 build["javaPath"] = b.javaPath;
             }
             reply["build"] = build;
+        }
+    }
+
+    // 「保存」「別名で保存」ボタン
+    else if (kind == "save") {
+        json work;
+        work["format"] = "robocode-blocks";
+        work["version"] = 1;
+        work["robotName"] = msg.value("name", "");
+        work["package"] = msg.value("package", "student");
+        work["workspace"] = msg.contains("workspace") ? msg["workspace"] : json::object();
+
+        const std::string suggested = msg.value("name", "");
+        WorkFileResult r = SaveWorkFile(g_hWnd, msg.value("path", ""),
+                                        suggested.empty() ? "MyRobot" : suggested,
+                                        work.dump(2, ' ', false, json::error_handler_t::replace));
+        reply["kind"] = "saved";
+        reply["ok"] = r.ok;
+        reply["canceled"] = r.canceled;
+        reply["path"] = r.path;
+        reply["error"] = r.error;
+    }
+
+    // 「開く」ボタン
+    else if (kind == "open") {
+        WorkFileResult r = OpenWorkFile(g_hWnd);
+        reply["kind"] = "opened";
+        reply["ok"] = r.ok;
+        reply["canceled"] = r.canceled;
+        reply["path"] = r.path;
+        reply["error"] = r.error;
+
+        if (r.ok) {
+            json work = json::parse(r.content, nullptr, false);
+            if (work.is_discarded() || !work.is_object() || work.value("format", "") != "robocode-blocks") {
+                reply["ok"] = false;
+                reply["error"] = "このファイルは作品のファイルではないか、こわれています";
+            } else {
+                reply["work"] = work;
+            }
         }
     }
 
@@ -201,17 +269,18 @@ static void InitWebView(HWND hWnd) {
                                         return S_OK;
                                     }).Get(), &navToken);
 
-                            // Blockly からメッセージが届いたら処理して、返事を送り返す
+                            // Blockly からメッセージが届いたら、ウィンドウに預ける（処理は WndProc で行う）
                             EventRegistrationToken msgToken;
                             g_webview->add_WebMessageReceived(
                                 Callback<ICoreWebView2WebMessageReceivedEventHandler>(
-                                    [](ICoreWebView2* sender, ICoreWebView2WebMessageReceivedEventArgs* args) -> HRESULT {
+                                    [](ICoreWebView2*, ICoreWebView2WebMessageReceivedEventArgs* args) -> HRESULT {
                                         LPWSTR raw = nullptr;
                                         if (SUCCEEDED(args->get_WebMessageAsJson(&raw)) && raw != nullptr) {
-                                            std::string reply = HandleMessageFromBlockly(WideToUtf8(raw));
+                                            std::string* text = new std::string(WideToUtf8(raw));
                                             CoTaskMemFree(raw);
-                                            if (!reply.empty()) {
-                                                sender->PostWebMessageAsJson(Utf8ToWide(reply).c_str());
+                                            if (!PostMessageW(g_hWnd, WM_APP_BLOCKLY_MESSAGE, 0,
+                                                              reinterpret_cast<LPARAM>(text))) {
+                                                delete text;
                                             }
                                         }
                                         return S_OK;
@@ -235,6 +304,24 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
     case WM_SIZE:
         ResizeWebView(hWnd);
         return 0;
+
+    // Blockly から届いたメッセージを処理して、返事を送り返す
+    case WM_APP_BLOCKLY_MESSAGE: {
+        std::unique_ptr<std::string> text(reinterpret_cast<std::string*>(lParam));
+        std::string reply;
+        try {
+            reply = HandleMessageFromBlockly(*text);
+        } catch (const std::exception& ex) {
+            // 予想していない問題が起きても、アプリを止めずに画面に知らせる
+            json error = {{"kind", "error"},
+                          {"message", std::string("アプリの中で問題が起きました：") + ex.what()}};
+            reply = error.dump(-1, ' ', false, json::error_handler_t::replace);
+        }
+        if (!reply.empty() && g_webview) {
+            g_webview->PostWebMessageAsJson(Utf8ToWide(reply).c_str());
+        }
+        return 0;
+    }
     case WM_DESTROY:
         PostQuitMessage(0);
         return 0;

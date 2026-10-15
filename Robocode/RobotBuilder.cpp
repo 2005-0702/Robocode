@@ -11,9 +11,6 @@
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "ole32.lib")
 
-// Java の package 名（RobocodeBlocksCore.cpp の kJavaPackage と同じにする）
-static const wchar_t* const kPackageFolder = L"student";
-
 // ---------------------------------------------------------------------
 //  文字コードの変換
 // ---------------------------------------------------------------------
@@ -194,35 +191,68 @@ static bool RunCommand(std::wstring commandLine, std::string& output, DWORD& exi
     return true;
 }
 
-// Java のクラス名に使える名前か（英字で始まり、英数字と _ だけ）
-static bool IsValidRobotName(const std::string& name) {
-    if (name.empty() || name.size() > 60) return false;
-    if (!((name[0] >= 'A' && name[0] <= 'Z') || (name[0] >= 'a' && name[0] <= 'z'))) return false;
+// ---------------------------------------------------------------------
+//  名前のチェック
+//    Robocode では、パッケージ名は16文字まで、ロボットの名前は32文字まで
+// ---------------------------------------------------------------------
+static bool IsLower(char c) { return c >= 'a' && c <= 'z'; }
+static bool IsUpper(char c) { return c >= 'A' && c <= 'Z'; }
+static bool IsDigit(char c) { return c >= '0' && c <= '9'; }
+
+std::string CheckRobotName(const std::string& name) {
+    if (name.empty()) return "ロボットの名前が入っていません";
+    if (name.size() > 32) return "ロボットの名前は32文字までにしてください";
+    if (!IsLower(name[0]) && !IsUpper(name[0])) return "ロボットの名前は英字で始めてください";
     for (char c : name) {
-        bool ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
-        if (!ok) return false;
+        if (!IsLower(c) && !IsUpper(c) && !IsDigit(c) && c != '_') {
+            return "ロボットの名前には、英字・数字・_ だけを使ってください";
+        }
     }
-    return true;
+    return "";
+}
+
+std::string CheckPackageName(const std::string& name) {
+    if (name.empty()) return "パッケージ名が入っていません";
+    if (name.size() > 16) return "パッケージ名は16文字までにしてください";
+    bool startOfPart = true;  // . の直後（区切りの最初の文字）かどうか
+    for (char c : name) {
+        if (c == '.') {
+            if (startOfPart) return "パッケージ名の . の前後には文字を入れてください";
+            startOfPart = true;
+            continue;
+        }
+        if (startOfPart && !IsLower(c)) return "パッケージ名は小文字の英字で始めてください（. のあとも同じ）";
+        if (!IsLower(c) && !IsDigit(c) && c != '_') {
+            return "パッケージ名には、小文字の英字・数字・_ と、区切りの . だけを使ってください";
+        }
+        startOfPart = false;
+    }
+    if (startOfPart) return "パッケージ名の最後に . は付けられません";
+    return "";
 }
 
 // ---------------------------------------------------------------------
 //  保存してコンパイルする
 // ---------------------------------------------------------------------
 BuildResult BuildRobot(const std::wstring& robocodeFolder,
+                       const std::string& packageName,
                        const std::string& robotName,
                        const std::string& javaCode) {
     BuildResult r;
 
-    if (!IsValidRobotName(robotName)) {
-        r.message = "ロボットの名前は、英字で始めて、英字・数字・_ だけで書いてください";
-        return r;
-    }
+    r.message = CheckPackageName(packageName);
+    if (r.message.empty()) r.message = CheckRobotName(robotName);
+    if (!r.message.empty()) return r;
 
-    // 1. robots\student\ロボット名.java に保存する
+    // 1. robots\パッケージ名\ロボット名.java に保存する
+    //    パッケージ名の . はフォルダの区切りになる（例：team.red → robots\team\red）
+    std::wstring packagePath = ToWide(packageName, CP_UTF8);
+    for (auto& c : packagePath) {
+        if (c == L'.') c = L'\\';
+    }
     const std::wstring robotsDir = robocodeFolder + L"\\robots";
-    const std::wstring packageDir = robotsDir + L"\\" + kPackageFolder;
-    CreateDirectoryW(robotsDir.c_str(), nullptr);
-    CreateDirectoryW(packageDir.c_str(), nullptr);
+    const std::wstring packageDir = robotsDir + L"\\" + packagePath;
+    SHCreateDirectoryExW(nullptr, packageDir.c_str(), nullptr);  // 途中のフォルダもまとめて作る
 
     const std::wstring javaFile = packageDir + L"\\" + ToWide(robotName, CP_UTF8) + L".java";
     {
@@ -246,9 +276,11 @@ BuildResult BuildRobot(const std::wstring& robocodeFolder,
     }
 
     // 3. javac でコンパイルする
-    //   javac -encoding UTF-8 -cp "<Robocode>\libs\robocode.jar" -d "<Robocode>\robots" "<.java>"
+    //   javac -encoding UTF-8 -source 1.8 -target 1.8 -Xlint:-options -cp "<Robocode>\libs\robocode.jar" -d "<Robocode>\robots" "<.java>"
+    //   -source 1.8 -target 1.8：Java 8 でも動く .class を作る（JDK 8 でも JDK 21 でも使える書き方）
+    //   -Xlint:-options      ：JDK 21 で出る「8 は廃止予定」という警告を出さない
     const std::wstring command =
-        L"\"" + javac + L"\" -encoding UTF-8 -source 1.8 -target 1.8 -Xlint:-options"   // ← --release 8 をこれに変える
+        L"\"" + javac + L"\" -encoding UTF-8 -source 1.8 -target 1.8 -Xlint:-options"
         L" -cp \"" + robocodeFolder + L"\\libs\\robocode.jar\""
         L" -d \"" + robotsDir + L"\""
         L" \"" + javaFile + L"\"";
@@ -267,7 +299,7 @@ BuildResult BuildRobot(const std::wstring& robocodeFolder,
     }
 
     r.ok = true;
-    r.message = "Robocode で使えるようになりました（" + robotName + "）";
+    r.message = "Robocode で使えるようになりました（" + packageName + "." + robotName + "）";
     r.detail = output;  // 警告が出ていればここに入る
     return r;
 }
