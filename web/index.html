@@ -33,7 +33,24 @@
     #toolbar input {
       font-size: 14px;
       padding: 4px 8px;
-      width: 180px;
+      width: 150px;
+    }
+    #toolbar input#packageName { width: 110px; }
+    #toolbar input.invalid { outline: 2px solid #e74c3c; }
+    #toolbar .sep {
+      width: 1px;
+      height: 28px;
+      background: #4b6278;
+      margin: 0 4px;
+    }
+    #toolbar .dot { font-weight: bold; }
+    #fileName {
+      font-size: 12px;
+      color: #c8d3de;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     #toolbar button {
       font-size: 14px;
@@ -117,9 +134,25 @@
 </head>
 <body>
   <div id="toolbar">
+    <!-- 作品のファイル -->
+    <button id="newButton" class="sub" title="新しく作る">新規</button>
+    <button id="openButton" class="sub" title="保存した作品を開く">開く</button>
+    <button id="saveButton" class="sub" title="作品を保存（Ctrl+S）">保存</button>
+    <button id="saveAsButton" class="sub" title="別の名前で保存">別名で保存</button>
+    <span id="fileName">（まだ保存していません）</span>
+
+    <span class="sep"></span>
+
+    <!-- パッケージ名とロボットの名前 → Robocode では「パッケージ名.ロボットの名前」で表示される -->
+    <label for="packageName">パッケージ</label>
+    <input id="packageName" value="student" maxlength="16"
+           title="小文字の英字で始まり、小文字・数字・_ だけ（. で区切れる）。16文字まで">
+    <span class="dot">.</span>
     <label for="robotName">ロボットの名前</label>
-    <input id="robotName" value="MyRobot" maxlength="40">
+    <input id="robotName" value="MyRobot" maxlength="32"
+           title="英字で始まり、英字・数字・_ だけ。32文字まで">
     <button id="convertButton">Java を作る</button>
+
     <span style="flex: 1"></span>
     <button id="folderButton" class="sub">Robocode の場所</button>
   </div>
@@ -181,7 +214,7 @@
       zoom: {
         controls: true,                   // 右下に ＋ − ボタンを出す
         wheel: true,                      // マウスホイールで拡大・縮小
-        startScale: 1.1,                  // 最初の大きさ（1 が標準）
+        startScale: 1.0,                  // 最初の大きさ（1 が標準）
         maxScale: 2,                      // 一番大きくしたとき
         minScale: 0.5,                    // 一番小さくしたとき
         scaleSpeed: 1.2                   // 1回の拡大・縮小の幅
@@ -200,23 +233,165 @@
     //   送る形：{ kind: "convert", name: "MyRobot", workspace: {...} }
     // ------------------------------------------------------------
     document.getElementById('convertButton').addEventListener('click', () => {
-      const name = document.getElementById('robotName').value.trim();
-
-      // Java のクラス名に使えるか確かめる（英字で始まり、英数字と _ だけ）
-      if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(name)) {
-        showStatus('error', 'ロボットの名前は、英字で始めて、英字・数字・_ だけで書いてください');
-        return;
-      }
+      if (!checkNames()) return;
 
       showStatus('', 'Java を作っています…');
       document.getElementById('convertButton').disabled = true;
 
       window.chrome.webview.postMessage({
         kind: 'convert',
-        name: name,
+        name: robotName(),
+        package: packageName(),
         workspace: Blockly.serialization.workspaces.save(workspace)
       });
     });
+
+    // ------------------------------------------------------------
+    // パッケージ名とロボットの名前
+    //   Robocode では「パッケージ名.ロボットの名前」（例：student.MyRobot）で表示される
+    // ------------------------------------------------------------
+    const robotName = () => document.getElementById('robotName').value.trim();
+    const packageName = () => document.getElementById('packageName').value.trim();
+
+    // パッケージ名：小文字の英字で始まり、小文字・数字・_ だけ。. で区切れる。16文字まで
+    const PACKAGE_RULE = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/;
+    // ロボットの名前：英字で始まり、英字・数字・_ だけ。32文字まで
+    const ROBOT_RULE = /^[A-Za-z][A-Za-z0-9_]*$/;
+
+    // 名前が正しいか確かめる（だめなら理由を表示して false）
+    function checkNames() {
+      const pkg = packageName();
+      const name = robotName();
+      let error = '';
+      if (!PACKAGE_RULE.test(pkg) || pkg.length > 16) {
+        error = 'パッケージ名は、小文字の英字で始めて、小文字・数字・_ だけで書いてください（. で区切れます。16文字まで）';
+      } else if (!ROBOT_RULE.test(name) || name.length > 32) {
+        error = 'ロボットの名前は、英字で始めて、英字・数字・_ だけで書いてください（32文字まで）';
+      }
+      if (error) showStatus('error', error);
+      return !error;
+    }
+
+    // 入力中に、使えない名前なら枠を赤くする
+    function markInvalid() {
+      const pkg = document.getElementById('packageName');
+      const name = document.getElementById('robotName');
+      pkg.classList.toggle('invalid', !PACKAGE_RULE.test(pkg.value.trim()));
+      name.classList.toggle('invalid', !ROBOT_RULE.test(name.value.trim()));
+    }
+    ['packageName', 'robotName'].forEach(id => {
+      document.getElementById(id).addEventListener('input', () => {
+        markInvalid();
+        changed = true;
+        updateFileName();
+      });
+    });
+
+    // ------------------------------------------------------------
+    // 作品の保存・読み込み
+    // ------------------------------------------------------------
+    let currentPath = '';    // 今開いている作品ファイルの場所（まだ保存していなければ ''）
+    let changed = false;     // 保存してから変更があったか
+    let loading = false;     // 作品を読み込んでいる最中か（そのあいだの変更は数えない）
+
+    // ブロックが変わったら「変更あり」にする
+    workspace.addChangeListener((e) => {
+      if (loading || e.isUiEvent) return;
+      if (!changed) {
+        changed = true;
+        updateFileName();
+      }
+    });
+
+    // 上のバーにファイル名を表示する（変更があれば ＊ を付ける）
+    function updateFileName() {
+      const label = document.getElementById('fileName');
+      const file = currentPath ? currentPath.split(/[\\/]/).pop() : '（まだ保存していません）';
+      label.textContent = (changed ? '＊ ' : '') + file;
+      label.title = currentPath;
+    }
+
+    // 「変更なし」にする
+    //   Blockly は少しあとで変更のお知らせを出すので、そのお知らせが終わってからもう一度「変更なし」にする
+    function markUnchanged() {
+      changed = false;
+      updateFileName();
+      setTimeout(() => {
+        changed = false;
+        loading = false;
+        updateFileName();
+      }, 0);
+    }
+
+    // 変更を捨ててもいいか聞く（変更がなければそのまま true）
+    function confirmDiscard() {
+      return !changed || confirm('保存していない変更があります。保存せずに続けますか？');
+    }
+
+    // 保存（saveAs が true なら必ず「名前を付けて保存」の画面を出す）
+    function saveWork(saveAs) {
+      window.chrome.webview.postMessage({
+        kind: 'save',
+        path: saveAs ? '' : currentPath,
+        name: robotName(),
+        package: packageName(),
+        workspace: Blockly.serialization.workspaces.save(workspace)
+      });
+    }
+
+    document.getElementById('saveButton').addEventListener('click', () => saveWork(false));
+    document.getElementById('saveAsButton').addEventListener('click', () => saveWork(true));
+
+    document.getElementById('openButton').addEventListener('click', () => {
+      if (!confirmDiscard()) return;
+      window.chrome.webview.postMessage({ kind: 'open' });
+    });
+
+    document.getElementById('newButton').addEventListener('click', () => {
+      if (!confirmDiscard()) return;
+      loading = true;
+      workspace.clear();
+      workspace.clearUndo();
+      document.getElementById('robotName').value = 'MyRobot';
+      currentPath = '';
+      markInvalid();
+      markUnchanged();
+      document.getElementById('javaCode').textContent = '';
+      document.getElementById('messages').innerHTML = '';
+      showStatus('', '新しい作品です');
+    });
+
+    // Ctrl+S で保存
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        saveWork(false);
+      }
+    });
+
+    // 開いた作品をブロックの画面に読み込む
+    function loadWork(work, path) {
+      try {
+        loading = true;
+        Blockly.serialization.workspaces.load(work.workspace || {}, workspace);
+      } catch (err) {
+        // 今のアプリにないブロックが入っていると、ここに来る
+        loading = false;
+        workspace.clear();
+        showStatus('error', 'この作品は開けませんでした。今のアプリにないブロックが使われている可能性があります');
+        addMessage('detail', '', String(err && err.message ? err.message : err));
+        return;
+      }
+      workspace.clearUndo();
+      if (work.robotName) document.getElementById('robotName').value = work.robotName;
+      if (work.package) document.getElementById('packageName').value = work.package;
+      currentPath = path;
+      markInvalid();
+      markUnchanged();
+      document.getElementById('javaCode').textContent = '';
+      document.getElementById('messages').innerHTML = '';
+      showStatus('ok', '作品を開きました');
+    }
 
     // 「Robocode の場所」ボタン：Robocode のフォルダを選び直す
     document.getElementById('folderButton').addEventListener('click', () => {
@@ -268,6 +443,33 @@
         }
         if (build && build.detail) {
           addMessage('detail', '', build.detail);
+        }
+      }
+
+      // アプリの中で予想していない問題が起きた
+      if (msg.kind === 'error') {
+        document.getElementById('convertButton').disabled = false;
+        showStatus('error', msg.message);
+      }
+
+      // 保存した結果
+      if (msg.kind === 'saved') {
+        if (msg.ok) {
+          currentPath = msg.path;
+          changed = false;
+          updateFileName();
+          showStatus('ok', '保存しました');
+        } else if (!msg.canceled) {
+          showStatus('error', msg.error);
+        }
+      }
+
+      // 開いた結果
+      if (msg.kind === 'opened') {
+        if (msg.ok) {
+          loadWork(msg.work, msg.path);
+        } else if (!msg.canceled) {
+          showStatus('error', msg.error);
         }
       }
 
