@@ -45,6 +45,9 @@
       cursor: pointer;
     }
     #toolbar button:hover { background: #2ecc71; }
+    #toolbar button.sub { background: #5d6d7e; }
+    #toolbar button.sub:hover { background: #7f8c8d; }
+    #toolbar button:disabled { background: #95a5a6; cursor: wait; }
 
     /* 左：ブロックを組む場所 */
     #blocklyDiv {
@@ -81,6 +84,14 @@
     }
     .message.error   { color: #b02a1f; }
     .message.warning { color: #8a6d00; }
+    .message.info    { color: #1e7e34; }
+    .message.detail  {
+      color: #333;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      background: #fff;
+    }
     .message.clickable { cursor: pointer; }
     .message.clickable:hover { background: #eef3fb; }
     #javaHeader {
@@ -109,6 +120,8 @@
     <label for="robotName">ロボットの名前</label>
     <input id="robotName" value="MyRobot" maxlength="40">
     <button id="convertButton">Java を作る</button>
+    <span style="flex: 1"></span>
+    <button id="folderButton" class="sub">Robocode の場所</button>
   </div>
 
   <div id="blocklyDiv"></div>
@@ -124,11 +137,62 @@
   </div>
 
   <script>
-    // ブロックは C++（ROBOCODE_BLOCKS で書いたもの）から届くので、ここでは書かない。
+    // ------------------------------------------------------------
+    // 見た目のテーマ（色や文字の大きさ）
+    //   ブロック1つ1つの色は C++ の kCategories で決まる
+    // ------------------------------------------------------------
+    const robocodeTheme = Blockly.Theme.defineTheme('robocode', {
+      base: Blockly.Themes.Classic,
+      componentStyles: {
+        workspaceBackgroundColour: '#f4f7fb',  // 作業エリアの背景
+        toolboxBackgroundColour: '#2c3e50',    // ツールボックスの背景（上のバーと同じ色）
+        toolboxForegroundColour: '#ffffff',    // ツールボックスの文字
+        flyoutBackgroundColour: '#3d566e',     // ブロック一覧が出てくる部分の背景
+        flyoutForegroundColour: '#ffffff',     // ブロック一覧の文字
+        flyoutOpacity: 0.95,                   // ブロック一覧の透け具合（1 で透けない）
+        scrollbarColour: '#9aa8b6',            // スクロールバーの色
+        insertionMarkerColour: '#000000',      // ブロックをくっつける場所の目印の色
+        insertionMarkerOpacity: 0.3
+      },
+      fontStyle: {
+        family: 'Meiryo, sans-serif',
+        size: 12
+      }
+    });
+
+    // ------------------------------------------------------------
+    // Blockly を表示する
+    //   ブロックは C++（ROBOCODE_BLOCKS で書いたもの）から届くので、ここでは書かない。
+    // ------------------------------------------------------------
     const workspace = Blockly.inject('blocklyDiv', {
       toolbox: { kind: 'categoryToolbox', contents: [] },
-      trashcan: true,
-      zoom: { controls: true, wheel: true }
+      theme: robocodeTheme,
+      trashcan: true,                     // 右下にゴミ箱を出す
+
+      // 方眼を表示して、ブロックを方眼にそろえる
+      grid: {
+        spacing: 25,                      // 方眼の間隔
+        length: 3,                        // 方眼の点の大きさ
+        colour: '#cfd8e3',                // 方眼の色
+        snap: true                        // ブロックを方眼にぴったりそろえる
+      },
+
+      // 拡大・縮小
+      zoom: {
+        controls: true,                   // 右下に ＋ − ボタンを出す
+        wheel: true,                      // マウスホイールで拡大・縮小
+        startScale: 1.1,                  // 最初の大きさ（1 が標準）
+        maxScale: 2,                      // 一番大きくしたとき
+        minScale: 0.5,                    // 一番小さくしたとき
+        scaleSpeed: 1.2                   // 1回の拡大・縮小の幅
+      },
+
+      // スクロール
+      move: {
+        scrollbars: true,                 // スクロールバーを出す
+        drag: true,                       // 何もないところをドラッグして動かせる
+        wheel: false                      // ホイールは拡大・縮小に使うので、スクロールには使わない
+      }
     });
 
     // ------------------------------------------------------------
@@ -144,11 +208,19 @@
         return;
       }
 
+      showStatus('', 'Java を作っています…');
+      document.getElementById('convertButton').disabled = true;
+
       window.chrome.webview.postMessage({
         kind: 'convert',
         name: name,
         workspace: Blockly.serialization.workspaces.save(workspace)
       });
+    });
+
+    // 「Robocode の場所」ボタン：Robocode のフォルダを選び直す
+    document.getElementById('folderButton').addEventListener('click', () => {
+      window.chrome.webview.postMessage({ kind: 'chooseFolder' });
     });
 
     // できた Java をコピーする
@@ -175,16 +247,34 @@
         }
       }
 
-      // Java に変換した結果
+      // Java に変換・保存・コンパイルした結果
       if (msg.kind === 'java') {
+        document.getElementById('convertButton').disabled = false;
         document.getElementById('javaCode').textContent = msg.java;
         showMessages(msg.errors, msg.warnings);
-        if (msg.ok) {
-          showStatus('ok', msg.warnings.length > 0
-            ? 'Java ができました（注意が ' + msg.warnings.length + ' 件あります）'
-            : 'Java ができました');
-        } else {
+
+        if (!msg.ok) {
           showStatus('error', 'エラーが ' + msg.errors.length + ' 件あります。直してからもう一度押してください');
+          return;
+        }
+
+        const build = msg.build;
+        if (build && build.ok) {
+          showStatus('ok', build.message + (msg.warnings.length > 0
+            ? '（注意が ' + msg.warnings.length + ' 件あります）' : ''));
+          addMessage('info', '✔', '保存した場所：' + build.javaPath);
+        } else if (build) {
+          showStatus('error', build.message);
+        }
+        if (build && build.detail) {
+          addMessage('detail', '', build.detail);
+        }
+      }
+
+      // Robocode のフォルダを選び直した結果
+      if (msg.kind === 'folder') {
+        if (msg.path) {
+          showStatus('ok', 'Robocode のフォルダ：' + msg.path);
         }
       }
     });
@@ -216,6 +306,14 @@
       };
       errors.forEach(m => add('error', '✖', m));
       warnings.forEach(m => add('warning', '⚠', m));
+    }
+
+    // 一覧に1行足す（保存した場所や javac のエラーなど）
+    function addMessage(type, mark, text) {
+      const div = document.createElement('div');
+      div.className = 'message ' + type;
+      div.textContent = (mark ? mark + ' ' : '') + text;
+      document.getElementById('messages').appendChild(div);
     }
   </script>
 </body>

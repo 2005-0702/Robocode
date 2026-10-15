@@ -7,6 +7,7 @@
 #include <wrl.h>
 #include "WebView2.h"
 #include "RobocodeBlocks.h"   // ブロックの仕組み（ROBOCODE_BLOCKS で書いたブロックは自動で登録される）
+#include "RobotBuilder.h"     // Java の保存と javac でのコンパイル
 #include <nlohmann/json.hpp>  // Blockly とやり取りする JSON を読み書きする
 
 using Microsoft::WRL::Callback;
@@ -15,6 +16,7 @@ using json = nlohmann::json;
 
 static ComPtr<ICoreWebView2Controller> g_controller;  // WebView2 の「入れ物」（大きさや表示を管理）
 static ComPtr<ICoreWebView2> g_webview;               // WebView2 本体（ページの表示や読み込み）
+static HWND g_hWnd = nullptr;                          // アプリのウィンドウ（ダイアログを出すときに使う）
 
 // ------------------------------------------------------------
 // web フォルダを探す
@@ -80,35 +82,68 @@ static json MessagesToJson(const std::vector<rb::Message>& list) {
 
 // ------------------------------------------------------------
 // Blockly から届いたメッセージを処理して、返事の JSON を返す（返事がないときは ""）
-//   届く形：{ "kind": "convert", "name": "MyRobot", "workspace": { ...ブロックのデータ... } }
-//   返す形：{ "kind": "java", "ok": true, "java": "...", "errors": [...], "warnings": [...] }
+//
+//   「Java を作る」ボタン
+//     届く形：{ "kind": "convert", "name": "MyRobot", "workspace": { ...ブロックのデータ... } }
+//     返す形：{ "kind": "java", "ok": true, "java": "...", "errors": [...], "warnings": [...],
+//               "build": { "ok": true, "message": "...", "detail": "...", "javaPath": "..." } }
+//
+//   「Robocode の場所」ボタン
+//     届く形：{ "kind": "chooseFolder" }
+//     返す形：{ "kind": "folder", "path": "C:\\robocode" }（キャンセルなら ""）
 // ------------------------------------------------------------
 static std::string HandleMessageFromBlockly(const std::string& text) {
     json msg = json::parse(text, nullptr, false);
     if (msg.is_discarded() || !msg.is_object()) return "";
 
     const std::string kind = msg.value("kind", "");
+    json reply;
 
     // 「Java を作る」ボタン
     if (kind == "convert") {
         const std::string name = msg.value("name", "");
         const std::string workspace = msg.contains("workspace") ? msg["workspace"].dump() : "{}";
 
+        // 1. ブロックを Java にする
         rb::JavaResult result = rb::ConvertToJava(workspace, name);
 
-        // TODO（#4 の担当）：result.ok のとき、ここで Java を保存して javac でコンパイルする
-        //   例）SaveJavaFile(name, result.java);  CompileRobot(name, ...);
-
-        json reply;
         reply["kind"] = "java";
         reply["ok"] = result.ok;
         reply["java"] = result.java;
         reply["errors"] = MessagesToJson(result.errors);
         reply["warnings"] = MessagesToJson(result.warnings);
-        return reply.dump(-1, ' ', false, json::error_handler_t::replace);
+
+        // 2. エラーがなければ、保存して javac でコンパイルする
+        if (result.ok) {
+            json build;
+            std::wstring folder = GetRobocodeFolder(g_hWnd);
+            if (folder.empty()) {
+                build["ok"] = false;
+                build["message"] = "Robocode のフォルダが選ばれなかったので、保存していません";
+                build["detail"] = "";
+                build["javaPath"] = "";
+            } else {
+                BuildResult b = BuildRobot(folder, name, result.java);
+                build["ok"] = b.ok;
+                build["message"] = b.message;
+                build["detail"] = b.detail;
+                build["javaPath"] = b.javaPath;
+            }
+            reply["build"] = build;
+        }
     }
 
-    return "";
+    // 「Robocode の場所」ボタン
+    else if (kind == "chooseFolder") {
+        reply["kind"] = "folder";
+        reply["path"] = WideToUtf8(GetRobocodeFolder(g_hWnd, true));
+    }
+
+    else {
+        return "";
+    }
+
+    return reply.dump(-1, ' ', false, json::error_handler_t::replace);
 }
 
 // ウィンドウの大きさに WebView2 を合わせる
@@ -226,6 +261,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ LPWSTR,
     if (!hWnd) {
         return 1;
     }
+    g_hWnd = hWnd;
     ShowWindow(hWnd, nCmdShow);
     UpdateWindow(hWnd);
 

@@ -30,4 +30,8 @@ ROBOCODE_BLOCKS(GetGameInfomation)
         .output("Number")                              // 数字を出す値ブロックにする
         .tooltip("自分のロボットのX座標（上下の位置）を調べます")
         .java("getX()");                               // Robocode の「Y座標を調べる」関数（; は付けない）
+    ////エネルギー残量を取得
+    //Block("robot_energy")
+    //    .category("ゲーム情報")
+    //    .text("");
 }

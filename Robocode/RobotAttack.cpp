@@ -13,7 +13,7 @@ ROBOCODE_BLOCKS(RobotAttack)
             b.warning("パワーが大きいと、エネルギーがすぐ減ります");  // 注意を出す
         }
             })
-        .java("fire({POWER})");                           // 作られるJava（{POWER} に入力した数字が入る）
+        .java("fire({POWER});");                           // 作られるJava（{POWER} に入力した数字が入る）
 
 
 }
