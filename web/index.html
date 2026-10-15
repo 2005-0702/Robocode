@@ -184,7 +184,7 @@
   <div id="blocklyDiv"></div>
 
   <div id="resultPanel">
-    <div id="status">ブロックを組んで「Java を作る」を押してください（Shift を押しながらドラッグで囲むと、まとめて消せます）</div>
+    <div id="status">ブロックを組んで「Java を作る」を押してください（Shift + ドラッグで囲んで Delete でまとめて消す／Ctrl + D で複製）</div>
     <div id="messages"></div>
     <div id="javaHeader">
       <span>できた Java</span>
@@ -757,6 +757,84 @@
       e.preventDefault();
       e.stopPropagation();
       deleteBoxSelection();
+    }, true);
+
+    // ------------------------------------------------------------
+    // Ctrl + D で複製
+    //   ・ブロックを1つクリックして選んでいるとき：そのブロック（中に入っているブロックも）を複製
+    //   ・Shift で囲んで選んでいるとき：選んだブロックをまとめて複製
+    //   複製したブロックは、もとの少し右下に置かれる
+    // ------------------------------------------------------------
+    // 同じブロックを続けて複製したときに、同じ場所に重ならないよう少しずつずらすための記録
+    let dupSourceKey = '';   // 前に複製したもとのブロック
+    let dupCount = 0;        // 同じブロックを続けて何回複製したか
+
+    function duplicateBlocks() {
+      const useBox = boxSelected.size > 0;
+      let roots;
+      if (useBox) {
+        // 親も選ばれているブロックは、親を複製すれば一緒に入るので、親のほうだけ複製する
+        roots = Array.from(boxSelected).filter(b =>
+          !b.isDeadOrDying() && !(b.getParent() && boxSelected.has(b.getParent())));
+      } else {
+        const selected = Blockly.common.getSelected();
+        roots = (selected && selected.workspace === workspace && !selected.isShadow()) ? [selected] : [];
+      }
+      if (roots.length === 0) {
+        showStatus('', '複製したいブロックをクリックして選んでから Ctrl + D を押してください');
+        return;
+      }
+
+      // 同じブロックを続けて複製したら、そのたびに 30 ずつ右下にずらす
+      const key = roots.map(b => b.id).join(',');
+      dupCount = (key === dupSourceKey) ? dupCount + 1 : 1;
+      dupSourceKey = key;
+      const offset = 30 * dupCount;
+
+      const created = [];
+      Blockly.Events.setGroup(true);   // 「元に戻す（Ctrl+Z）」1回で全部戻せるようにする
+      try {
+        roots.forEach(block => {
+          const state = Blockly.serialization.blocks.save(block, {
+            addCoordinates: true,
+            addNextBlocks: useBox,   // 囲んだときは、下につながっているブロックも（選んだものだけ）複製する
+            saveIds: false           // 新しいブロックとして作る
+          });
+          if (useBox) {
+            // 下につながっているブロックは、選んだものが続いているところまでにする
+            let s = state, b = block;
+            while (s.next && s.next.block) {
+              const next = b.getNextBlock();
+              if (!next || !boxSelected.has(next)) { delete s.next; break; }
+              s = s.next.block;
+              b = next;
+            }
+          }
+          state.x = (state.x || 0) + offset;
+          state.y = (state.y || 0) + offset;
+          created.push(Blockly.serialization.blocks.append(state, workspace));
+        });
+      } finally {
+        Blockly.Events.setGroup(false);
+      }
+
+      // 複製したブロックを選んだ状態にする（そのままドラッグしたり、Delete で消したりできる）
+      clearBoxSelection();
+      if (created.length === 1) {
+        created[0].select();
+      } else {
+        created.forEach(b => { boxSelected.add(b); b.addSelect(); });
+      }
+      showStatus('', created.length + ' 個複製しました（Ctrl+Z で元に戻せます）');
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (!e.ctrlKey || (e.key !== 'd' && e.key !== 'D')) return;
+      const tag = (document.activeElement && document.activeElement.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;   // 入力欄で文字を打っているときは何もしない
+      e.preventDefault();
+      e.stopPropagation();
+      duplicateBlocks();
     }, true);
 
     // 上の帯に結果を表示する
