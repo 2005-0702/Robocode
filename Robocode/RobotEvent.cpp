@@ -42,6 +42,19 @@
 //%1 ・・
 ROBOCODE_BLOCKS(RobotEvent)
 {
+    //通常時の処理
+    Block("robot_event_run")
+        .category("イベント")
+        .text("スタートしたら、ずっと %1")
+        .statements("DO")
+        .event()
+        .java("public void run() {\n"
+            "    while (true) {\n"
+            "        {DO}\n"
+            "    }\n"
+            "}");
+
+
     //敵を発見したとき
     Block("robot_event_enemyDetected")
         .category("イベント")
@@ -60,7 +73,7 @@ ROBOCODE_BLOCKS(RobotEvent)
         .tooltip("壁に衝突したときに実行します")
         .statements("D0")
         .event()
-        .java("onHitWall(HitWallEvevt event) {\n"
+        .java("public void onHitWall(HitWallEvevt event) {\n"
             "{D0}\n"
             "}");
 
@@ -82,7 +95,7 @@ ROBOCODE_BLOCKS(RobotEvent)
         .tooltip("自分の弾が敵に命中しなかったときに実行します")
         .statements("D0")
         .event()
-        .java("onBulletMissed(BulletMissedEvent event) {\n"
+        .java("public void onBulletMissed(BulletMissedEvent event) {\n"
             " {D0}\n"
             "}");
 
@@ -93,7 +106,7 @@ ROBOCODE_BLOCKS(RobotEvent)
         .tooltip("自分の弾が敵の弾と衝突したときに実行します")
         .statements("D0")
         .event()
-        .java("onBulletHitBullet(BulletHitBulletEvent event) {\n"
+        .java("public void onBulletHitBullet(BulletHitBulletEvent event) {\n"
             " {D0}\n"
             "}");*/
 
@@ -141,8 +154,7 @@ ROBOCODE_BLOCKS(RobotEvent)
             " {D0}\n"
             "}");
 
-    //// 勝利時
-    Block("robot_event_win")
+
         .category("イベント")
         .text("勝利したとき %1")
         .tooltip("バトルで勝利したときに実行します")
@@ -151,16 +163,18 @@ ROBOCODE_BLOCKS(RobotEvent)
         .java("public void onWin(WinEvent event) {\n"
             " {D0}\n"
             "}");
-    //通常時の処理
-    Block("robot_event_run")
+   
+   
+    // 勝利時
+    Block("robot_event_over")
         .category("イベント")
-        .text("スタートしたら、ずっと %1")
-        .statements("DO")
+        .text("敗北したとき %1")
+        .tooltip("バトルで勝利したときに実行します")
+        .statements("D0")
         .event()
-        .java("public void run() {\n"
-            "    while (true) {\n"
-            "        {DO}\n"
-            "    }\n"
+        .java("public void onWin(WinEvent event) {\n"
+            " {D0}\n"
             "}");
-
+   
+   
 }
