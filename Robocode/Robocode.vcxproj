@@ -138,6 +138,7 @@
     <ClInclude Include="RobocodeBlocks.h" />
     <ClInclude Include="RobotBuilder.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="WorkFile.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Block.cpp" />
@@ -151,6 +152,7 @@
     <ClCompile Include="RobotControl.cpp" />
     <ClCompile Include="RobotEvent.cpp" />
     <ClCompile Include="RobotMove.cpp" />
+    <ClCompile Include="WorkFile.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Robocode.rc" />

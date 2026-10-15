@@ -236,7 +236,8 @@ struct JavaResult {
 std::string GetBlocklySetupJson();
 
 // Blockly のブロック（Blockly.serialization.workspaces.save の JSON）を Java にする
-JavaResult ConvertToJava(const std::string& workspaceJson, const std::string& robotName);
+JavaResult ConvertToJava(const std::string& workspaceJson, const std::string& robotName,
+    const std::string& packageName = "student");
 
 // =====================================================================
 //  ROBOCODE_BLOCKS のしくみ（読まなくてOK）

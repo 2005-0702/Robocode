@@ -764,8 +764,7 @@ std::string GetBlocklySetupJson() {
     setup["problems"] = r.problems;
     return setup.dump(-1, ' ', false, json::error_handler_t::replace);
 }
-
-JavaResult ConvertToJava(const std::string& workspaceJson, const std::string& robotName) {
+JavaResult ConvertToJava(const std::string& workspaceJson, const std::string& robotName,const std::string& packageName) {
     ensureLoaded();
     Converter conv;
     for (const auto& p : registry().problems) conv.error(nullptr, nullptr, p);
@@ -828,7 +827,7 @@ JavaResult ConvertToJava(const std::string& workspaceJson, const std::string& ro
 
         // Java のファイル全体
         std::ostringstream java;
-        java << "package " << kJavaPackage << ";\n"
+        java << "package " << (trim(packageName).empty() ? kJavaPackage : trim(packageName)) << ";\n"
              << "\n"
              << "import robocode.*;\n"
              << "\n"

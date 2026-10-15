@@ -3,7 +3,7 @@
 //  RobotBuilder.h  ―  できた Java を Robocode で使えるようにする
 //
 //    1. Robocode のフォルダを決める（最初の1回だけ選んでもらい、覚えておく）
-//    2. robots\student\ロボット名.java に保存する
+//    2. robots\パッケージ名\ロボット名.java に保存する
 //    3. javac でコンパイルして、ロボット名.class を作る
 // =====================================================================
 #ifndef NOMINMAX
@@ -27,5 +27,10 @@ std::wstring GetRobocodeFolder(HWND owner, bool forceChoose = false);
 
 // Java を保存して、javac でコンパイルする
 BuildResult BuildRobot(const std::wstring& robocodeFolder,
+                       const std::string& packageName,
                        const std::string& robotName,
                        const std::string& javaCode);
+
+// 名前のチェック（だめなら理由を返す。よければ空の文字列）
+std::string CheckRobotName(const std::string& name);
+std::string CheckPackageName(const std::string& name);

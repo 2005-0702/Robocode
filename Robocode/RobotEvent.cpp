@@ -154,8 +154,7 @@ ROBOCODE_BLOCKS(RobotEvent)
             " {D0}\n"
             "}");
 
-    // 勝利時
-    Block("robot_event_win")
+
         .category("イベント")
         .text("勝利したとき %1")
         .tooltip("バトルで勝利したときに実行します")
