@@ -1,5 +1,5 @@
 // =====================================================================
-//  RobotEvent.cpp  ―  「イベント」のブロック
+//  Robote.cpp  ―  「イベント」のブロック
 // 
 // 2026/10/14 片山　ロボットイベントの作成
 // 2026/10/15 片山　public void の追加
@@ -62,7 +62,7 @@ ROBOCODE_BLOCKS(RobotEvent)
         .tooltip("敵ロボットを発見したときに実行します")
         .statements("D0")
         .event()
-        .java("public void onScannedRobot(ScannedRobotEvent event) {\n"
+        .java("public void onScannedRobot(ScannedRobotEvent e) {\n"
             " {D0}\n"
             "}");
 
@@ -73,7 +73,7 @@ ROBOCODE_BLOCKS(RobotEvent)
         .tooltip("壁に衝突したときに実行します")
         .statements("D0")
         .event()
-        .java("public void onHitWall(HitWallEvevt event) {\n"
+        .java("public void onHitWall(HitWallEvevt e) {\n"
             "{D0}\n"
             "}");
 
@@ -84,7 +84,7 @@ ROBOCODE_BLOCKS(RobotEvent)
         .tooltip("自分の弾が敵ロボットに命中したときに実行します")
         .statements("D0")
         .event()
-        .java("public void onBulletHit(BulletHitEvent event) {\n"
+        .java("public void onBulletHit(BulletHitEvent e) {\n"
             " {D0}\n"
             "}");
 
@@ -95,7 +95,7 @@ ROBOCODE_BLOCKS(RobotEvent)
         .tooltip("自分の弾が敵に命中しなかったときに実行します")
         .statements("D0")
         .event()
-        .java("public void onBulletMissed(BulletMissedEvent event) {\n"
+        .java("public void onBulletMissed(BulletMissedEvent e) {\n"
             " {D0}\n"
             "}");
 
@@ -117,7 +117,7 @@ ROBOCODE_BLOCKS(RobotEvent)
         .tooltip("自分のロボットが破壊されたときに実行します")
         .statements("D0")
         .event()
-        .java("public void onDeath(DeathEvent event) {\n"
+        .java("public void onDeath(DeathEvent e) {\n"
             " {D0}\n"
             "}");
 
@@ -128,7 +128,7 @@ ROBOCODE_BLOCKS(RobotEvent)
         .tooltip("敵の弾が自分のロボットに命中したときに実行します")
         .statements("D0")
         .event()
-        .java("public void onHitByBullet(HitByBulletEvent event) {\n"
+        .java("public void onHitByBullet(HitByBulletEvent e) {\n"
             " {D0}\n"
             "}");
 
@@ -139,7 +139,7 @@ ROBOCODE_BLOCKS(RobotEvent)
         .tooltip("ほかのロボットと衝突したときに実行します")
         .statements("D0")
         .event()
-        .java("public void onHitRobot(HitRobotEvent event) {\n"
+        .java("public void onHitRobot(HitRobotEvent e) {\n"
             " {D0}\n"
             "}");
 
@@ -150,7 +150,7 @@ ROBOCODE_BLOCKS(RobotEvent)
         .tooltip("ほかのロボットが破壊されたときに実行します")
         .statements("D0")
         .event()
-        .java("public void onRobotDeath(RobotDeathEvent event) {\n"
+        .java("public void onRobotDeath(RobotDeathEvent e) {\n"
             " {D0}\n"
             "}");
 
@@ -163,7 +163,7 @@ ROBOCODE_BLOCKS(RobotEvent)
         .tooltip("バトルで勝利したときに実行します")
         .statements("D0")
         .event()
-        .java("public void onWin(WinEvent event) {\n"
+        .java("public void onWin(WinEvent e) {\n"
             " {D0}\n"
             "}");
    
