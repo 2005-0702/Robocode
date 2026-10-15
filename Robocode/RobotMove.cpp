@@ -12,7 +12,7 @@ ROBOCODE_BLOCKS(RobotMove)
         .number("DIST", 100, 0)        //↑%1に表示される数字の入力欄
         .tooltip("ロボットを前に進めます（単位はピクセル）")    //マウスを乗せたときに出る説明
         .warnIfZero("DIST", "距離が0なので、ロボットは動きません")   // 0のときに出す注意
-        .java("ahead({DIST})"); 
+        .java("ahead({DIST});"); 
     
 
     // 後ろに〇〇下がる
