@@ -36,5 +36,5 @@ ROBOCODE_BLOCKS(GetGameInfomation)
         .text("エネルギー残量")
         .output("Number")
         .tooltip("自分のエネルギー残量が分かります")
-        .java("getEnergy");
+        .java("getEnergy()");
 }

@@ -24,9 +24,6 @@
     <ClInclude Include="Resource.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Block.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="RobocodeBlocks.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -39,9 +36,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="RobocodeBlocks.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Block.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp">
@@ -72,6 +66,9 @@
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="WorkFile.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="RobotSample.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
