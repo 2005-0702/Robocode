@@ -155,15 +155,6 @@ ROBOCODE_BLOCKS(RobotEvent)
             "}");
 
 
-        .category("イベント")
-        .text("勝利したとき %1")
-        .tooltip("バトルで勝利したときに実行します")
-        .statements("D0")
-        .event()
-        .java("public void onWin(WinEvent event) {\n"
-            " {D0}\n"
-            "}");
-   
    
     // 勝利時
     Block("robot_event_over")
