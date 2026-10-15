@@ -154,6 +154,7 @@
     <button id="convertButton">Java を作る</button>
 
     <span style="flex: 1"></span>
+    <button id="launchButton" title="Robocode を起動する（このアプリから開いた Robocode なら開き直す）">Robocode を開く</button>
     <button id="folderButton" class="sub">Robocode の場所</button>
   </div>
 
@@ -214,7 +215,7 @@
       zoom: {
         controls: true,                   // 右下に ＋ − ボタンを出す
         wheel: true,                      // マウスホイールで拡大・縮小
-        startScale: 1.0,                  // 最初の大きさ（1 が標準）
+        startScale: 1.1,                  // 最初の大きさ（1 が標準）
         maxScale: 2,                      // 一番大きくしたとき
         minScale: 0.5,                    // 一番小さくしたとき
         scaleSpeed: 1.2                   // 1回の拡大・縮小の幅
@@ -296,11 +297,12 @@
 
     // ブロックが変わったら「変更あり」にする
     workspace.addChangeListener((e) => {
-      if (loading || e.isUiEvent) return;
-      if (!changed) {
+      if (e.isUiEvent) return;
+      if (!loading && !changed) {
         changed = true;
         updateFileName();
       }
+      autosave();
     });
 
     // 上のバーにファイル名を表示する（変更があれば ＊ を付ける）
@@ -309,6 +311,75 @@
       const file = currentPath ? currentPath.split(/[\\/]/).pop() : '（まだ保存していません）';
       label.textContent = (changed ? '＊ ' : '') + file;
       label.title = currentPath;
+      autosave();
+    }
+
+    // ------------------------------------------------------------
+    // 自動保存：アプリを閉じても、次に開いたときに前回の続きから始められるようにする
+    //   ブロックや名前が変わるたびに、少し待ってからパソコンの中（WebView2 の保存場所）に記録する。
+    //   「保存」ボタンで作る作品ファイルとは別のもの。
+    // ------------------------------------------------------------
+    const AUTOSAVE_KEY = 'robocodeBlocks.autosave';
+    let autosaveTimer = null;
+    let restored = false;   // 前回の続きを読み込んだか（ページを開いて最初の1回だけ読み込む）
+
+    function autosave() {
+      if (!restored) return;   // 読み込む前に保存すると、前回の続きを消してしまうので待つ
+      clearTimeout(autosaveTimer);
+      autosaveTimer = setTimeout(() => {
+        try {
+          localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({
+            workspace: Blockly.serialization.workspaces.save(workspace),
+            name: robotName(),
+            package: packageName(),
+            path: currentPath,
+            changed: changed
+          }));
+        } catch (err) {
+          // 保存できなくても、アプリはそのまま使えるようにする
+        }
+      }, 300);
+    }
+
+    // 前回の続きを読み込む（ブロックの定義が C++ から届いたあとに呼ぶ）
+    function restoreAutosave() {
+      if (restored) return;
+      restored = true;
+
+      let data = null;
+      try {
+        data = JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || 'null');
+      } catch (err) {
+        data = null;
+      }
+      if (!data || !data.workspace) return;
+
+      try {
+        loading = true;
+        Blockly.serialization.workspaces.load(data.workspace, workspace);
+        workspace.clearUndo();
+      } catch (err) {
+        // 今のアプリにないブロックが入っていると、ここに来る
+        loading = false;
+        workspace.clear();
+        showStatus('error', '前回の続きを開けませんでした（今のアプリにないブロックが入っていた可能性があります）');
+        return;
+      }
+
+      if (data.name) document.getElementById('robotName').value = data.name;
+      if (data.package) document.getElementById('packageName').value = data.package;
+      currentPath = data.path || '';
+      const wasChanged = !!data.changed;
+      changed = wasChanged;
+      markInvalid();
+      updateFileName();
+      // Blockly の変更のお知らせが終わってから、「変更あり／なし」を前回のとおりに戻す
+      setTimeout(() => {
+        changed = wasChanged;
+        loading = false;
+        updateFileName();
+      }, 0);
+      showStatus('ok', '前回の続きから始めます');
     }
 
     // 「変更なし」にする
@@ -398,6 +469,12 @@
       window.chrome.webview.postMessage({ kind: 'chooseFolder' });
     });
 
+    // 「Robocode を開く」ボタン：Robocode を起動する（開いていたら開き直す）
+    document.getElementById('launchButton').addEventListener('click', () => {
+      showStatus('', 'Robocode を起動しています…');
+      window.chrome.webview.postMessage({ kind: 'launchRobocode' });
+    });
+
     // できた Java をコピーする
     document.getElementById('copyButton').addEventListener('click', () => {
       const text = document.getElementById('javaCode').textContent;
@@ -414,6 +491,9 @@
       if (msg.kind === 'blocks') {
         Blockly.defineBlocksWithJsonArray(msg.setup.blocks);
         workspace.updateToolbox(msg.setup.toolbox);
+
+        // 前回の続きを読み込む（ブロックの定義がそろってからでないと読み込めない）
+        restoreAutosave();
 
         // ブロックの書き方にミスがあったら知らせる（作っている人向け）
         const problems = msg.setup.problems || [];
@@ -438,6 +518,7 @@
           showStatus('ok', build.message + (msg.warnings.length > 0
             ? '（注意が ' + msg.warnings.length + ' 件あります）' : ''));
           addMessage('info', '✔', '保存した場所：' + build.javaPath);
+          addMessage('info', '💡', 'Robocode を開いていたら、「Robocode を開く」で開き直すと一覧に出ます');
         } else if (build) {
           showStatus('error', build.message);
         }
@@ -471,6 +552,11 @@
         } else if (!msg.canceled) {
           showStatus('error', msg.error);
         }
+      }
+
+      // Robocode を起動した結果
+      if (msg.kind === 'launched') {
+        showStatus(msg.ok ? 'ok' : 'error', msg.message);
       }
 
       // Robocode のフォルダを選び直した結果

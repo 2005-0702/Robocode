@@ -34,3 +34,8 @@ BuildResult BuildRobot(const std::wstring& robocodeFolder,
 // 名前のチェック（だめなら理由を返す。よければ空の文字列）
 std::string CheckRobotName(const std::string& name);
 std::string CheckPackageName(const std::string& name);
+
+// Robocode を起動する
+//   このアプリから起動した Robocode がまだ開いていたら、いったん閉じてから起動し直す。
+//   message には画面に出す説明が入る。起動できたら true。
+bool LaunchRobocode(const std::wstring& robocodeFolder, std::string& message);

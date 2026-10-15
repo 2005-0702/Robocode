@@ -303,3 +303,64 @@ BuildResult BuildRobot(const std::wstring& robocodeFolder,
     r.detail = output;  // 警告が出ていればここに入る
     return r;
 }
+
+// ---------------------------------------------------------------------
+//  Robocode を起動する（開き直す）
+// ---------------------------------------------------------------------
+//  このアプリから起動した Robocode は「ジョブ」という入れ物に入れておく。
+//  開き直すときは、その入れ物ごと閉じる（robocode.bat から起動した Java もまとめて閉じられる）。
+//  自分で別に起動した Robocode は閉じられないので、そのときは手で閉じてもらう。
+static HANDLE g_robocodeJob = nullptr;
+
+bool LaunchRobocode(const std::wstring& robocodeFolder, std::string& message) {
+    const std::wstring bat = robocodeFolder + L"\\robocode.bat";
+    if (!FileExists(bat)) {
+        message = "robocode.bat が見つかりません（" + ToUtf8(robocodeFolder) + "）";
+        return false;
+    }
+
+    // 前に起動した Robocode がまだ開いていたら閉じる
+    bool restarted = false;
+    if (g_robocodeJob != nullptr) {
+        JOBOBJECT_BASIC_ACCOUNTING_INFORMATION info = {};
+        if (QueryInformationJobObject(g_robocodeJob, JobObjectBasicAccountingInformation,
+                                      &info, sizeof(info), nullptr) &&
+            info.ActiveProcesses > 0) {
+            restarted = true;
+        }
+        TerminateJobObject(g_robocodeJob, 0);
+        CloseHandle(g_robocodeJob);
+        g_robocodeJob = nullptr;
+        if (restarted) Sleep(500);  // 閉じ終わるのを少し待つ
+    }
+
+    // robocode.bat を、Robocode のフォルダで実行する
+    //   黒い画面（コンソール）は最小化して出す。起動できないときはそこにエラーが出る。
+    std::wstring command = L"cmd.exe /c \"\"" + bat + L"\"\"";
+    STARTUPINFOW si = {};
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESHOWWINDOW;
+    si.wShowWindow = SW_SHOWMINNOACTIVE;
+
+    PROCESS_INFORMATION pi = {};
+    if (!CreateProcessW(nullptr, &command[0], nullptr, nullptr, FALSE,
+                        CREATE_NEW_CONSOLE | CREATE_SUSPENDED, nullptr,
+                        robocodeFolder.c_str(), &si, &pi)) {
+        message = "Robocode を起動できませんでした";
+        return false;
+    }
+
+    HANDLE job = CreateJobObjectW(nullptr, nullptr);
+    if (job != nullptr && !AssignProcessToJobObject(job, pi.hProcess)) {
+        CloseHandle(job);
+        job = nullptr;  // 入れ物に入れられなくても、起動はそのまま続ける
+    }
+    ResumeThread(pi.hThread);
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
+    g_robocodeJob = job;
+
+    message = restarted ? "Robocode を開き直しました" : "Robocode を起動しました";
+    message += "（画面が出るまで少し時間がかかります）";
+    return true;
+}
