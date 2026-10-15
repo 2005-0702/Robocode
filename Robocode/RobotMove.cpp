@@ -63,12 +63,12 @@ ROBOCODE_BLOCKS(RobotMove)
         .category("動き")
         .text("ロボット旋回時レーダーが固定される")
         .tooltip("ロボット旋回時レーダーが固定されます")
-        .java("setAdjustRadarForRobotTurn(ture);");
+        .java("setAdjustRadarForRobotTurn(true);");
 
     //レーダー固定砲塔旋回時
     Block("Gun_rader_keep_direction")
         .category("動き")
         .text("砲塔旋回時レーダーが固定される")
         .tooltip("砲塔旋回時レーダーが固定されます")
-        .java("setAdjustRadarForGunTurn(ture);");
+        .java("setAdjustRadarForGunTurn(true);");
 }
