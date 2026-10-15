@@ -248,7 +248,7 @@ BuildResult BuildRobot(const std::wstring& robocodeFolder,
     // 3. javac でコンパイルする
     //   javac -encoding UTF-8 -cp "<Robocode>\libs\robocode.jar" -d "<Robocode>\robots" "<.java>"
     const std::wstring command =
-        L"\"" + javac + L"\" -encoding UTF-8 --release 8"     // ← --release 8 を足す
+        L"\"" + javac + L"\" -encoding UTF-8 -source 1.8 -target 1.8 -Xlint:-options"   // ← --release 8 をこれに変える
         L" -cp \"" + robocodeFolder + L"\\libs\\robocode.jar\""
         L" -d \"" + robotsDir + L"\""
         L" \"" + javaFile + L"\"";
