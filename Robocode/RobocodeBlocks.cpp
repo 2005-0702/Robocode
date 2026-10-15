@@ -108,6 +108,10 @@ static json MessagesToJson(const std::vector<rb::Message>& list) {
 //   「Robocode の場所」ボタン
 //     届く形：{ "kind": "chooseFolder" }
 //     返す形：{ "kind": "folder", "path": "C:\\robocode" }（キャンセルなら ""）
+//
+//   「Robocode を開く」ボタン
+//     届く形：{ "kind": "launchRobocode" }
+//     返す形：{ "kind": "launched", "ok": true, "message": "Robocode を起動しました…" }
 // ------------------------------------------------------------
 static std::string HandleMessageFromBlockly(const std::string& text) {
     json msg = json::parse(text, nullptr, false);
@@ -205,6 +209,20 @@ static std::string HandleMessageFromBlockly(const std::string& text) {
     else if (kind == "chooseFolder") {
         reply["kind"] = "folder";
         reply["path"] = WideToUtf8(GetRobocodeFolder(g_hWnd, true));
+    }
+
+    // 「Robocode を開く」ボタン（開いていたら開き直す）
+    else if (kind == "launchRobocode") {
+        reply["kind"] = "launched";
+        std::wstring folder = GetRobocodeFolder(g_hWnd);
+        if (folder.empty()) {
+            reply["ok"] = false;
+            reply["message"] = "Robocode のフォルダが選ばれなかったので、起動していません";
+        } else {
+            std::string message;
+            reply["ok"] = LaunchRobocode(folder, message);
+            reply["message"] = message;
+        }
     }
 
     else {
