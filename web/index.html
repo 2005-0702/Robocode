@@ -4,9 +4,10 @@
   <meta charset="utf-8">
   <title>Robocode Blocks</title>
 
-  <!-- いまは確認用にネットから Blockly を読み込む（あとで web フォルダに同梱する） -->
-  <script src="https://unpkg.com/blockly/blockly.min.js"></script>
-  <script src="https://unpkg.com/blockly/msg/ja.js"></script>
+  <!-- いまは確認用にネットから Blockly を読み込む（あとで web フォルダに同梱する）
+       バージョンを固定しておく（固定しないと、Blockly が更新されたときに急に動かなくなることがある） -->
+  <script src="https://unpkg.com/blockly@11.2.1/blockly.min.js"></script>
+  <script src="https://unpkg.com/blockly@11.2.1/msg/ja.js"></script>
 
   <style>
     html, body {
@@ -130,6 +131,22 @@
       font-size: 13px;
       white-space: pre;
     }
+
+    /* ブロックの検索 */
+    #searchBox {
+      width: 140px !important;
+      border-radius: 12px;
+      border: none;
+    }
+
+    /* 囲んで選ぶときの四角 */
+    #selectBand {
+      position: fixed;
+      border: 2px dashed #2980b9;
+      background: rgba(41, 128, 185, 0.12);
+      pointer-events: none;
+      z-index: 50;
+    }
   </style>
 </head>
 <body>
@@ -140,6 +157,12 @@
     <button id="saveButton" class="sub" title="作品を保存（Ctrl+S）">保存</button>
     <button id="saveAsButton" class="sub" title="別の名前で保存">別名で保存</button>
     <span id="fileName">（まだ保存していません）</span>
+
+    <span class="sep"></span>
+
+    <!-- ブロックを名前で探す -->
+    <input id="searchBox" type="search" placeholder="🔍 ブロックを検索"
+           title="ブロックの名前の一部を入れると、当てはまるブロックが出てきます（Esc で閉じる）">
 
     <span class="sep"></span>
 
@@ -161,7 +184,7 @@
   <div id="blocklyDiv"></div>
 
   <div id="resultPanel">
-    <div id="status">ブロックを組んで「Java を作る」を押してください</div>
+    <div id="status">ブロックを組んで「Java を作る」を押してください（Shift を押しながらドラッグで囲むと、まとめて消せます）</div>
     <div id="messages"></div>
     <div id="javaHeader">
       <span>できた Java</span>
@@ -492,6 +515,9 @@
         Blockly.defineBlocksWithJsonArray(msg.setup.blocks);
         workspace.updateToolbox(msg.setup.toolbox);
 
+        // 検索できるように、ブロックの一覧を覚えておく
+        buildSearchIndex(msg.setup);
+
         // 前回の続きを読み込む（ブロックの定義がそろってからでないと読み込めない）
         restoreAutosave();
 
@@ -566,6 +592,172 @@
         }
       }
     });
+
+    // ------------------------------------------------------------
+    // ブロックの検索
+    //   上のバーの検索欄に文字を入れると、名前・説明・カテゴリに当てはまるブロックを一覧で出す。
+    //   出てきたブロックは、ツールボックスのときと同じようにドラッグして使える。
+    // ------------------------------------------------------------
+    let searchIndex = [];   // { item: ツールボックスのブロック, words: 探すときに使う文字 }
+
+    function buildSearchIndex(setup) {
+      const texts = {};
+      (setup.blocks || []).forEach(b => {
+        // 「前に %1 進む」→「前に 進む」のように、%1 などを消して探しやすくする
+        const message = String(b.message0 || '').replace(/%\d+/g, ' ');
+        texts[b.type] = message + ' ' + (b.tooltip || '') + ' ' + b.type;
+      });
+      searchIndex = [];
+      const walk = (contents, categoryName) => {
+        (contents || []).forEach(item => {
+          if (item.kind === 'category') {
+            walk(item.contents, categoryName + ' ' + item.name);
+          } else if (item.kind === 'block') {
+            searchIndex.push({ item: item, words: ((texts[item.type] || '') + ' ' + categoryName).toLowerCase() });
+          }
+        });
+      };
+      walk(setup.toolbox && setup.toolbox.contents, '');
+    }
+
+    function searchBlocks(query) {
+      const flyout = workspace.getToolbox() && workspace.getToolbox().getFlyout();
+      if (!flyout) return;
+      const words = query.trim().toLowerCase().split(/\s+/).filter(w => w);
+      if (words.length === 0) {
+        flyout.hide();
+        return;
+      }
+      // スペースで区切ったら、全部の言葉に当てはまるものだけ出す
+      const hits = searchIndex.filter(entry => words.every(w => entry.words.includes(w)));
+      workspace.getToolbox().clearSelection();
+      if (hits.length === 0) {
+        flyout.show([{ kind: 'label', text: '「' + query.trim() + '」のブロックは見つかりませんでした' }]);
+      } else {
+        flyout.show(hits.map(entry => entry.item));
+      }
+    }
+
+    const searchBox = document.getElementById('searchBox');
+    let searchTimer = null;
+    searchBox.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => searchBlocks(searchBox.value), 150);
+    });
+    searchBox.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        searchBox.value = '';
+        searchBlocks('');
+      }
+    });
+
+    // ------------------------------------------------------------
+    // 囲んで消す
+    //   Shift を押しながら、作業エリアの何もないところからドラッグすると四角が出る。
+    //   四角の中にすっぽり入ったブロックが選ばれるので、Delete キー（または Backspace）でまとめて消せる。
+    // ------------------------------------------------------------
+    const boxSelected = new Set();   // 囲んで選んだブロック
+    let band = null;                 // ドラッグ中の四角 { x, y, div }
+
+    function clearBoxSelection() {
+      boxSelected.forEach(block => {
+        if (!block.isDeadOrDying()) block.removeSelect();
+      });
+      boxSelected.clear();
+    }
+
+    function updateBand(e) {
+      const left = Math.min(band.x, e.clientX);
+      const top = Math.min(band.y, e.clientY);
+      band.div.style.left = left + 'px';
+      band.div.style.top = top + 'px';
+      band.div.style.width = Math.abs(e.clientX - band.x) + 'px';
+      band.div.style.height = Math.abs(e.clientY - band.y) + 'px';
+    }
+
+    const blocklyArea = document.getElementById('blocklyDiv');
+    blocklyArea.addEventListener('pointerdown', (e) => {
+      if (!e.shiftKey || e.button !== 0) {
+        if (!e.shiftKey) clearBoxSelection();
+        return;
+      }
+      // ツールボックスやブロック一覧の上では使わない
+      if (e.target.closest && e.target.closest('.blocklyToolboxDiv, .blocklyToolbox, .blocklyFlyout')) return;
+
+      // Blockly にドラッグ（ブロックの移動や画面のスクロール）をさせない
+      e.preventDefault();
+      e.stopPropagation();
+      clearBoxSelection();
+
+      const div = document.createElement('div');
+      div.id = 'selectBand';
+      document.body.appendChild(div);
+      band = { x: e.clientX, y: e.clientY, div: div };
+      updateBand(e);
+    }, true);   // true：Blockly より先に受け取る
+
+    document.addEventListener('pointermove', (e) => {
+      if (band) updateBand(e);
+    });
+
+    document.addEventListener('pointerup', (e) => {
+      if (!band) return;
+      const x1 = Math.min(band.x, e.clientX), x2 = Math.max(band.x, e.clientX);
+      const y1 = Math.min(band.y, e.clientY), y2 = Math.max(band.y, e.clientY);
+      band.div.remove();
+      band = null;
+      if (x2 - x1 < 5 && y2 - y1 < 5) return;   // ほとんど動かしていなければ何もしない
+
+      // 画面の座標を、作業エリアの座標に変える
+      const topLeft = Blockly.utils.svgMath.screenToWsCoordinates(workspace, new Blockly.utils.Coordinate(x1, y1));
+      const bottomRight = Blockly.utils.svgMath.screenToWsCoordinates(workspace, new Blockly.utils.Coordinate(x2, y2));
+
+      workspace.getAllBlocks(false).forEach(block => {
+        if (block.isShadow() || !block.isDeletable()) return;
+        const r = block.getBoundingRectangleWithoutChildren();
+        if (r.left >= topLeft.x && r.right <= bottomRight.x && r.top >= topLeft.y && r.bottom <= bottomRight.y) {
+          boxSelected.add(block);
+          block.addSelect();
+        }
+      });
+
+      if (boxSelected.size > 0) {
+        showStatus('', boxSelected.size + ' 個のブロックを選びました。Delete キーでまとめて消せます');
+      }
+    });
+
+    // 選んだブロックをまとめて消す
+    function deleteBoxSelection() {
+      // 中や下につながっているブロックから先に消す（親から消すと、子も一緒に消えて二重に消してしまうため）
+      const depth = (block) => {
+        let d = 0;
+        for (let p = block.getParent(); p; p = p.getParent()) d++;
+        return d;
+      };
+      const blocks = Array.from(boxSelected).sort((a, b) => depth(b) - depth(a));
+      const count = blocks.length;
+      boxSelected.clear();
+
+      Blockly.Events.setGroup(true);   // 「元に戻す（Ctrl+Z）」1回で全部戻せるようにする
+      try {
+        blocks.forEach(block => {
+          if (!block.isDeadOrDying()) block.dispose(true, true);   // true：選ばなかった下のブロックは上につめる
+        });
+      } finally {
+        Blockly.Events.setGroup(false);
+      }
+      showStatus('', count + ' 個のブロックを消しました（Ctrl+Z で元に戻せます）');
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (boxSelected.size === 0) return;
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      const tag = (document.activeElement && document.activeElement.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;   // 入力欄で文字を消しているときは何もしない
+      e.preventDefault();
+      e.stopPropagation();
+      deleteBoxSelection();
+    }, true);
 
     // 上の帯に結果を表示する
     function showStatus(type, text) {
