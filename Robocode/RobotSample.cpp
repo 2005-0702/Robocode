@@ -49,6 +49,7 @@ ROBOCODE_BLOCKS(RobotEvent)
     *{"ゲーム情報",180},
     *{"色",270},
     *{"サンプル戦術",330}
+    *{"サンプル戦術2",330}
     */
    
     //============//
@@ -84,17 +85,17 @@ ROBOCODE_BLOCKS(RobotEvent)
         );
 
 
-    // ぐるぐる走行
-    Block("robot_sample_spinRunning")
-        .category("サンプル戦術")
-        .text("ぐるぐる走行")
-        .tooltip("車体を旋回させながら前進するサンプルです")
-        .color(210)
-        .java(
-            "setTurnRight(10000);\n"
-            "setMaxVelocity(5);\n"
-            "ahead(1000);\n"
-        );
+    //// ぐるぐる走行
+    //Block("robot_sample_spinRunning")
+    //    .category("サンプル戦術")
+    //    .text("ぐるぐる走行")
+    //    .tooltip("車体を旋回させながら前進するサンプルです")
+    //    .color(210)
+    //    .java(
+    //        "setTurnRight(10000);\n"
+    //        "setMaxVelocity(5);\n"
+    //        "ahead(1000);\n"
+    //    );
 
     //// 勝利のダンス
     //Block("robot_sample_victoryDance")
