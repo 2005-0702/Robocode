@@ -22,7 +22,7 @@
     #toolbar {
       position: absolute;
       top: 0; left: 0; right: 0;
-      height: 48px;
+      height: 56px;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -30,6 +30,7 @@
       background: #2c3e50;
       color: #fff;
       box-sizing: border-box;
+      z-index: 100;           /* ツールチップがブロックの画面より上に出るように */
     }
     #toolbar input {
       font-size: 14px;
@@ -45,6 +46,11 @@
       margin: 0 4px;
     }
     #toolbar .dot { font-weight: bold; }
+    #toolbar label,
+    #toolbar button {
+      white-space: nowrap;    /* 文字が2行に折り返さないように */
+      flex-shrink: 0;
+    }
     #fileName {
       font-size: 12px;
       color: #c8d3de;
@@ -70,14 +76,14 @@
     /* 左：ブロックを組む場所 */
     #blocklyDiv {
       position: absolute;
-      top: 48px; left: 0; bottom: 0;
+      top: 56px; left: 0; bottom: 0;
       right: 400px;
     }
 
     /* 右：結果を表示する場所 */
     #resultPanel {
       position: absolute;
-      top: 48px; right: 0; bottom: 0;
+      top: 56px; right: 0; bottom: 0;
       width: 400px;
       display: flex;
       flex-direction: column;
@@ -156,15 +162,60 @@
       font-size: 15px;
     }
 
-    /* 元に戻す・やり直すボタン */
+    /* アイコンのボタン（新規・開く・保存・別名で保存・元に戻す・やり直す） */
     #toolbar button.icon {
-      font-size: 18px;
-      padding: 2px 10px;
-      line-height: 1;
+      position: relative;
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #toolbar button.icon svg {
+      width: 30px;
+      height: 30px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      pointer-events: none;
     }
     #toolbar button.icon:disabled {
       opacity: 0.4;
       cursor: default;
+      background: #5d6d7e;
+    }
+
+    /* カーソルを乗せると出る説明（data-tip に書いた文字） */
+    #toolbar [data-tip]::after {
+      content: attr(data-tip);
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 12px;
+      border-radius: 6px;
+      background: #1b2631;
+      color: #fff;
+      font-size: 15px;
+      white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.15s;
+      pointer-events: none;
+      z-index: 1000;
+    }
+    #toolbar [data-tip]:hover::after {
+      opacity: 1;
+      visibility: visible;
+      transition-delay: 0.3s;  /* 少し止めたら出る */
+    }
+    #toolbar [data-tip].tip-left::after {   /* 左はしのボタンは、説明が画面からはみ出さないように */
+      left: 0;
+      transform: none;
     }
 
     /* ブロックの検索 */
@@ -187,17 +238,17 @@
 <body>
   <div id="toolbar">
     <!-- 作品のファイル -->
-    <button id="newButton" class="sub" title="新しく作る">新規</button>
-    <button id="openButton" class="sub" title="保存した作品を開く">開く</button>
-    <button id="saveButton" class="sub" title="作品を保存（Ctrl+S）">保存</button>
-    <button id="saveAsButton" class="sub" title="別の名前で保存">別名で保存</button>
+    <button id="newButton" class="sub icon tip-left" data-tip="新しく作る" aria-label="新しく作る"><svg viewBox="0 0 24 24"><path d="M13 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9z"/><path d="M13 3v6h6"/><path d="M12 12v6M9 15h6"/></svg></button>
+    <button id="openButton" class="sub icon" data-tip="保存した作品を開く" aria-label="開く"><svg viewBox="0 0 24 24"><path d="M3 7a1 1 0 0 1 1-1h5l2 2h8a1 1 0 0 1 1 1v2"/><path d="M3 7v12a1 1 0 0 0 1 1h14l3-9H7l-3 8"/></svg></button>
+    <button id="saveButton" class="sub icon" data-tip="保存する（Ctrl + S）" aria-label="保存"><svg viewBox="0 0 24 24"><path d="M5 3h11l4 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M8 3v5h7V3"/><rect x="7" y="13" width="10" height="7"/></svg></button>
+    <button id="saveAsButton" class="sub icon" data-tip="別の名前で保存する" aria-label="別名で保存"><svg viewBox="0 0 24 24"><path d="M12 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h11l4 4v4"/><path d="M8 3v5h7V3"/><path d="M7 21v-7h6"/><path d="M19.5 13.5l2 2L16 21h-2v-2z"/></svg></button>
     <span id="fileName">（まだ保存していません）</span>
 
     <span class="sep"></span>
 
     <!-- 元に戻す・やり直す -->
-    <button id="undoButton" class="sub icon" title="元に戻す（Ctrl + Z）" disabled>↶</button>
-    <button id="redoButton" class="sub icon" title="やり直す（Ctrl + Y）" disabled>↷</button>
+    <button id="undoButton" class="sub icon" data-tip="元に戻す（Ctrl + Z）" aria-label="元に戻す" disabled><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
+    <button id="redoButton" class="sub icon" data-tip="やり直す（Ctrl + Y）" aria-label="やり直す" disabled><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
 
     <span class="sep"></span>
 
@@ -219,7 +270,6 @@
 
     <span style="flex: 1"></span>
     <button id="launchButton" title="Robocode を起動する（このアプリから開いた Robocode なら開き直す）">Robocode を開く</button>
-    <button id="folderButton" class="sub">Robocode の場所</button>
   </div>
 
   <div id="blocklyDiv"></div>
@@ -235,6 +285,22 @@
   </div>
 
   <script>
+    // ------------------------------------------------------------
+    // ブロックの説明（tooltip）が出るまでの時間
+    //   Blockly は 750 ミリ秒（0.75 秒）で決まっていて、設定では変えられない。
+    //   そこで、Blockly が「750 ミリ秒後に説明を出す」タイマーを作るときだけ、
+    //   時間を TOOLTIP_DELAY_MS に置きかえる。
+    //   （タッチ画面の長押しも 750 ミリ秒なので、いっしょに短くなる）
+    // ------------------------------------------------------------
+    const TOOLTIP_DELAY_MS = 250;   // ← ここを変える（1000 で 1 秒）
+    (() => {
+      const originalSetTimeout = window.setTimeout;
+      window.setTimeout = function (fn, delay, ...args) {
+        if (delay === 750) delay = TOOLTIP_DELAY_MS;
+        return originalSetTimeout.call(window, fn, delay, ...args);
+      };
+    })();
+
     // ------------------------------------------------------------
     // 見た目のテーマ（色や文字の大きさ）
     //   ブロック1つ1つの色は C++ の kCategories で決まる
@@ -527,11 +593,6 @@
       document.getElementById('messages').innerHTML = '';
       showStatus('ok', '作品を開きました');
     }
-
-    // 「Robocode の場所」ボタン：Robocode のフォルダを選び直す
-    document.getElementById('folderButton').addEventListener('click', () => {
-      window.chrome.webview.postMessage({ kind: 'chooseFolder' });
-    });
 
     // 「Robocode を開く」ボタン：Robocode を起動する（開いていたら開き直す）
     document.getElementById('launchButton').addEventListener('click', () => {
