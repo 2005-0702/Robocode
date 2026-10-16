@@ -133,4 +133,26 @@ ROBOCODE_BLOCKS(RobotMove)
         // ぐるぐる走行（Robot でも動く形）
         .java("turnRight(30);\n"
             "ahead(60);");
+
+    // 勝利のダンス
+    Block("robot_sample_victoryDance")
+        .category("動き2")
+        .text("勝利のダンス")
+        .tooltip("右回転と左回転を繰り返して、勝利を表現します")
+        .java(R"(
+     for (int i = 0; i < 50; i++) {
+         turnRight(30);
+         turnLeft(30);
+     }
+     )");
+
+    // 勝利の回転
+    Block("robot_sample_victorySpin")
+        .category("動き2")
+        .text("勝利の回転")
+        .tooltip("車体を大きく回転させて、勝利を表現します")
+        .java(R"(
+         turnRight(36000);
+     )");
+
 }
