@@ -12,8 +12,20 @@ ROBOCODE_BLOCKS(RobotSensor)
         getHeading() + e.getBearing() - getRadarHeading());
         turnRadarRight(radarTurn + (radarTurn < 0 ? -20 : 20));   // 少し行き過ぎるように回す
         scan();
-        })");
-        //.onlyIn("robot_event_enemyDetected");
+        })")
+        .onlyIn("robot_event_enemyDetected");
+    // 砲塔を敵にロックする
+    Block("robot_gun_lock")
+        .category("センサー")
+        .text("砲塔を敵にロックする")
+        .tooltip("見つけた敵の方へ砲塔を向け直して、ずっと敵を見続けます")
+        .java(R"({
+        double gunTurn = robocode.util.Utils.normalRelativeAngleDegrees(
+        getHeading() + e.getBearing() - getGunHeading());
+        turnGunRight(gunTurn);   // 少し行き過ぎるように回す
+        scan();
+        })")
+        .onlyIn("robot_event_enemyDetected");
     // 敵との距離
     Block("enemy_distance")
         .category("センサー")
