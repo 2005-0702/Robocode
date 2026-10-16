@@ -46,6 +46,7 @@ ROBOCODE_BLOCKS(RobotEvent)
     Block("robot_event_run")
         .category("イベント")
         .text("スタートしたら、ずっと %1")
+        .tooltip("ゲームがスタートしてからずっと呼び出されます")
         .statements("DO")
         .event()
         .java("public void run() {\n"
