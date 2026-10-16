@@ -74,9 +74,21 @@ ROBOCODE_BLOCKS(RobotControl)
         .number("COUNT", 5, 0)
         .statements("DO")
         .tooltip("指定した回数だけ、中の処理を繰り返します")
-        .java("for (int i = 0; i < {COUNT}; i++) {\n"
-            "    {DO}\n"
-            "}");
+        .javaFunction([](BlockData& b) {
+        static int counter = 0;
+        std::string i = "i" + std::to_string(counter++);   // i0, i1, i2 … と毎回ちがう名前にする
+        std::string inner = b.text("DO");
+        std::string indented;                               // 中身を4文字ずつ字下げする
+        size_t start = 0;
+        while (start <= inner.size()) {
+            size_t end = inner.find('\n', start);
+            if (end == std::string::npos) end = inner.size();
+            indented += "    " + inner.substr(start, end - start) + "\n";
+            start = end + 1;
+        }
+        return "for (int " + i + " = 0; " + i + " < " + b.text("COUNT") + "; " + i + "++) {\n" +
+            indented + "}";
+            });
 
     // 〇〇 < 〇〇（数字を比べる）
     Block("robot_compare")

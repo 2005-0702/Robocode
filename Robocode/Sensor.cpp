@@ -11,8 +11,9 @@ ROBOCODE_BLOCKS(RobotSensor)
         double radarTurn = robocode.util.Utils.normalRelativeAngleDegrees(
         getHeading() + e.getBearing() - getRadarHeading());
         turnRadarRight(radarTurn + (radarTurn < 0 ? -20 : 20));   // 少し行き過ぎるように回す
-        })")
-        .onlyIn("robot_event_enemyDetected");
+        scan();
+        })");
+        //.onlyIn("robot_event_enemyDetected");
     // 敵との距離
     Block("enemy_distance")
         .category("センサー")

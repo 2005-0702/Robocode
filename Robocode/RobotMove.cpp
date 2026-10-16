@@ -108,15 +108,20 @@ ROBOCODE_BLOCKS(RobotMove)
         .text("ぐにゃぐにゃ動く")
         .tooltip("前進、車体の回転、待機を組み合わせたサンプルです")
         .color(210)
-        .java(
-            "setAhead(40000);\n"
-            "setTurnRight(90);\n"
-            "waitFor(new TurnCompleteCondition(this));\n"
-            "setTurnLeft(180);\n"
-            "waitFor(new TurnCompleteCondition(this));\n"
-            "setTurnRight(180);\n"
-            "waitFor(new TurnCompleteCondition(this));"
-        );
+        .java(R"({
+        for (int step = 0; step < 6; step++) {    // 右に曲がりながら進む（15度 × 6回 = 90度）
+            turnRight(15);
+            ahead(25);
+        }
+        for (int step = 0; step < 12; step++) {   // 左に曲がりながら進む（15度 × 12回 = 180度）
+            turnLeft(15);
+            ahead(25);
+        }
+        for (int step = 0; step < 6; step++) {    // 右に曲がりながら進む（90度。向きが元にもどる）
+            turnRight(15);
+            ahead(25);
+        }
+        })");
 
 
     // ぐるぐる走行
@@ -125,9 +130,7 @@ ROBOCODE_BLOCKS(RobotMove)
         .text("ぐるぐる走行")
         .tooltip("車体を旋回させながら前進するサンプルです")
         .color(210)
-        .java(
-            "setTurnRight(10000);\n"
-            "setMaxVelocity(5);\n"
-            "ahead(1000);"
-        );
+        // ぐるぐる走行（Robot でも動く形）
+        .java("turnRight(30);\n"
+            "ahead(60);");
 }
