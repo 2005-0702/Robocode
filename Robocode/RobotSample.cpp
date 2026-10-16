@@ -39,30 +39,62 @@
 
 ROBOCODE_BLOCKS(RobotEvent)
 {
+    /*カテゴリー別色一覧
+    *{"イベント", 30},
+    *{"動き", 210},
+    *{"攻撃", 0},
+    *{"センサー", 160},
+    *{"制御", 120},
+    *{"計算", 230},
+    *{"ゲーム情報",180},
+    *{"色",270},
+    *{"サンプル戦術",330}
+    */
+   
+    //============//
+    // 動き
+    //============// 
     // 前進・後退しながら砲塔を回す
     Block("robot_sample_aheadAndBack")
         .category("サンプル戦術")
-        .color(110)
         .text("前進・後退しながら砲塔を回す")
         .tooltip("前進、砲塔の回転、後退を組み合わせたサンプルです")
+        .color(210)
         .java(
             "ahead(100);\n"
             "turnGunRight(360);\n"
             "back(100);\n"
-            "turnGunRight(360);"
+            "turnGunRight(360);\n"
         );
 
-    //// ぐるぐる走行
-    //Block("robot_sample_spinRunning")
-    //    .category("サンプル戦術")
-    //    .text("ぐるぐる走行")
-    //    .tooltip("車体を旋回させながら前進するサンプルです")
-    //    .color(210)
-    //    .java(
-    //        "setTurnRight(10000);\n"
-    //        "setMaxVelocity(5);\n"
-    //        "ahead(1000);"
-    //    );
+    //ぐにゃぐにゃ動く
+    Block("robot_sample_limpRunnning")
+        .category("サンプル戦術")
+        .text("ぐにゃぐにゃ動く")
+        .tooltip("前進、車体の回転、待機を組み合わせたサンプルです")
+        .color(210)
+        .java(
+            "setAhead(40000);\n"
+            "setTurnRight(90);\n"
+            "waitFor(new TurnCompleteCondition(this));\n"
+            "setTurnLeft(180);\n"
+            "waitFor(new TurnCompleteCondition(this));\n"
+            "setTurnRight(180);\n"
+            "waitFor(new TurnCompleteCondition(this));\n"
+        );
+
+
+    // ぐるぐる走行
+    Block("robot_sample_spinRunning")
+        .category("サンプル戦術")
+        .text("ぐるぐる走行")
+        .tooltip("車体を旋回させながら前進するサンプルです")
+        .color(210)
+        .java(
+            "setTurnRight(10000);\n"
+            "setMaxVelocity(5);\n"
+            "ahead(1000);\n"
+        );
 
     //// 勝利のダンス
     //Block("robot_sample_victoryDance")
