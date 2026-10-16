@@ -16,20 +16,14 @@ ROBOCODE_BLOCKS(GetGameInfomation)
         .valueInput("TEXT", "")                 // 種類を "" にすると、数字も文字もはまる穴になる
         .tooltip("Robocode のコンソールに表示します")
         .java("out.println({TEXT});");
-    // 自分のY座標を調べる
-    Block("robot_get_y")
-        .category("ゲーム情報")                        // カテゴリー
-        .text("自分のY座標")                            // ブロックに表示する文（入力欄がないので %1 はなし）
-        .output("Number")                              // 数字を出す値ブロックにする
-        .tooltip("自分のロボットのY座標（上下の位置）を調べます")
-        .java("getY()");                               // Robocode の「Y座標を調べる」関数（; は付けない）
-    // 自分のX座標を調べる
-    Block("robot_get_x")
-        .category("ゲーム情報")                        // カテゴリー
-        .text("自分のX座標")                            // ブロックに表示する文（入力欄がないので %1 はなし）
-        .output("Number")                              // 数字を出す値ブロックにする
-        .tooltip("自分のロボットのX座標（上下の位置）を調べます")
-        .java("getX()");                               // Robocode の「Y座標を調べる」関数（; は付けない）
+    // 自分の X 座標・Y 座標を調べる
+    Block("robot_get_position")
+        .category("ゲーム情報")
+        .text("自分の %1 座標")                         // %1 に選ぶ欄が入る
+        .dropdown("AXIS", { {"X", "X"}, {"Y", "Y"} })  // 名前は AXIS。{画面に出す文字, Java に入れる文字}
+        .output("Number")                               // 数字を出す値ブロック
+        .tooltip("自分のロボットの X 座標（左右の位置）か Y 座標（上下の位置）を調べます")
+        .java("get{AXIS}()");                           // X を選ぶと getX()、Y を選ぶと getY() になる
     //自分のエネルギー残量を取得
     Block("robot_energy")
         .category("ゲーム情報")
@@ -37,4 +31,3 @@ ROBOCODE_BLOCKS(GetGameInfomation)
         .output("Number")
         .tooltip("自分のエネルギー残量が分かります")
         .java("getEnergy()");
-}
