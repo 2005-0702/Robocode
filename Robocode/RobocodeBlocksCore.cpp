@@ -348,23 +348,11 @@ namespace rb {
             }
         }
 
-        // 最初から用意しておくブロック
-        void addBuiltinBlocks() {
-            Block(kNumberBlock)
-                .category("計算")
-                .text("%1")
-                .number("NUM", 0)
-                .output("Number")
-                .tooltip("数字")
-                .java("{NUM}");
-        }
-
         // 全部のブロックを集める（最初に1回だけ）
         void ensureLoaded() {
             Registry& r = registry();
             if (r.loaded) return;
             r.loaded = true;
-            addBuiltinBlocks();
             auto sets = r.sets;
             std::stable_sort(sets.begin(), sets.end(),
                 [](const std::pair<std::string, BlockSetFunction>& a,
