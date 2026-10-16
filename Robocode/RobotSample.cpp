@@ -11,12 +11,7 @@
 *category(name)     : カテゴリを設定                    例: .category("動き")
 *text(message)      : ブロックに表示する文字            例: .text("前に %1 進む")
 *tooltip(message)   : マウスを乗せたときの説明          例: .tooltip("前に進みます")
-*color(hue)         : ブロックの色を設定（色相 0～360） 例: .color(210)
-*
-*【2. 入力欄・接続口】
-*number(name, value)            : 数値入力欄を追加                例: .number("DIST", 100)
-*number(name, value, min)       : 最小値付きの数値入力欄          例: .number("DIST", 100, 0)
-*number(name, value, min, max)  : 最小値・最大値付きの数値入力欄  例: .number("ANGLE", 90, 0, 360)
+*color(hue)         : Arg::Statements, value, min, max)  : 最小値・最大値付きの数値入力欄  例: .number("ANGLE", 90, 0, 360)
 *dropdown(name, opts)           : 選択肢を追加                    例: .dropdown("DIR", options)
 *valueInput(name)               : 値を受け取る接続口を追加        例: .valueInput("ANGLE")
 *statements(name)               : 命令を入れる接続口を追加        例: .statements("DO")
@@ -37,7 +32,7 @@
 
 #include "RobocodeBlocks.h"
 
-ROBOCODE_BLOCKS(RobotEvent)
+ROBOCODE_BLOCKS(RobotSample)
 {
     /*カテゴリー別色一覧
     *{"イベント", 30},
@@ -55,58 +50,101 @@ ROBOCODE_BLOCKS(RobotEvent)
     //============//
     // 動き
     //============// 
-    // 前進・後退しながら砲塔を回す
-    Block("robot_sample_aheadAndBack")
-        .category("サンプル戦術")
-        .text("前進・後退しながら砲塔を回す")
-        .tooltip("前進、砲塔の回転、後退を組み合わせたサンプルです")
-        .color(210)
-        .java(
-            "ahead(100);\n"
-            "turnGunRight(360);\n"
-            "back(100);\n"
-            "turnGunRight(360);\n"
-        );
+    
 
-    //ぐにゃぐにゃ動く
-    Block("robot_sample_limpRunnning")
-        .category("サンプル戦術")
-        .text("ぐにゃぐにゃ動く")
-        .tooltip("前進、車体の回転、待機を組み合わせたサンプルです")
-        .color(210)
-        .java(
-            "setAhead(40000);\n"
-            "setTurnRight(90);\n"
-            "waitFor(new TurnCompleteCondition(this));\n"
-            "setTurnLeft(180);\n"
-            "waitFor(new TurnCompleteCondition(this));\n"
-            "setTurnRight(180);\n"
-            "waitFor(new TurnCompleteCondition(this));\n"
-        );
+	//// onHitWallイベントで使用可能: 壁から離れる
+	//Block("robot_sample_aheadAndBack")
+	//	.category("動き2")
+	//	.text("前進・後退しながら砲塔を回す")
+	//	.tooltip("前進、砲塔の回転、後退を組み合わせたサンプルです")
+	//	.color(210)
+	//	.java(
+	//		"ahead(100);\n"
+	//		"turnGunRight(360);\n"
+	//		"back(100);\n"
+	//		"turnGunRight(360);"
+	//	);
 
-
-    //// ぐるぐる走行
-    //Block("robot_sample_spinRunning")
-    //    .category("サンプル戦術")
-    //    .text("ぐるぐる走行")
-    //    .tooltip("車体を旋回させながら前進するサンプルです")
-    //    .color(210)
-    //    .java(
-    //        "setTurnRight(10000);\n"
-    //        "setMaxVelocity(5);\n"
-    //        "ahead(1000);\n"
-    //    );
-
-    //// 勝利のダンス
-    //Block("robot_sample_victoryDance")
-    //    .category("サンプル戦術")
-    //    .text("勝利のダンス")
-    //    .tooltip("左右に旋回する動作を50回繰り返します")
-    //    .color(210)
-    //    .java(
-    //        "for (int i = 0; i < 50; i++) {\n"
-    //        "    turnRight(30);\n"
-    //        "    turnLeft(30);\n"
-    //        "}"
-    //    );
+//	private void getAwayFromWall(HitWallEvent e) {
+//
+//		double bearing = e.getBearing();
+//
+//		if (bearing > -90 && bearing < 90) {
+//			setBack(200);
+//		}
+//		else {
+//			setAhead(200);
+//		}
+//	}
+//
+//	/*
+//		onHitByBulletイベントで使用可能
+//		弾が飛んできた方向を向いてスキャン
+//	*/
+//	private void turnFlewBullet(HitByBulletEvent e) {
+//
+//		turnRight(e.getHeading() - getHeading() + 180);
+//		turnGunRight(getHeading() - getGunHeading());
+//		scan();
+//	}
+//
+//	/*
+//		onHitByBulletイベントで使用可能
+//		飛んできた弾に対して垂直に車体を向けて前進(次の弾を躱す)
+//	*/
+//	private void hesitateNextBullet(HitByBulletEvent e) {
+//		turnRight(normalRelativeAngleDegrees(90 - (getHeading() - e.getHeading())));
+//		ahead(100);
+//	}
+//
+//	/*
+//		onHitRobotイベントで使用可能
+//		相手の方向に車体を向けてスキャン
+//	*/
+//	private void turnBodyToEnemy(HitRobotEvent e) {
+//		double turnAmt = normalRelativeAngleDegrees(e.getBearing() + getHeading() - getGunHeading());
+//		turnRight(turnAmt);
+//		if (getHeading() - getGunHeading() != 0) {
+//			turnGunRight(getHeading() - getGunHeading());
+//		}
+//		scan();
+//	}
+//
+//	/*
+//		onHitRobotイベントで使用可能
+//		相手の方向に砲塔を向けてスキャン
+//	*/
+//	private void turnGunToEnemy(HitRobotEvent e) {
+//		double turnAmt = normalRelativeAngleDegrees(e.getBearing() + getHeading() - getGunHeading());
+//		turnGunRight(turnAmt);
+//		scan();
+//	}
+//
+//	/*
+//		勝利のダンス
+//	*/
+//	private void victoryDance() {
+//		for (int i = 0; i < 50; i++) {
+//			turnRight(30);
+//			turnLeft(30);
+//		}
+//	}
+//
+//	/*
+//		勝利の回転
+//	*/
+//	private void victorySpin() {
+//		turnRight(36000);
+//	}
+//}
+Block("robot_sample_scan")
+.category("サンプル戦術")
+.text("砲塔とレーダーを回して周囲を探す")
+.tooltip("砲塔とレーダーを回転させて周囲を探します")
+.color(330)
+.java(
+    "setAdjustRadarForGunTurn(true);\n"
+    "turnGunRight(360);\n"
+    "turnRadarRight(360);\n"
+);
 }

@@ -73,7 +73,7 @@ ROBOCODE_BLOCKS(RobotEvent)
         .tooltip("壁に衝突したときに実行します")
         .statements("D0")
         .event()
-        .java("public void onHitWall(HitWallEvevt e) {\n"
+        .java("public void onHitWall(HitWallEvent  e) {\n"
             "{D0}\n"
             "}");
 
