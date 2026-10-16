@@ -34,117 +34,81 @@
 
 ROBOCODE_BLOCKS(RobotSample)
 {
-    /*カテゴリー別色一覧
-    *{"イベント", 30},
-    *{"動き", 210},
-    *{"攻撃", 0},
-    *{"センサー", 160},
-    *{"制御", 120},
-    *{"計算", 230},
-    *{"ゲーム情報",180},
-    *{"色",270},
-    *{"サンプル戦術",330}
-    *{"サンプル戦術2",330}
-    */
+    // 壁から離れる
+    Block("robot_sample_getAwayFromWall")
+        .category("サンプル戦術")
+        .text("壁から離れる")
+        .tooltip("壁にぶつかったとき、壁との位置関係に応じて移動します")
+        .color(330)
+        .java(R"(
+    double bearing = e.getBearing();
+
+    if (bearing > -90 && bearing < 90) {
+        setBack(200);
+    } else {
+        setAhead(200);
+    }
+    )")
+        .onlyIn("robot_event_hitWall");
    
-    //============//
-    // 動き
-    //============// 
+    //  弾の方向を向いてスキャン
+    Block("robot_sample_turnFlewBullet")
+        .category("サンプル戦術")
+        .text("弾の方向を向いてスキャン")
+        .tooltip("弾が当たった方向をもとに向きを調整し、敵をスキャンします")
+        .color(330)
+        .java(R"(
+    turnRight(e.getHeading() - getHeading() + 180);
+    turnGunRight(getHeading() - getGunHeading());
+    scan();
+    )")
+        .onlyIn("robot_event_hitByBullet");
+
+    // 次の弾を避ける
+    Block("robot_sample_hesitateNextBullet")
+        .category("サンプル戦術")
+        .text("次の弾を避ける")
+        .tooltip("飛んできた弾に対して垂直方向に向きを変えて前進します")
+        .color(330)
+        .java(R"(
+    turnRight(normalRelativeAngleDegrees(90 - (getHeading() - e.getHeading())));
+    ahead(100);
+    )")
+        .onlyIn("robot_event_hitByBullet");
+
+
+    // 相手に車体を向けてスキャン
+    Block("robot_sample_turnBodyToEnemy")
+        .category("サンプル戦術")
+        .text("相手に車体を向ける")
+        .tooltip("相手にぶつかったとき、車体の向きを調整してスキャンします")
+        .color(330)
+        .java(R"(
+    double bodyTurnAmt = normalRelativeAngleDegrees(e.getBearing() + getHeading() - getGunHeading());
     
+    turnRight(bodyTurnAmt);
+    
+    if (getHeading() - getGunHeading() != 0) {
+        turnGunRight(getHeading() - getGunHeading());
+    }
+    
+    scan();
+    )")
+        .onlyIn("robot_event_hitEnemy");
 
-	//// onHitWallイベントで使用可能: 壁から離れる
-	//Block("robot_sample_aheadAndBack")
-	//	.category("動き2")
-	//	.text("前進・後退しながら砲塔を回す")
-	//	.tooltip("前進、砲塔の回転、後退を組み合わせたサンプルです")
-	//	.color(210)
-	//	.java(
-	//		"ahead(100);\n"
-	//		"turnGunRight(360);\n"
-	//		"back(100);\n"
-	//		"turnGunRight(360);"
-	//	);
+    // 相手に砲塔を向けてスキャン
+    Block("robot_sample_turnGunToEnemy")
+        .category("サンプル戦術")
+        .text("相手に砲塔を向ける")
+        .tooltip("相手にぶつかったとき、砲塔を相手の方向に向けてスキャンします")
+        .color(330)
+        .java(R"(
+    double gunTurnAmt = normalRelativeAngleDegrees(e.getBearing() + getHeading() - getGunHeading());
+    
+    turnGunRight(gunTurnAmt);
+    scan();
+    )")
+        .onlyIn("robot_event_hitEnemy");
 
-//	private void getAwayFromWall(HitWallEvent e) {
-//
-//		double bearing = e.getBearing();
-//
-//		if (bearing > -90 && bearing < 90) {
-//			setBack(200);
-//		}
-//		else {
-//			setAhead(200);
-//		}
-//	}
-//
-//	/*
-//		onHitByBulletイベントで使用可能
-//		弾が飛んできた方向を向いてスキャン
-//	*/
-//	private void turnFlewBullet(HitByBulletEvent e) {
-//
-//		turnRight(e.getHeading() - getHeading() + 180);
-//		turnGunRight(getHeading() - getGunHeading());
-//		scan();
-//	}
-//
-//	/*
-//		onHitByBulletイベントで使用可能
-//		飛んできた弾に対して垂直に車体を向けて前進(次の弾を躱す)
-//	*/
-//	private void hesitateNextBullet(HitByBulletEvent e) {
-//		turnRight(normalRelativeAngleDegrees(90 - (getHeading() - e.getHeading())));
-//		ahead(100);
-//	}
-//
-//	/*
-//		onHitRobotイベントで使用可能
-//		相手の方向に車体を向けてスキャン
-//	*/
-//	private void turnBodyToEnemy(HitRobotEvent e) {
-//		double turnAmt = normalRelativeAngleDegrees(e.getBearing() + getHeading() - getGunHeading());
-//		turnRight(turnAmt);
-//		if (getHeading() - getGunHeading() != 0) {
-//			turnGunRight(getHeading() - getGunHeading());
-//		}
-//		scan();
-//	}
-//
-//	/*
-//		onHitRobotイベントで使用可能
-//		相手の方向に砲塔を向けてスキャン
-//	*/
-//	private void turnGunToEnemy(HitRobotEvent e) {
-//		double turnAmt = normalRelativeAngleDegrees(e.getBearing() + getHeading() - getGunHeading());
-//		turnGunRight(turnAmt);
-//		scan();
-//	}
-//
-//	/*
-//		勝利のダンス
-//	*/
-//	private void victoryDance() {
-//		for (int i = 0; i < 50; i++) {
-//			turnRight(30);
-//			turnLeft(30);
-//		}
-//	}
-//
-//	/*
-//		勝利の回転
-//	*/
-//	private void victorySpin() {
-//		turnRight(36000);
-//	}
-//}
-Block("robot_sample_scan")
-.category("サンプル戦術")
-.text("砲塔とレーダーを回して周囲を探す")
-.tooltip("砲塔とレーダーを回転させて周囲を探します")
-.color(330)
-.java(
-    "setAdjustRadarForGunTurn(true);\n"
-    "turnGunRight(360);\n"
-    "turnRadarRight(360);\n"
-);
+
 }
