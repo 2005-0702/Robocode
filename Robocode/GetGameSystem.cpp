@@ -25,7 +25,7 @@ ROBOCODE_BLOCKS(GetGameSystem)
         .text("総ラウンド数")
         .output("Number")
         .tooltip("総ラウンド数です")
-        .java("getNumRound()");
+        .java("getRoundNum() + 1");
     //現在のラウンド数
     Block("round_num")
         .category("ゲーム情報2")
