@@ -60,7 +60,7 @@ ROBOCODE_BLOCKS(RobotControl)
         .valueInput("COND", "Boolean")          // 「はい／いいえ」のブロックをはめる穴
         .statements("DO")                       // 中にブロックを入れる口
         .statements("ELSE")                       
-        .tooltip("条件に応じて、実行する処理を切り替え")
+        .tooltip("条件に応じて、実行する処理を切り替えます")
         .java("if ({COND}) {\n"
             "    {DO}\n"
             "}else {\n"
