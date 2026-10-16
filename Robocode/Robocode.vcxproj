@@ -141,6 +141,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="GetGameInfo.cpp" />
+    <ClCompile Include="GetGameSystem.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="RobocodeBlocks.cpp" />
     <ClCompile Include="RobocodeBlocksCore.cpp" />
@@ -151,6 +152,7 @@
     <ClCompile Include="RobotEvent.cpp" />
     <ClCompile Include="RobotMove.cpp" />
     <ClCompile Include="RobotSample.cpp" />
+    <ClCompile Include="Sensor.cpp" />
     <ClCompile Include="WorkFile.cpp" />
   </ItemGroup>
   <ItemGroup>
