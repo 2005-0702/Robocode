@@ -1,7 +1,8 @@
 ﻿// =====================================================================
 //  RobocodeBlocksCore.cpp  ―  ブロックのしくみ（難しい部分）
 // 
-// 2026/10/16 片山　カテゴリー色に色とサンプル戦術追加
+// 2026/10/16 片山　カテゴリー色に色とサンプル戦術追加,Javaコードの親クラス名を修正。
+// 
 // =====================================================================
 //
 //  ブロックを作る人は読まなくてOK。ここでやっていること：
@@ -44,6 +45,7 @@ namespace rb {
         const CategoryColor kCategories[] = {
             {"イベント", 30},
             {"動き", 210},
+            {"動き2", 210},
             {"攻撃", 0},
             {"センサー", 160},
             {"制御", 120},
@@ -597,8 +599,10 @@ namespace rb {
                 std::string t = trim(line);
                 if (t.size() > 2 && t.front() == '{' && t.back() == '}') {
                     const BlockDef::Arg* arg = def.findArg(t.substr(1, t.size() - 2));
+                    //見つかった接続口が、命令を入れる種類かどうかを確認
                     if (arg && arg->kind == BlockDef::Arg::Statements) {
                         std::string indent = line.substr(0, line.find_first_not_of(" \t"));
+                        // 接続された命令からJavaコードを取得する
                         for (const std::string& inner : splitLines(data.text(arg->name))) {
                             out.push_back(inner.empty() ? "" : indent + inner);
                         }
