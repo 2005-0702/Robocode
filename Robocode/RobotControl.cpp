@@ -90,6 +90,17 @@ ROBOCODE_BLOCKS(RobotControl)
             indented + "}";
             });
 
+    //条件が成立している間、中の処理を繰り返す(while文)
+    Block("robot_while")
+        .category("制御")
+        .text("条件 %1 の間繰り返す %2")
+        .valueInput("COND", "Boolean")
+        .statements("DO")
+        .tooltip("条件が成立している間、中の処理を繰り返します")
+        .java("while ({COND}) {\n"
+            "    {DO}\n"
+            "}");
+
     // 〇〇 < 〇〇（数字を比べる）
     Block("robot_compare")
         .category("制御")
