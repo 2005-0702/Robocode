@@ -4,6 +4,8 @@
 #define NOMINMAX
 #include <windows.h>
 #include <memory>
+#include <shellapi.h>          // ShellExecuteW（エクスプローラーでフォルダを開く）
+#pragma comment(lib, "shell32.lib")
 #include <string>
 #include <wrl.h>
 #include "WebView2.h"
@@ -234,6 +236,17 @@ static std::string HandleMessageFromBlockly(const std::string& text) {
                 reply["notes"] = imported.notes;
             }
         }
+    }
+    // 「保存した場所」をクリック：エクスプローラーで、そのファイルを選んだ状態でフォルダを開く
+   //   届く形：{ "kind": "showInFolder", "path": "C:\\robocode\\robots\\student\\MyRobot.java" }
+   //   返事はしない
+    else if (kind == "showInFolder") {
+        std::wstring path = Utf8ToWide(msg.value("path", ""));
+        if (!path.empty() && GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES) {
+            std::wstring args = L"/select,\"" + path + L"\"";
+            ShellExecuteW(nullptr, L"open", L"explorer.exe", args.c_str(), nullptr, SW_SHOWNORMAL);
+        }
+        return "";
     }
 
     // 「Robocode の場所」ボタン

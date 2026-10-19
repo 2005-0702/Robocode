@@ -33,24 +33,7 @@
 #include "RobocodeBlocks.h"
 
 ROBOCODE_BLOCKS(RobotSample)
-{
-    // 壁から離れる
-    Block("robot_sample_getAwayFromWall")
-        .category("サンプル戦術")
-        .text("壁から離れる")
-        .tooltip("壁にぶつかったとき、壁との位置関係に応じて移動します")
-        .color(330)
-        .java(R"(
-    double bearing = e.getBearing();
-
-    if (bearing > -90 && bearing < 90) {
-        setBack(200);
-    } else {
-        setAhead(200);
-    }
-    )")
-        .onlyIn("robot_event_hitWall");
-   
+{  
     //  弾の方向を向いてスキャン
     Block("robot_sample_turnFlewBullet")
         .category("サンプル戦術")
@@ -63,19 +46,6 @@ ROBOCODE_BLOCKS(RobotSample)
     scan();
     )")
         .onlyIn("robot_event_hitByBullet");
-
-    // 次の弾を避ける
-    Block("robot_sample_hesitateNextBullet")
-        .category("サンプル戦術")
-        .text("次の弾を避ける")
-        .tooltip("飛んできた弾に対して垂直方向に向きを変えて前進します")
-        .color(330)
-        .java(R"(
-    turnRight(normalRelativeAngleDegrees(90 - (getHeading() - e.getHeading())));
-    ahead(100);
-    )")
-        .onlyIn("robot_event_hitByBullet");
-
 
     // 相手に車体を向けてスキャン
     Block("robot_sample_turnBodyToEnemy")
@@ -108,5 +78,28 @@ ROBOCODE_BLOCKS(RobotSample)
     scan();
     )");
 
+    // 距離と残りエネルギーに合わせて、弾の強さを自動で決めて撃つ
+    Block("smart_fire")
+        .category("サンプル戦術")
+        .text("距離と残りエネルギーで強さを決めて撃つ")   // 入力欄がないので %1 はなし
+        .tooltip("敵が近いほど強い弾を撃ちます。エネルギーが少ないときは、弱い弾にして節約します")
+        .java(R"({
+        double power;
+        if (e.getDistance() < 150) {                 // 近い → 当たりやすいので強く
+            power = 3;
+        } else if (e.getDistance() < 400) {          // 中くらい
+            power = 2;
+        } else {                                     // 遠い → 外れやすいので弱く
+            power = 1;
+        }
+        if (getEnergy() < 20) {                      // エネルギーが少ないときは節約する
+            power = Math.min(power, 1);
+        }
+        if (getEnergy() < 5) {                       // ほとんど残っていないときは、もっと弱く
+            power = 0.1;
+        }
+            fire(power);
+        })")
+        .onlyIn("robot_event_enemyDetected");        // 「敵を見つけたとき」のイベントの名前に合わせる
 
 }
