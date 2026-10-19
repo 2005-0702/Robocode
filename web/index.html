@@ -290,6 +290,20 @@
       pointer-events: none;
       z-index: 50;
     }
+
+    /* RGBノード用の円形カラーピッカー */
+    #colorPickerOverlay { position:fixed; inset:0; background:rgba(0,0,0,.42); z-index:3000; display:none; align-items:center; justify-content:center; }
+    #colorPickerOverlay.open { display:flex; }
+    #colorPickerDialog { background:#fff; border-radius:14px; padding:20px; width:350px; box-sizing:border-box; box-shadow:0 12px 45px #0005; }
+    #colorPickerDialog h3 { margin:0 0 12px; font-size:17px; }
+    #colorWheelCanvas { display:block; margin:auto; width:300px; height:300px; cursor:crosshair; touch-action:none; }
+    #colorPickerValues { display:flex; gap:12px; align-items:center; margin:14px 0; }
+    #colorPickerPreview { width:64px; height:44px; border:1px solid #aaa; border-radius:6px; flex:none; }
+    #colorPickerNumbers { font-family:Consolas,monospace; font-size:13px; line-height:1.7; }
+    #colorPickerDialog .actions { display:flex; justify-content:flex-end; gap:8px; }
+    #colorPickerDialog button { border:0; border-radius:6px; padding:8px 18px; cursor:pointer; }
+    #colorPickerApply { background:#27ae60; color:white; }
+    #colorPickerHint { font-size:12px; color:#666; margin:8px 0 12px; }
   </style>
 </head>
 <body>
@@ -350,6 +364,18 @@
       <button id="copyButton">コピー</button>
     </div>
     <pre id="javaCode"></pre>
+  </div>
+
+
+  <!-- 円形HSVカラーピッカー（既存のRGB数値フィールドに反映する） -->
+  <div id="colorPickerOverlay">
+    <div id="colorPickerDialog" role="dialog" aria-modal="true" aria-labelledby="colorPickerTitle">
+      <h3 id="colorPickerTitle">色を選択</h3>
+      <canvas id="colorWheelCanvas" width="300" height="300"></canvas>
+      <div id="colorPickerHint">円の角度：色相 ／ 中心からの距離：彩度 ／ ホイール：明度</div>
+      <div id="colorPickerValues"><div id="colorPickerPreview"></div><div id="colorPickerNumbers"></div></div>
+      <div class="actions"><button id="colorPickerCancel">キャンセル</button><button id="colorPickerApply">決定</button></div>
+    </div>
   </div>
 
   <script>
@@ -520,6 +546,218 @@
     const AUTOSAVE_KEY = 'robocodeBlocks.autosave';
     let autosaveTimer = null;
     let restored = false;   // 前回の続きを読み込んだか（ページを開いて最初の1回だけ読み込む）
+
+    // ------------------------------------------------------------
+    // 色ノードのRGB欄を、円形HSVカラーホイールから変更する
+    // 既存の R / G / B フィールドとJava生成はそのまま使用
+    // ------------------------------------------------------------
+    const COLOR_BLOCK_TYPES = new Set([
+      'robot_color_bodyColor', 'robot_color_gunColor',
+      'robot_color_radarColor', 'robot_color_bulletColor',
+      'robot_color_scanColor'
+    ]);
+    const colorOverlay = document.getElementById('colorPickerOverlay');
+    const colorCanvas = document.getElementById('colorWheelCanvas');
+    const colorCtx = colorCanvas.getContext('2d');
+    let colorTarget = null;
+    let colorH = 0, colorS = 1, colorV = 1;
+    let colorDragging = false;
+    let pendingColorBlock = null;
+    // 起動時の自動復元で発生するブロック作成イベントでは開かない
+    let restoringStartupColors = true;
+
+    const clamp01 = x => Math.max(0, Math.min(1, x));
+    function hsvToRgb(h, s, v) {
+      const c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c;
+      const a = h < 60 ? [c,x,0] : h < 120 ? [x,c,0] : h < 180 ? [0,c,x] :
+                h < 240 ? [0,x,c] : h < 300 ? [x,0,c] : [c,0,x];
+      return a.map(n => Math.round((n + m) * 255));
+    }
+    function rgbToHsv(r,g,b) {
+      r /= 255; g /= 255; b /= 255;
+      const max = Math.max(r,g,b), min = Math.min(r,g,b), d = max-min;
+      let h = 0;
+      if (d) {
+        if (max === r) h = ((g-b)/d) % 6;
+        else if (max === g) h = (b-r)/d + 2;
+        else h = (r-g)/d + 4;
+        h = (h * 60 + 360) % 360;
+      }
+      return [h, max === 0 ? 0 : d/max, max];
+    }
+    function drawColorWheel() {
+      const w = colorCanvas.width, radius = w/2;
+      const image = colorCtx.createImageData(w,w), data = image.data;
+      for (let y=0; y<w; y++) for (let x=0; x<w; x++) {
+        const dx=x+0.5-radius, dy=y+0.5-radius, dist=Math.hypot(dx,dy);
+        const i=(y*w+x)*4;
+        if (dist > radius) { data[i+3]=0; continue; }
+        const h=(Math.atan2(dy,dx)*180/Math.PI+360)%360;
+        const [r,g,b]=hsvToRgb(h,dist/radius,colorV);
+        data[i]=r; data[i+1]=g; data[i+2]=b; data[i+3]=255;
+      }
+      colorCtx.clearRect(0,0,w,w);
+      colorCtx.putImageData(image,0,0);
+      const a=colorH*Math.PI/180;
+      const px=radius+Math.cos(a)*colorS*radius;
+      const py=radius+Math.sin(a)*colorS*radius;
+      colorCtx.beginPath(); colorCtx.arc(px,py,8,0,2*Math.PI);
+      colorCtx.lineWidth=3; colorCtx.strokeStyle='#fff'; colorCtx.stroke();
+      colorCtx.beginPath(); colorCtx.arc(px,py,10,0,2*Math.PI);
+      colorCtx.lineWidth=1; colorCtx.strokeStyle='#222'; colorCtx.stroke();
+      const rgb=hsvToRgb(colorH,colorS,colorV);
+      document.getElementById('colorPickerPreview').style.background=`rgb(${rgb.join(',')})`;
+      document.getElementById('colorPickerNumbers').textContent =
+        `RGB: ${rgb.join(', ')} | #${rgb.map(n=>n.toString(16).padStart(2,'0')).join('').toUpperCase()}`;
+    }
+    // RGB値はJava生成用に保持し、画面上では色見本だけを表示する。
+    function swatchSource(rgb) {
+      const hex = '#' + rgb.map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="24" viewBox="0 0 36 24"><rect x="1" y="1" width="34" height="22" rx="5" fill="${hex}" stroke="#ffffff" stroke-width="2"/></svg>`;
+      return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    }
+    function refreshColorSwatch(block) {
+      if (!block || !COLOR_BLOCK_TYPES.has(block.type)) return;
+      for (const name of ['R', 'G', 'B']) {
+        const field = block.getField(name);
+        if (field && field.setVisible && field.isVisible && field.isVisible()) field.setVisible(false);
+      }
+      const swatch = block.getField('COLOR_SWATCH');
+      if (swatch) {
+        const rgb = ['R','G','B'].map(n => Number(block.getFieldValue(n)) || 0);
+        const nextSource = swatchSource(rgb);
+        if (swatch.getValue() !== nextSource) swatch.setValue(nextSource);
+      }
+    }
+    function refreshAllColorSwatches() {
+      workspace.getAllBlocks(false).forEach(refreshColorSwatch);
+    }
+    // 新規作成、読み込み、Undo/Redoの後も色見本を同期する。
+    workspace.addChangeListener(e => {
+      if (e.isUiEvent || e.type === Blockly.Events.BLOCK_MOVE) return;
+      if (e.type === Blockly.Events.BLOCK_CREATE || e.type === Blockly.Events.BLOCK_CHANGE) setTimeout(refreshAllColorSwatches, 0);
+    });
+    function openColorPicker(block) {
+      if (restoringStartupColors) return;
+      if (!block || block.isDeadOrDying() || !COLOR_BLOCK_TYPES.has(block.type)) return;
+      colorTarget=block;
+      const rgb=['R','G','B'].map(name => Math.max(0,Math.min(255,Number(block.getFieldValue(name))||0)));
+      [colorH,colorS,colorV]=rgbToHsv(...rgb);
+      // RGBが黒(0,0,0)でも、色を選び始められるよう明度を最大にする。
+      // 黒を選びたい場合はホイールを下に回して明度を下げられる。
+      if (colorV === 0) colorV = 1;
+      colorOverlay.classList.add('open');
+      drawColorWheel();
+    }
+    function closeColorPicker() { colorOverlay.classList.remove('open'); colorTarget=null; colorDragging=false; }
+    function pickWheelPosition(e) {
+      const rect=colorCanvas.getBoundingClientRect();
+      const dx=(e.clientX-rect.left)*colorCanvas.width/rect.width-150;
+      const dy=(e.clientY-rect.top)*colorCanvas.height/rect.height-150;
+      const dist=Math.hypot(dx,dy);
+      colorS=clamp01(dist/150);
+      if (dist>0.01) colorH=(Math.atan2(dy,dx)*180/Math.PI+360)%360;
+      drawColorWheel();
+    }
+    colorCanvas.addEventListener('pointerdown',e=>{
+      if (e.button!==0) return;
+      colorDragging=true; colorCanvas.setPointerCapture(e.pointerId); pickWheelPosition(e);
+    });
+    colorCanvas.addEventListener('pointermove',e=>{ if(colorDragging) pickWheelPosition(e); });
+    colorCanvas.addEventListener('pointerup',()=>{ colorDragging=false; });
+    colorCanvas.addEventListener('pointercancel',()=>{ colorDragging=false; });
+    colorCanvas.addEventListener('wheel',e=>{
+      e.preventDefault(); e.stopPropagation();
+      colorV=clamp01(colorV+(e.deltaY<0?0.05:-0.05)); drawColorWheel();
+    },{passive:false});
+    document.getElementById('colorPickerCancel').addEventListener('click',closeColorPicker);
+    document.getElementById('colorPickerApply').addEventListener('click',()=>{
+      if (colorTarget && !colorTarget.isDeadOrDying()) {
+        const rgb=hsvToRgb(colorH,colorS,colorV);
+        Blockly.Events.setGroup(true);
+        try { ['R','G','B'].forEach((name,i)=>colorTarget.setFieldValue(String(rgb[i]),name)); }
+        finally { Blockly.Events.setGroup(false); }
+        refreshColorSwatch(colorTarget);
+      }
+      closeColorPicker();
+    });
+    colorOverlay.addEventListener('pointerdown',e=>{ if(e.target===colorOverlay) closeColorPicker(); });
+    document.addEventListener('keydown',e=>{
+      if(e.key==='Escape' && colorOverlay.classList.contains('open')) { e.stopPropagation(); closeColorPicker(); }
+    },true);
+
+    // 色ノードの色見本を短くクリックしたときだけカラーホイールを開く。
+    // 選択イベントに頼らないので、選択済みのノードを再クリックしても開く。
+    // ドラッグして離したときは開かない。
+    let colorClickStart = null;
+    document.getElementById('blocklyDiv').addEventListener('pointerdown', e => {
+      colorClickStart = null;
+      if (e.button !== 0 || colorOverlay.classList.contains('open')) return;
+      // 色見本(field_image)のSVG画像を押した場合だけ反応する。
+      // ノード本体や文字をクリックしても開かない。
+      const image = e.target.closest && e.target.closest('image');
+      if (!image) return;
+      const svg = image.closest('.blocklyDraggable');
+      if (!svg) return;
+      const id = svg.getAttribute('data-id');
+      const block = id && workspace.getBlockById(id);
+      if (!block || !COLOR_BLOCK_TYPES.has(block.type) || block.isInFlyout) return;
+      const swatch = block.getField('COLOR_SWATCH');
+      const swatchRoot = swatch && swatch.getSvgRoot && swatch.getSvgRoot();
+      if (swatchRoot && !swatchRoot.contains(image)) return;
+      colorClickStart = { id, x: e.clientX, y: e.clientY };
+    }, true);
+    document.addEventListener('pointerup', e => {
+      const start = colorClickStart;
+      colorClickStart = null;
+      if (!start || e.button !== 0 || loading || !restored || restoringStartupColors) return;
+      if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > 5) return;
+      const releasedImage = document.elementFromPoint(e.clientX, e.clientY);
+      if (!releasedImage || !releasedImage.closest || !releasedImage.closest('image')) return;
+      setTimeout(() => {
+        if (loading || Blockly.Gesture.inProgress() || colorOverlay.classList.contains('open')) return;
+        openColorPicker(workspace.getBlockById(start.id));
+      }, 80);
+    }, true);
+    document.addEventListener('pointercancel', () => { colorClickStart = null; }, true);
+
+    // 右クリックメニューから、何度でも選び直せるようにする
+    workspace.addChangeListener(e=>{
+      if (e.type!==Blockly.Events.BLOCK_CREATE || loading || !restored || restoringStartupColors) return;
+      for(const id of e.ids || []) {
+        const b=workspace.getBlockById(id);
+        if(b && COLOR_BLOCK_TYPES.has(b.type)) { pendingColorBlock=id; break; }
+      }
+    });
+    // 配置操作が終わった後に表示する（ドラッグ中には開かない）
+    document.addEventListener('pointerup',()=>{
+      if (!pendingColorBlock || loading || restoringStartupColors) return;
+      const id=pendingColorBlock; pendingColorBlock=null;
+      setTimeout(()=>{ if (!loading && !Blockly.Gesture.inProgress()) openColorPicker(workspace.getBlockById(id)); },100);
+    });
+    // クリックで置く方式など、pointerup後に生成イベントが届く場合への対応
+    workspace.addChangeListener(e=>{
+      if(e.type!==Blockly.Events.BLOCK_CREATE || loading || !restored) return;
+      for(const id of e.ids || []) {
+        const b=workspace.getBlockById(id);
+        if(!b || !COLOR_BLOCK_TYPES.has(b.type)) continue;
+        setTimeout(()=>{
+          if(loading || Blockly.Gesture.inProgress() || colorOverlay.classList.contains('open')) return;
+          if(pendingColorBlock===id) pendingColorBlock=null;
+          openColorPicker(workspace.getBlockById(id));
+        },350);
+        break;
+      }
+    });
+    if (Blockly.ContextMenuRegistry && Blockly.ContextMenuRegistry.registry) {
+      Blockly.ContextMenuRegistry.registry.register({
+        id:'robocode_color_wheel', scopeType:Blockly.ContextMenuRegistry.ScopeType.BLOCK,
+        displayText:()=> '🎨 カラーホイールで色を選ぶ', weight:10,
+        preconditionFn:scope=>scope.block && COLOR_BLOCK_TYPES.has(scope.block.type)?'enabled':'hidden',
+        callback:scope=>openColorPicker(scope.block)
+      });
+    }
+
 
     function autosave() {
       if (!restored) return;   // 読み込む前に保存すると、前回の続きを消してしまうので待つ
@@ -721,7 +959,32 @@
 
       // ブロックの定義とツールボックス
       if (msg.kind === 'blocks') {
+        // 表示上はRGB数値欄を隠し、代わりに色見本を追加する。
+        for (const def of msg.setup.blocks) {
+          if (!COLOR_BLOCK_TYPES.has(def.type)) continue;
+          def.message0 = def.message0.replace(/\s*R\s*%1\s*G\s*%2\s*B\s*%3/, ' %1 %2 %3');
+          def.message0 += ' %4';
+          def.args0.push({
+            type: 'field_image', name: 'COLOR_SWATCH',
+            src: swatchSource([0, 0, 0]), width: 36, height: 24, alt: '色を選ぶ'
+          });
+        }
         Blockly.defineBlocksWithJsonArray(msg.setup.blocks);
+        // ツールボックス（色カテゴリー）内でもRGB数値欄を表示しない。
+        // ブロック生成時に隠すことで、作業領域とフライアウトの両方に適用する。
+        for (const type of COLOR_BLOCK_TYPES) {
+          const definition = Blockly.Blocks[type];
+          if (!definition || definition._rgbHiddenOnInit) continue;
+          const originalInit = definition.init;
+          definition.init = function() {
+            originalInit.call(this);
+            for (const name of ['R', 'G', 'B']) {
+              const field = this.getField(name);
+              if (field && field.setVisible) field.setVisible(false);
+            }
+          };
+          definition._rgbHiddenOnInit = true;
+        }
         workspace.updateToolbox(msg.setup.toolbox);
 
         // 検索できるように、ブロックの一覧を覚えておく
@@ -729,6 +992,12 @@
 
         // 前回の続きを読み込む（ブロックの定義がそろってからでないと読み込めない）
         restoreAutosave();
+        // 自動復元で発生した遅延イベントを処理し終えるまで待つ。
+        // 新規に配置した色ノードは、その後は通常どおり開く。
+        setTimeout(() => {
+          pendingColorBlock = null;
+          restoringStartupColors = false;
+        }, 700);
 
         // ブロックの書き方にミスがあったら知らせる（作っている人向け）
         const problems = msg.setup.problems || [];
