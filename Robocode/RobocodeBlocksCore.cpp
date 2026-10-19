@@ -348,11 +348,25 @@ namespace rb {
             }
         }
 
+        // 最初から用意しておくブロック
+        //   数字の穴（valueInput の "Number"）に最初から入っている数字ブロック。
+        //   これがないと、数字の穴があるブロックのカテゴリを開いたときにエラーになる。消さないこと！
+        void addBuiltinBlocks() {
+            Block(kNumberBlock)
+                .category("計算")
+                .text("%1")
+                .number("NUM", 0)
+                .output("Number")
+                .tooltip("数字")
+                .java("{NUM}");
+        }
+
         // 全部のブロックを集める（最初に1回だけ）
         void ensureLoaded() {
             Registry& r = registry();
             if (r.loaded) return;
             r.loaded = true;
+            addBuiltinBlocks();   // 数字ブロックを最初に作る（消さないこと！）
             auto sets = r.sets;
             std::stable_sort(sets.begin(), sets.end(),
                 [](const std::pair<std::string, BlockSetFunction>& a,
