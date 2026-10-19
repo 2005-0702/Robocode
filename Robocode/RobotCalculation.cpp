@@ -41,13 +41,20 @@
 
 ROBOCODE_BLOCKS(RobotCalculation)
 {
-    // 数字
-    Block("robot_calculation_number")
+    // 演算子
+    Block("robot_calculation_operator")
         .category("計算")
-        .text("%1")
-        .tooltip("数字を扱えます")
-        .number("NUM", 0)
+        .text("%1 %2 %3")
+        .valueInput("A")
+        .dropdown("OP", {
+            {"＋", "+"},
+            {"－", "-"},
+            {"×", "*"},
+            {"÷", "/"}
+            })
+        .valueInput("B")
         .output("Number")
-        .tooltip("数字")
-        .java("{NUM}");
+        .tooltip("2つの数を指定した演算子で計算します")
+        .java("({A} {OP} {B})");
 }
+
