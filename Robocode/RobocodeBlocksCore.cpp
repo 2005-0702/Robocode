@@ -39,6 +39,8 @@ namespace rb {
         const char* const kRawStatementBlock = "java_raw_statement";    // Java をそのまま書く（命令）
         const char* const kRawExpressionBlock = "java_raw_expression";  // Java をそのまま書く（式）
         const char* const kRawMemberBlock = "java_raw_member";          // Java をそのまま書く（メソッド・変数）
+        const char* const kVariableCategory = "変数";   // Blockly にもともとある変数のしくみを使うカテゴリ
+        const char* const kFunctionCategory = "関数";   // Blockly にもともとある関数のしくみを使うカテゴリ
 
         // ツールボックスに並ぶ順番と色（ここにないカテゴリは後ろに並ぶ）
         struct CategoryColor {
@@ -52,12 +54,14 @@ namespace rb {
             {"攻撃", 0},
             {"センサー", 160},
             {"制御", 120},
-            {"計算", 80},
+            {"計算", 230},
+            {"変数", 330},     // Blockly の「変数」カテゴリ（ブロックの色は Blockly が決める 330）
+            {"関数", 290},     // Blockly の「関数」カテゴリ（ブロックの色は Blockly が決める 290）
+            {"同時に動く", 60},  // AdvancedMove.cpp（setAhead などの予約して同時に動くブロック）
             {"ゲーム情報",180},
             {"ゲーム情報2",180},
             {"色",270},
-            {"サンプル戦術",330},
-            {"変数",90 }
+            {"サンプル戦術",330}
         };
         const int kOtherColor = 290;
 
@@ -256,13 +260,6 @@ namespace rb {
                     case BlockDef::Arg::Text:
                         out += (f && f->is_string()) ? f->get<std::string>() : arg.initialText;
                         break;
-                    case BlockDef::Arg::Variable:
-                        out += (f && f->is_string())
-                            ? f->get<std::string>()
-                            : arg.initialText;
-                        break;
-
-
                     }
                     continue;
                 }
@@ -276,6 +273,37 @@ namespace rb {
             }
             return trim(collapsed);
         }
+
+        // 変数の名前を、Java で使える名前にする（例：当たった回数 → v_当たった回数）
+        //   Java で使えない文字（空白・記号など）は _ にする。日本語（ひらがな・カタカナ・漢字）はそのまま使える。
+        std::string javaSafeName(const std::string& prefix, const std::string& name) {
+            std::string out = prefix;
+            size_t i = 0;
+            while (i < name.size()) {
+                unsigned char c = static_cast<unsigned char>(name[i]);
+                // UTF-8 の1文字を読む
+                unsigned int cp = c;
+                size_t len = 1;
+                if (c >= 0xF0) { cp = c & 0x07; len = 4; }
+                else if (c >= 0xE0) { cp = c & 0x0F; len = 3; }
+                else if (c >= 0xC0) { cp = c & 0x1F; len = 2; }
+                if (i + len > name.size()) len = name.size() - i;
+                for (size_t k = 1; k < len; ++k) cp = (cp << 6) | (static_cast<unsigned char>(name[i + k]) & 0x3F);
+                bool ok = (cp < 0x80 && (std::isalnum(c) || c == '_')) ||
+                          (cp >= 0x3041 && cp <= 0x3096) ||   // ひらがな
+                          (cp >= 0x30A1 && cp <= 0x30FA) ||   // カタカナ
+                          cp == 0x30FC || cp == 0x3005 ||     // ー 々
+                          (cp >= 0x4E00 && cp <= 0x9FFF) ||   // 漢字
+                          (cp >= 0xFF10 && cp <= 0xFF19) ||   // 全角数字
+                          (cp >= 0xFF21 && cp <= 0xFF3A) || (cp >= 0xFF41 && cp <= 0xFF5A);  // 全角英字
+                out += ok ? name.substr(i, len) : "_";
+                i += len;
+            }
+            return out;
+        }
+        std::string variableJavaName(const std::string& name) { return javaSafeName("v_", name); }
+        // 関数の名前を、Java で使える名前にする（例：前に進んで撃つ → f_前に進んで撃つ）
+        std::string functionJavaName(const std::string& name) { return javaSafeName("f_", name); }
 
         // カテゴリの色（kCategories から探す。なければ kOtherColor）
         int categoryColor(const std::string& category) {
@@ -455,10 +483,6 @@ namespace rb {
                     a["text"] = arg.initialText;
                     a["spellcheck"] = false;
                     break;
-                case BlockDef::Arg::Variable:
-                    a["type"] = "field_variable";
-                    a["variable"] = arg.initialText;
-                    break;
                 }
                 args.push_back(a);
             }
@@ -487,6 +511,15 @@ namespace rb {
 
             json contents = json::array();
             for (const auto& cat : order) {
+                // 「変数」カテゴリ：Blockly が「変数を作る」ボタンとブロックを自動で出す
+                if (cat == kVariableCategory || cat == kFunctionCategory) {
+                    // 「関数」カテゴリ：Blockly が「関数を作る」ブロックと、作った関数を呼ぶブロックを自動で出す
+                    contents.push_back({ {"kind", "category"},
+                                        {"name", cat},
+                                        {"colour", std::to_string(categoryColor(cat))},
+                                        {"custom", cat == kVariableCategory ? "VARIABLE" : "PROCEDURE"} });
+                    continue;
+                }
                 json items = json::array();
                 int color = categoryColor(cat);   // カテゴリの色は kCategories で決める（ブロックの .color() は関係ない）
                 std::set<std::string> added;
@@ -552,15 +585,145 @@ namespace rb {
         // 1つのブロックを Java にする
         std::string render(const BlockDef::Info& def, const json& block);
 
+        // ---- 変数（Blockly にもともとあるブロック） ----
+        //   variables_set：〇 を △ にする     → v_名前 = △;
+        //   math_change  ：〇 を △ ずつ変える → v_名前 += △;
+        //   variables_get：〇                 → v_名前
+        //   math_number  ：数字（変数のブロックの穴に最初から入っている）
+        std::map<std::string, std::string> variableJavaNames;  // 変数の id → Java の名前
+
+        std::string variableOf(const json& block) {
+            const json* f = fieldOf(block, "VAR");
+            std::string id, name;
+            if (f && f->is_object()) {
+                id = stringOf(*f, "id");
+                name = stringOf(*f, "name");
+            } else if (f && f->is_string()) {
+                id = f->get<std::string>();
+            }
+            auto it = variableJavaNames.find(id);
+            if (it != variableJavaNames.end()) return it->second;
+            if (!name.empty()) return variableJavaName(name);
+            error(&block, nullptr, "変数が見つかりません");
+            return "v_unknown";
+        }
+
+        bool isBuiltinValue(const std::string& type) const {
+            return type == "variables_get" || type == "math_number" || type == "procedures_callreturn";
+        }
+        bool isBuiltinStatement(const std::string& type) const {
+            return type == "variables_set" || type == "math_change" ||
+                   type == "procedures_callnoreturn" || type == "procedures_ifreturn";
+        }
+        bool isFunctionDefinition(const std::string& type) const {
+            return type == "procedures_defnoreturn" || type == "procedures_defreturn";
+        }
+
+        // ---- 関数（Blockly にもともとあるブロック） ----
+        //   procedures_defnoreturn：関数を作る          → void f_名前(double v_引数) { … }
+        //   procedures_defreturn  ：値を返す関数を作る  → double f_名前(double v_引数) { … return 値; }
+        //   procedures_callnoreturn：関数を呼ぶ（命令）  → f_名前(値);
+        //   procedures_callreturn ：関数を呼ぶ（値）    → f_名前(値)
+        //   procedures_ifreturn   ：もし〇なら値を返す  → if (〇) { return 値; }
+        bool insideReturnFunction = false;   // 今、値を返す関数の中を変換しているか
+
+        // 関数を呼ぶ：f_名前(引数1, 引数2)
+        std::string functionCall(const json& block) {
+            const json* state = nullptr;
+            auto it = block.find("extraState");
+            if (it != block.end() && it->is_object()) state = &*it;
+            std::string name = state ? stringOf(*state, "name") : "";
+            size_t count = 0;
+            if (state && state->contains("params") && (*state)["params"].is_array()) count = (*state)["params"].size();
+            std::string args;
+            for (size_t i = 0; i < count; ++i) {
+                if (i > 0) args += ", ";
+                std::string input = "ARG" + std::to_string(i);
+                args += valueOfInput(block, input.c_str());
+            }
+            return functionJavaName(name) + "(" + args + ")";
+        }
+
+        // 関数を作るブロックを、Java のメソッドにする
+        std::string renderFunction(const json& def) {
+            bool returns = stringOf(def, "type") == "procedures_defreturn";
+            const json* nameField = fieldOf(def, "NAME");
+            std::string name = (nameField && nameField->is_string()) ? nameField->get<std::string>() : "";
+            std::string params;
+            auto st = def.find("extraState");
+            if (st != def.end() && st->is_object() && st->contains("params") && (*st)["params"].is_array()) {
+                for (const auto& prm : (*st)["params"]) {
+                    if (!params.empty()) params += ", ";
+                    auto vt = variableJavaNames.find(stringOf(prm, "id"));
+                    params += "double " + (vt != variableJavaNames.end() ? vt->second : variableJavaName(stringOf(prm, "name")));
+                }
+            }
+            insideReturnFunction = returns;
+            std::string body = statementChain(inputOf(def, "STACK"));
+            if (returns) {
+                std::string value = valueOfInput(def, "RETURN");
+                body += (body.empty() ? "" : "\n") + std::string("return ") + value + ";";
+            }
+            insideReturnFunction = false;
+            std::string out = std::string(returns ? "double " : "void ") + functionJavaName(name) + "(" + params + ") {\n";
+            for (const std::string& line : splitLines(body)) out += (line.empty() ? "" : "    " + line) + "\n";
+            return out + "}";
+        }
+
+        // 穴の中（block）を値として Java にする。穴が空なら 0
+        std::string valueOfInput(const json& block, const char* inputName) {
+            const json* child = inputOf(block, inputName);
+            if (!child || isDisabled(*child)) {
+                error(&block, nullptr, "穴にブロックが入っていません");
+                return "0";
+            }
+            return valueOfBlock(*child);
+        }
+
+        std::string valueOfBlock(const json& child) {
+            std::string type = stringOf(child, "type");
+            if (type == "variables_get") return variableOf(child);
+            if (type == "math_number") return formatNumber(numberFrom(fieldOf(child, "NUM"), 0));
+            if (type == "procedures_callreturn") return functionCall(child);
+            const BlockDef::Info* childDef = find(type);
+            if (!childDef) {
+                error(&child, nullptr, "知らないブロックです（" + type + "）");
+                return "0";
+            }
+            if (!childDef->isOutput) {
+                error(&child, childDef, "このブロックは穴にははめられません");
+                return "0";
+            }
+            return render(*childDef, child);
+        }
+
+        std::string builtinStatement(const json& block) {
+            std::string type = stringOf(block, "type");
+            if (type == "procedures_callnoreturn") return functionCall(block) + ";";
+            if (type == "procedures_ifreturn") {
+                std::string cond = valueOfInput(block, "CONDITION");
+                if (insideReturnFunction) return "if (" + cond + ") {\n    return " + valueOfInput(block, "VALUE") + ";\n}";
+                return "if (" + cond + ") {\n    return;\n}";
+            }
+            std::string var = variableOf(block);
+            if (type == "variables_set") return var + " = " + valueOfInput(block, "VALUE") + ";";
+            return var + " += " + valueOfInput(block, "DELTA") + ";";
+        }
+
         // つながっている命令ブロックを順番に Java にする
         std::string statementChain(const json* first) {
             std::vector<std::string> parts;
             for (const json* b = first; b != nullptr; b = nextOf(*b)) {
                 if (isDisabled(*b)) continue;
                 std::string type = stringOf(*b, "type");
+                if (isBuiltinStatement(type)) {   // 変数のブロック
+                    parts.push_back(builtinStatement(*b));
+                    continue;
+                }
                 const BlockDef::Info* def = find(type);
                 if (!def) {
-                    error(b, nullptr, "知らないブロックです（" + type + "）");
+                    error(b, nullptr, isBuiltinValue(type) ? "このブロックはここには置けません"
+                                                           : "知らないブロックです（" + type + "）");
                     continue;
                 }
                 if (def->isEvent || def->isOutput) {
@@ -580,17 +743,7 @@ namespace rb {
                 error(&block, &def, "穴にブロックが入っていません");
                 return arg.valueType == "Boolean" ? "false" : "0";
             }
-            std::string type = stringOf(*child, "type");
-            const BlockDef::Info* childDef = find(type);
-            if (!childDef) {
-                error(child, nullptr, "知らないブロックです（" + type + "）");
-                return "0";
-            }
-            if (!childDef->isOutput) {
-                error(child, childDef, "このブロックは穴にははめられません");
-                return "0";
-            }
-            return render(*childDef, *child);
+            return valueOfBlock(*child);
         }
 
         // 口の中の命令ブロックを Java にする
@@ -715,15 +868,6 @@ namespace rb {
             const json* f = fieldOf(*impl_->block, name);
             return (f && f->is_string()) ? f->get<std::string>() : arg->initialText;
         }
-        case BlockDef::Arg::Variable: {
-            const json* f = fieldOf(*impl_->block, name);
-
-            if (f && f->is_string()) {
-                return f->get<std::string>();
-            }
-
-            return arg->initialText;
-        }
         }
         return "";
     }
@@ -811,18 +955,6 @@ namespace rb {
         return *this;
     }
 
-    BlockDef& BlockDef::variableField(const std::string& name, const std::string& initial)
-    {
-        Arg arg;
-        arg.kind = Arg::Variable;
-        arg.name = name;
-        arg.initialText = initial;
-
-        info.args.push_back(arg);
-
-        return *this;
-    }
-
     BlockDef& BlockDef::output(const std::string& type) {
         info.isOutput = true;
         info.outputType = type;
@@ -893,6 +1025,21 @@ namespace rb {
         try {
             json ws = json::parse(workspaceJson);
 
+            // 変数（「変数を作る」で作ったもの）を集めて、Java の名前を決める
+            std::vector<std::string> fieldNames;
+            std::set<std::string> usedNames;
+            auto vars = ws.find("variables");
+            if (vars != ws.end() && vars->is_array()) {
+                for (const auto& v : *vars) {
+                    if (!v.is_object()) continue;
+                    std::string javaName = variableJavaName(stringOf(v, "name"));
+                    std::string unique = javaName;
+                    for (int n = 2; !usedNames.insert(unique).second; ++n) unique = javaName + "_" + std::to_string(n);
+                    conv.variableJavaNames[stringOf(v, "id")] = unique;
+                    fieldNames.push_back(unique);
+                }
+            }
+
             // 一番上に置かれているブロックを集める
             std::vector<const json*> tops;
             auto blocks = ws.find("blocks");
@@ -907,10 +1054,15 @@ namespace rb {
 
             // イベントブロックを選び出す
             std::vector<std::pair<const BlockDef::Info*, const json*>> events;
+            std::vector<const json*> functions;   // 「関数」カテゴリで作った関数
             std::set<std::string> seen;
             for (const json* b : tops) {
                 if (isDisabled(*b)) continue;
                 std::string type = stringOf(*b, "type");
+                if (conv.isFunctionDefinition(type)) {
+                    functions.push_back(b);
+                    continue;
+                }
                 const BlockDef::Info* def = conv.find(type);
                 if (!def) {
                     conv.error(b, nullptr, "知らないブロックです（" + type + "）");
@@ -946,6 +1098,15 @@ namespace rb {
                 }
             }
 
+            // 関数ごとに Java のメソッドを作る（イベントのあとに並べる）
+            for (const json* f : functions) {
+                std::string method = conv.renderFunction(*f);
+                if (!body.empty()) body += "\n";
+                for (const std::string& line : splitLines(method)) {
+                    body += (line.empty() ? "" : "    " + line) + "\n";
+                }
+            }
+
             // Java のファイル全体
             std::ostringstream java;
             java << "package " << (trim(packageName).empty() ? kJavaPackage : trim(packageName)) << ";\n"
@@ -956,6 +1117,11 @@ namespace rb {
                 << "\n"
                 << "// Generated by Robocode Blocks\n"
                 << "public class " << name << " extends AdvancedRobot {\n";
+            if (!fieldNames.empty()) {
+                java << "\n";
+                java << "    // 「変数」カテゴリで作った変数（ラウンドが変わると 0 にもどる）\n";
+                for (const auto& f : fieldNames) java << "    double " << f << " = 0;\n";
+            }
             if (!body.empty()) java << "\n" << body;
             java << "}\n";
             conv.result.java = java.str();
@@ -982,7 +1148,7 @@ namespace rb {
                 if (!m.blockLabel.empty()) s += "【" + m.blockLabel + "】";
                 s += m.text + "\n";
             }
-         };
+            };
         put("エラー（直さないと動きません）", errors);
         if (!errors.empty() && !warnings.empty()) s += "\n";
         put("注意", warnings);
