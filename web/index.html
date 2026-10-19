@@ -80,6 +80,63 @@
       right: 400px;
     }
 
+    /* ブロックを置くあいだだけ、上のバーと右の結果を消して、ブロックの画面を広くする */
+    body.focus-mode #toolbar,
+    body.focus-mode #resultPanel {
+      display: none;
+    }
+    body.focus-mode #blocklyDiv {
+      top: 0;
+      right: 0;
+    }
+    /* 画面を広くしているあいだだけ出る、右上のボタン */
+    #focusBar {
+      display: none;
+      position: absolute;
+      top: 10px;
+      right: 28px;            /* 右のスクロールバーに重ならないように */
+      z-index: 100;
+      gap: 8px;
+      padding: 6px;
+      border-radius: 10px;
+      background: rgba(44, 62, 80, 0.92);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    }
+    body.focus-mode #focusBar {
+      display: flex;
+    }
+    #focusBar button {
+      position: relative;
+      height: 44px;
+      min-width: 44px;
+      padding: 0 12px;
+      border: none;
+      border-radius: 6px;
+      background: #5d6d7e;
+      color: #fff;
+      font-size: 15px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    #focusBar button:hover { background: #7f8c8d; }
+    #focusBar button:disabled { opacity: 0.4; cursor: default; background: #5d6d7e; }
+    #focusBar button.primary { background: #27ae60; }
+    #focusBar button.primary:hover { background: #2ecc71; }
+    #focusBar svg {
+      width: 26px;
+      height: 26px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+
     /* 右：結果を表示する場所 */
     #resultPanel {
       position: absolute;
@@ -250,6 +307,9 @@
     <button id="undoButton" class="sub icon" data-tip="元に戻す（Ctrl + Z）" aria-label="元に戻す" disabled><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
     <button id="redoButton" class="sub icon" data-tip="やり直す（Ctrl + Y）" aria-label="やり直す" disabled><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
 
+    <!-- ブロックを選ぶときに画面を広くする（オン／オフ） -->
+    <button id="focusButton" class="sub icon" data-tip="画面を広くする（もどすときは Esc）" aria-label="画面を広くする"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+
     <span class="sep"></span>
 
     <!-- ブロックを名前で探す -->
@@ -273,6 +333,13 @@
   </div>
 
   <div id="blocklyDiv"></div>
+
+  <!-- 画面を広くしているあいだだけ出るボタン（右上） -->
+  <div id="focusBar">
+    <button id="focusUndoButton" title="元に戻す（Ctrl + Z）" aria-label="元に戻す" disabled><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
+    <button id="focusRedoButton" title="やり直す（Ctrl + Y）" aria-label="やり直す" disabled><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
+    <button id="exitFocusButton" class="primary" title="上のバーと結果の欄を出す（Esc）"><svg viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>元の画面にもどす</button>
+  </div>
 
   <div id="resultPanel">
     <div id="status">ブロックを組んで「Java を作る」を押してください（Shift + ドラッグで囲んで Delete でまとめて消す／Ctrl + D で複製／Ctrl + Z・Ctrl + Y で戻す・やり直す）</div>
@@ -951,13 +1018,53 @@
     }
 
     function updateUndoButtons() {
-      document.getElementById('undoButton').disabled = workspace.getUndoStack().length === 0;
-      document.getElementById('redoButton').disabled = workspace.getRedoStack().length === 0;
+      const noUndo = workspace.getUndoStack().length === 0;
+      const noRedo = workspace.getRedoStack().length === 0;
+      document.getElementById('undoButton').disabled = noUndo;
+      document.getElementById('redoButton').disabled = noRedo;
+      document.getElementById('focusUndoButton').disabled = noUndo;   // 広い画面の右上のボタン
+      document.getElementById('focusRedoButton').disabled = noRedo;
     }
 
     document.getElementById('undoButton').addEventListener('click', () => undoRedo(false));
     document.getElementById('redoButton').addEventListener('click', () => undoRedo(true));
+    document.getElementById('focusUndoButton').addEventListener('click', () => undoRedo(false));
+    document.getElementById('focusRedoButton').addEventListener('click', () => undoRedo(true));
     workspace.addChangeListener(() => updateUndoButtons());
+
+    // ------------------------------------------------------------
+    // 画面を広くする
+    //   上のバーの ⛶ ボタンを押したときだけ、上のバーと右の結果を消して、ブロックの画面を広くする。
+    //   広いままブロックを組み続けられる。もどすときは、右上の「元の画面にもどす」か Esc。
+    //   画面の上の位置が変わっても、置いてあるブロックが動いて見えないように、その分スクロールする。
+    // ------------------------------------------------------------
+
+    function setFocusMode(on) {
+      if (document.body.classList.contains('focus-mode') === on) return;
+      const div = document.getElementById('blocklyDiv');
+      const oldTop = div.getBoundingClientRect().top;
+      document.body.classList.toggle('focus-mode', on);
+      Blockly.svgResize(workspace);   // 画面の大きさが変わったことを Blockly に伝える
+      const shift = oldTop - div.getBoundingClientRect().top;   // 画面が上にずれた分（広げると 56）
+      if (shift !== 0) {
+        // ずれた分だけスクロールして、ブロックが画面の同じ場所に見えるようにする
+        // （ドラッグ中のブロックもカーソルからずれない）
+        workspace.scroll(workspace.scrollX, workspace.scrollY + shift);
+      }
+    }
+
+    // 「元の画面にもどす」ボタン
+    document.getElementById('exitFocusButton').addEventListener('click', () => setFocusMode(false));
+
+    // Esc キーでも元の画面にもどす（ドラッグ中は何もしない）
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || !document.body.classList.contains('focus-mode')) return;
+      if (Blockly.Gesture.inProgress()) return;
+      setFocusMode(false);
+    });
+
+    // 「画面を広くする」ボタン：押したらすぐに広くする
+    document.getElementById('focusButton').addEventListener('click', () => setFocusMode(true));
 
     document.addEventListener('keydown', (e) => {
       if (!e.ctrlKey) return;

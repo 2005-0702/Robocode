@@ -8,10 +8,10 @@ ROBOCODE_BLOCKS(RobotSensor)
         .text("レーダーを敵にロックする")
         .tooltip("見つけた敵の方へレーダーを向け直して、ずっと敵を見続けます")
         .java(R"({
-        double radarTurn = robocode.util.Utils.normalRelativeAngleDegrees(
-        getHeading() + e.getBearing() - getRadarHeading());
-        turnRadarRight(radarTurn + (radarTurn < 0 ? -20 : 20));   // 少し行き過ぎるように回す
-        scan();
+         double radar = getHeading() + e.getBearing() - getRadarHeading();
+         while (radar > 180) radar -= 360;                           
+         while (radar < -180) radar += 360;
+         turnRadarRight(radar);
         })")
         .onlyIn("robot_event_enemyDetected");
     // 砲塔を敵にロックする
@@ -20,10 +20,10 @@ ROBOCODE_BLOCKS(RobotSensor)
         .text("砲塔を敵にロックする")
         .tooltip("見つけた敵の方へ砲塔を向け直して、ずっと敵を見続けます")
         .java(R"({
-        double gunTurn = robocode.util.Utils.normalRelativeAngleDegrees(
-        getHeading() + e.getBearing() - getGunHeading());
-        turnGunRight(gunTurn);   // 少し行き過ぎるように回す
-        scan();
+        double gun = getHeading() + e.getBearing() - getGunHeading();
+        while (gun > 180) gun -= 360;
+        while (gun < -180) gun += 360;
+        turnGunRight(gun);
         })")
         .onlyIn("robot_event_enemyDetected");
     // 敵との距離
