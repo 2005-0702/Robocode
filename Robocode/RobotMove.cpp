@@ -66,22 +66,22 @@ ROBOCODE_BLOCKS(RobotMove)
     //砲塔固定
     Block("robot_gun_keep_direction")
         .category("動き")
-        .text("砲塔が固定される")
-        .tooltip("砲塔の向きが固定されます")
+        .text("砲塔がロボットから独立して動く")
+        .tooltip("砲塔がロボットから独立して動きます")
         .java("setAdjustGunForRobotTurn(true);");
 
     //レーダー固定ロボット旋回時
     Block("robot_rader_keep_direction")
         .category("動き")
-        .text("ロボット旋回時レーダーが固定される")
-        .tooltip("ロボット旋回時レーダーが固定されます")
+        .text("ロボット旋回時レーダーが独立して動く")
+        .tooltip("ロボット旋回時レーダーが独立して動きます")
         .java("setAdjustRadarForRobotTurn(true);");
 
     //レーダー固定砲塔旋回時
     Block("Gun_rader_keep_direction")
         .category("動き")
-        .text("砲塔旋回時レーダーが固定される")
-        .tooltip("砲塔旋回時レーダーが固定されます")
+        .text("砲塔旋回時レーダーが独立して動く")
+        .tooltip("砲塔旋回時レーダーが独立して動きます")
         .java("setAdjustRadarForGunTurn(true);");
 
 

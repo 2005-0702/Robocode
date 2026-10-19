@@ -93,8 +93,7 @@ ROBOCODE_BLOCKS(RobotSample)
     }
     
     scan();
-    )")
-        .onlyIn("robot_event_hitEnemy");
+    )");
 
     // 相手に砲塔を向けてスキャン
     Block("robot_sample_turnGunToEnemy")
@@ -107,8 +106,7 @@ ROBOCODE_BLOCKS(RobotSample)
     
     turnGunRight(gunTurnAmt);
     scan();
-    )")
-        .onlyIn("robot_event_hitEnemy");
+    )");
 
 
 }

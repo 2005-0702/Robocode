@@ -80,4 +80,11 @@ ROBOCODE_BLOCKS(GetGameInfomation)
         .output("Number")
         .tooltip("残りの敵の数がわかります")
         .java("getOthers()");
+    //敵との方向
+    Block("enemy_Bearing")
+        .category("ゲーム情報2")
+        .text("敵の方向")
+        .output("Number")
+        .tooltip("敵の方向です")
+        .java("e.getBearing()");
 }
