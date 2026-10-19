@@ -92,10 +92,11 @@
     /* 画面を広くしているあいだだけ出る、右上のボタン */
     #focusBar {
       display: none;
-      position: absolute;
-      top: 10px;
+      position: fixed;
+      top: 10px;              /* 最初の場所（ドラッグで動かすと JS で left / top を変える） */
       right: 28px;            /* 右のスクロールバーに重ならないように */
       z-index: 100;
+      align-items: center;
       gap: 8px;
       padding: 6px;
       border-radius: 10px;
@@ -126,6 +127,46 @@
     #focusBar button:disabled { opacity: 0.4; cursor: default; background: #5d6d7e; }
     #focusBar button.primary { background: #27ae60; }
     #focusBar button.primary:hover { background: #2ecc71; }
+    /* つまんで動かすところ */
+    #focusGrip {
+      width: 18px;
+      height: 44px;
+      cursor: grab;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #aab7c4;
+      font-size: 18px;
+      letter-spacing: -3px;
+      user-select: none;
+      touch-action: none;
+    }
+    #focusGrip:active { cursor: grabbing; }
+    #focusBar button.hide { min-width: 32px; padding: 0 6px; font-size: 20px; }
+
+    /* 横にかくしたときに出る、小さな矢印のつまみ */
+    #focusTab {
+      display: none;
+      position: fixed;
+      z-index: 100;
+      width: 30px;
+      height: 64px;
+      border: none;
+      background: rgba(44, 62, 80, 0.92);
+      color: #fff;
+      font-size: 22px;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+      touch-action: none;
+    }
+    #focusTab.left  { left: 0;  border-radius: 0 10px 10px 0; }
+    #focusTab.right { right: 0; border-radius: 10px 0 0 10px; }
+    #focusTab:hover { background: rgba(61, 86, 110, 0.95); }
+    body.focus-mode.focus-collapsed #focusBar { display: none; }
+    body.focus-mode.focus-collapsed #focusTab { display: flex; }
+
     #focusBar svg {
       width: 26px;
       height: 26px;
@@ -277,10 +318,26 @@
 
     /* ブロックの検索 */
     #searchBox {
-      width: 140px !important;
+      width: 80px !important;
       border-radius: 12px;
       border: none;
     }
+
+    /* ゴミ箱の中身の横スクロールバー（横に長いブロックがあるときだけ出る） */
+    #trashScroll {
+      display: none;
+      position: fixed;
+      height: 16px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      z-index: 95;
+      background: rgba(255, 255, 255, 0.9);
+    }
+    #trashScroll > div { height: 1px; }
+
+    /* クリックできるメッセージ（保存した場所など） */
+    .message.link { cursor: pointer; text-decoration: underline; }
+    .message.link:hover { background: #eef3fb; }
 
     /* 囲んで選ぶときの四角 */
     #selectBand {
@@ -313,7 +370,6 @@
     <button id="openButton" class="sub icon" data-tip="保存した作品を開く" aria-label="開く"><svg viewBox="0 0 24 24"><path d="M3 7a1 1 0 0 1 1-1h5l2 2h8a1 1 0 0 1 1 1v2"/><path d="M3 7v12a1 1 0 0 0 1 1h14l3-9H7l-3 8"/></svg></button>
     <button id="saveButton" class="sub icon" data-tip="保存する（Ctrl + S）" aria-label="保存"><svg viewBox="0 0 24 24"><path d="M5 3h11l4 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M8 3v5h7V3"/><rect x="7" y="13" width="10" height="7"/></svg></button>
     <button id="saveAsButton" class="sub icon" data-tip="別の名前で保存する" aria-label="別名で保存"><svg viewBox="0 0 24 24"><path d="M12 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h11l4 4v4"/><path d="M8 3v5h7V3"/><path d="M7 21v-7h6"/><path d="M19.5 13.5l2 2L16 21h-2v-2z"/></svg></button>
-    <button id="importJavaButton" class="sub icon" data-tip="Java（.java）を読みこんでブロックにする" aria-label="Java を読みこむ"><svg viewBox="0 0 24 24"><path d="M13 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9z"/><path d="M13 3v6h6"/><path d="M10 12l-2.5 2.5L10 17M14 12l2.5 2.5L14 17"/></svg></button>
     <span id="fileName">（まだ保存していません）</span>
 
     <span class="sep"></span>
@@ -328,33 +384,38 @@
     <span class="sep"></span>
 
     <!-- ブロックを名前で探す -->
-    <input id="searchBox" type="search" placeholder="🔍 ブロックを検索"
+    <input id="searchBox" type="search" placeholder="🔍 検索"
            title="ブロックの名前の一部を入れると、当てはまるブロックが出てきます（Esc で閉じる）">
 
     <span class="sep"></span>
 
     <!-- パッケージ名とロボットの名前 → Robocode では「パッケージ名.ロボットの名前」で表示される -->
-    <label for="packageName">パッケージ</label>
+    <label for="packageName">フォルダ</label>
     <input id="packageName" value="student" maxlength="16"
            title="英字で始まり、英字・数字・_ だけ（. で区切れる）。16文字まで">
     <span class="dot">.</span>
     <label for="robotName">ロボットの名前</label>
     <input id="robotName" value="MyRobot" maxlength="32"
            title="英字で始まり、英字・数字・_ だけ。32文字まで">
-    <button id="convertButton">Java を作る</button>
+    <button id="convertButton">ロボットを作る</button>
+    <button id="importJavaButton" class="sub icon" data-tip="Java（.java）を読みこんでブロックにする" aria-label="Java を読みこむ"><svg viewBox="0 0 24 24"><path d="M13 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9z"/><path d="M13 3v6h6"/><path d="M10 12l-2.5 2.5L10 17M14 12l2.5 2.5L14 17"/></svg></button>
 
     <span style="flex: 1"></span>
     <button id="launchButton" title="Robocode を起動する（このアプリから開いた Robocode なら開き直す）">Robocode を開く</button>
   </div>
 
   <div id="blocklyDiv"></div>
+  <div id="trashScroll"><div></div></div>
 
   <!-- 画面を広くしているあいだだけ出るボタン（右上） -->
   <div id="focusBar">
+    <div id="focusGrip" title="ドラッグして好きな場所に動かせます">⋮⋮</div>
     <button id="focusUndoButton" title="元に戻す（Ctrl + Z）" aria-label="元に戻す" disabled><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
     <button id="focusRedoButton" title="やり直す（Ctrl + Y）" aria-label="やり直す" disabled><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
     <button id="exitFocusButton" class="primary" title="上のバーと結果の欄を出す（Esc）"><svg viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>元の画面にもどす</button>
+    <button id="focusHideButton" class="hide" title="画面の横にかくす（矢印を押すとまた出てきます）">⇥</button>
   </div>
+  <button id="focusTab" class="right" title="ボタンを出す">‹</button>
 
   <div id="resultPanel">
     <div id="status">ブロックを組んで「Java を作る」を押してください（Shift + ドラッグで囲んで Delete でまとめて消す／Ctrl + D で複製／Ctrl + Z・Ctrl + Y で戻す・やり直す）</div>
@@ -546,7 +607,6 @@
     const AUTOSAVE_KEY = 'robocodeBlocks.autosave';
     let autosaveTimer = null;
     let restored = false;   // 前回の続きを読み込んだか（ページを開いて最初の1回だけ読み込む）
-
     // ------------------------------------------------------------
     // 色ノードのRGB欄を、円形HSVカラーホイールから変更する
     // 既存の R / G / B フィールドとJava生成はそのまま使用
@@ -759,6 +819,7 @@
     }
 
 
+
     function autosave() {
       if (!restored) return;   // 読み込む前に保存すると、前回の続きを消してしまうので待つ
       clearTimeout(autosaveTimer);
@@ -792,12 +853,13 @@
 
       try {
         loading = true;
+        clearWorkspaceCompletely();
         Blockly.serialization.workspaces.load(data.workspace, workspace);
         workspace.clearUndo();
       } catch (err) {
         // 今のアプリにないブロックが入っていると、ここに来る
         loading = false;
-        workspace.clear();
+        clearWorkspaceCompletely();
         showStatus('error', '前回の続きを開けませんでした（今のアプリにないブロックが入っていた可能性があります）');
         return;
       }
@@ -816,6 +878,19 @@
         updateFileName();
       }, 0);
       showStatus('ok', '前回の続きから始めます');
+    }
+
+    // ブロックの画面とゴミ箱を、完全に空にする（新しく作る・開く・Java を読みこむ・前回の続きを読み込むとき）
+    //   ふつうに消すと「ブロックを消した」お知らせが出て、消したブロックがゴミ箱に入ってしまう。
+    //   そこで、お知らせを止めてから消し、そのあとゴミ箱も空にする。
+    function clearWorkspaceCompletely() {
+      Blockly.Events.disable();
+      try {
+        workspace.clear();
+      } finally {
+        Blockly.Events.enable();
+      }
+      if (workspace.trashcan) workspace.trashcan.emptyContents();
     }
 
     // 「変更なし」にする
@@ -857,7 +932,7 @@
     document.getElementById('newButton').addEventListener('click', () => {
       if (!confirmDiscard()) return;
       loading = true;
-      workspace.clear();
+      clearWorkspaceCompletely();
       workspace.clearUndo();
       document.getElementById('robotName').value = 'MyRobot';
       currentPath = '';
@@ -886,10 +961,11 @@
     function loadImportedJava(msg) {
       try {
         loading = true;
+        clearWorkspaceCompletely();
         Blockly.serialization.workspaces.load(msg.workspace || {}, workspace);
       } catch (err) {
         loading = false;
-        workspace.clear();
+        clearWorkspaceCompletely();
         showStatus('error', 'Java をブロックにできませんでした');
         addMessage('detail', '', String(err && err.message ? err.message : err));
         return;
@@ -919,11 +995,12 @@
     function loadWork(work, path) {
       try {
         loading = true;
+        clearWorkspaceCompletely();
         Blockly.serialization.workspaces.load(work.workspace || {}, workspace);
       } catch (err) {
         // 今のアプリにないブロックが入っていると、ここに来る
         loading = false;
-        workspace.clear();
+        clearWorkspaceCompletely();
         showStatus('error', 'この作品は開けませんでした。今のアプリにないブロックが使われている可能性があります');
         addMessage('detail', '', String(err && err.message ? err.message : err));
         return;
@@ -1021,7 +1098,11 @@
         if (build && build.ok) {
           showStatus('ok', build.message + (msg.warnings.length > 0
             ? '（注意が ' + msg.warnings.length + ' 件あります）' : ''));
-          addMessage('info', '✔', '保存した場所：' + build.javaPath);
+          const where = addMessage('info link', '📂', '保存した場所：' + build.javaPath + '（クリックで開く）');
+          where.title = 'エクスプローラーで、保存したフォルダを開きます';
+          where.addEventListener('click', () => {
+            window.chrome.webview.postMessage({ kind: 'showInFolder', path: build.javaPath });
+          });
           addMessage('info', '💡', 'Robocode を開いていたら、「Robocode を開く」で開き直すと一覧に出ます');
         } else if (build) {
           showStatus('error', build.message);
@@ -1362,6 +1443,8 @@
       const div = document.getElementById('blocklyDiv');
       const oldTop = div.getBoundingClientRect().top;
       document.body.classList.toggle('focus-mode', on);
+      if (!on) document.body.classList.remove('focus-collapsed');   // 次に広くしたときは、ボタンを出しておく
+      if (on) placeFocusBar();
       Blockly.svgResize(workspace);   // 画面の大きさが変わったことを Blockly に伝える
       const shift = oldTop - div.getBoundingClientRect().top;   // 画面が上にずれた分（広げると 56）
       if (shift !== 0) {
@@ -1373,6 +1456,97 @@
 
     // 「元の画面にもどす」ボタン
     document.getElementById('exitFocusButton').addEventListener('click', () => setFocusMode(false));
+
+    // ------------------------------------------------------------
+    // 広い画面の右上のボタンを、動かしたり、横にかくしたりする
+    //   ・左はしの ⋮⋮ をつまんでドラッグすると、好きな場所に動かせる（場所は覚えておく）
+    //   ・⇥ を押すと、近い方の画面のはしにかくれて、小さな矢印だけになる
+    //   ・矢印を押すと、もとの場所にもどる（矢印は上下にドラッグして動かせる）
+    // ------------------------------------------------------------
+    const focusBar = document.getElementById('focusBar');
+    const focusTab = document.getElementById('focusTab');
+    const FOCUS_POS_KEY = 'robocodeBlocks.focusBarPos';
+    let focusPos = null;   // { left, top }（null なら最初の場所：右上）
+    try { focusPos = JSON.parse(localStorage.getItem(FOCUS_POS_KEY) || 'null'); } catch (err) { focusPos = null; }
+
+    // 画面からはみ出さないようにして、ボタンを置く
+    function placeFocusBar() {
+      if (!focusPos) return;   // まだ動かしていなければ、CSS の右上のまま
+      const w = focusBar.offsetWidth || 300, h = focusBar.offsetHeight || 56;
+      focusPos.left = Math.max(0, Math.min(window.innerWidth - w, focusPos.left));
+      focusPos.top = Math.max(0, Math.min(window.innerHeight - h, focusPos.top));
+      focusBar.style.left = focusPos.left + 'px';
+      focusBar.style.top = focusPos.top + 'px';
+      focusBar.style.right = 'auto';
+    }
+    function saveFocusPos() {
+      try { localStorage.setItem(FOCUS_POS_KEY, JSON.stringify(focusPos)); } catch (err) { /* 保存できなくても動く */ }
+    }
+
+    // ⋮⋮ をつまんでドラッグ
+    const focusGrip = document.getElementById('focusGrip');
+    let gripDrag = null;
+    focusGrip.addEventListener('pointerdown', (e) => {
+      const r = focusBar.getBoundingClientRect();
+      gripDrag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+      focusGrip.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    focusGrip.addEventListener('pointermove', (e) => {
+      if (!gripDrag) return;
+      focusPos = { left: e.clientX - gripDrag.dx, top: e.clientY - gripDrag.dy };
+      placeFocusBar();
+    });
+    focusGrip.addEventListener('pointerup', () => {
+      if (!gripDrag) return;
+      gripDrag = null;
+      saveFocusPos();
+    });
+
+    // ⇥ ：近い方の画面のはしにかくす
+    document.getElementById('focusHideButton').addEventListener('click', () => {
+      const r = focusBar.getBoundingClientRect();
+      const side = (r.left + r.width / 2 < window.innerWidth / 2) ? 'left' : 'right';
+      focusTab.className = side;
+      focusTab.textContent = side === 'left' ? '›' : '‹';   // 画面の内側を向く矢印
+      const top = r.top + r.height / 2 - 32;
+      focusTab.style.top = Math.max(0, Math.min(window.innerHeight - 64, top)) + 'px';
+      document.body.classList.add('focus-collapsed');
+    });
+
+    // 矢印：押すとボタンが出てくる（上下にドラッグすると、矢印を動かせる）
+    let tabDrag = null;
+    focusTab.addEventListener('pointerdown', (e) => {
+      tabDrag = { startY: e.clientY, startTop: focusTab.getBoundingClientRect().top, moved: false };
+      focusTab.setPointerCapture(e.pointerId);
+    });
+    focusTab.addEventListener('pointermove', (e) => {
+      if (!tabDrag) return;
+      const dy = e.clientY - tabDrag.startY;
+      if (Math.abs(dy) > 4) tabDrag.moved = true;
+      if (tabDrag.moved) {
+        focusTab.style.top = Math.max(0, Math.min(window.innerHeight - 64, tabDrag.startTop + dy)) + 'px';
+      }
+    });
+    focusTab.addEventListener('pointerup', () => {
+      if (!tabDrag) return;
+      const moved = tabDrag.moved;
+      tabDrag = null;
+      if (moved) return;   // ドラッグしただけなら、開かない
+      // 矢印の高さに合わせて、ボタンを出す（矢印がかくれる前に、場所を読んでおく）
+      const tabCenter = focusTab.getBoundingClientRect().top + 32;
+      const onLeft = focusTab.classList.contains('left');
+      document.body.classList.remove('focus-collapsed');
+      const h = focusBar.offsetHeight || 56;
+      const w = focusBar.offsetWidth || 300;
+      const top = tabCenter - h / 2;
+      const left = onLeft ? 8 : window.innerWidth - w - 28;
+      focusPos = { left: left, top: top };
+      placeFocusBar();
+      saveFocusPos();
+    });
+
+    window.addEventListener('resize', placeFocusBar);
 
     // Esc キーでも元の画面にもどす（ドラッグ中は何もしない）
     document.addEventListener('keydown', (e) => {
@@ -1396,6 +1570,81 @@
       e.stopPropagation();   // Blockly にもともとある Ctrl+Z / Ctrl+Y と二重に動かないようにする
       undoRedo(isRedo);
     }, true);
+
+    // ------------------------------------------------------------
+    // ゴミ箱の中身の一覧
+    //   ・背景を白にする（ゴミ箱のアイコンが紺色の背景に重なって見えにくいため）
+    //   ・幅を広げすぎないようにして、横に長いブロックは横スクロールで見る
+    // ------------------------------------------------------------
+    const trashFlyout = workspace.trashcan && workspace.trashcan.flyout;
+    const trashScroll = document.getElementById('trashScroll');
+    const TRASH_MAX_WIDTH = 360;   // ゴミ箱の中身の一覧の、いちばん広いときの幅
+
+    if (trashFlyout) {
+      const trashWs = trashFlyout.getWorkspace();
+
+      // 幅が TRASH_MAX_WIDTH より広くならないようにする
+      const originalReflow = trashFlyout.reflowInternal_;
+      trashFlyout.reflowInternal_ = function () {
+        originalReflow.call(this);
+        if (this.width_ > TRASH_MAX_WIDTH) {
+          this.width_ = TRASH_MAX_WIDTH;
+          this.position();
+          this.targetWorkspace.resizeContents();
+          this.targetWorkspace.recordDragTargets();
+        }
+        setTimeout(updateTrashScroll, 0);
+      };
+
+      // 横にずらす（scrollX はマイナスにするほど左にずれる）
+      const scrollTrashTo = (left) => {
+        trashWs.scrollX = -left;
+        const abs = trashWs.getMetricsManager().getAbsoluteMetrics();
+        trashWs.translate(trashWs.scrollX + abs.left, trashWs.scrollY + abs.top);
+      };
+      trashScroll.addEventListener('scroll', () => scrollTrashTo(trashScroll.scrollLeft));
+
+      // 横スクロールバーを出す・かくす
+      function updateTrashScroll() {
+        if (!trashFlyout.isVisible()) {
+          trashScroll.style.display = 'none';
+          return;
+        }
+        const box = trashWs.getBlocksBoundingBox();
+        const contentWidth = (box.right + 20) * trashWs.scale;                    // 中身の幅
+        const viewWidth = trashFlyout.getWidth() - Blockly.Scrollbar.scrollbarThickness;  // 見えている幅
+        if (contentWidth <= viewWidth + 1) {
+          trashScroll.style.display = 'none';
+          scrollTrashTo(0);
+          return;
+        }
+        const rect = trashWs.getParentSvg().getBoundingClientRect();
+        trashScroll.style.display = 'block';
+        trashScroll.style.left = rect.left + 'px';
+        trashScroll.style.top = (rect.bottom - 16) + 'px';
+        trashScroll.style.width = viewWidth + 'px';
+        trashScroll.firstElementChild.style.width = contentWidth + 'px';
+        scrollTrashTo(trashScroll.scrollLeft);
+      }
+
+      // ゴミ箱を開いた・閉じたとき、画面の大きさが変わったときに出し直す
+      workspace.addChangeListener((e) => {
+        if (e.type === Blockly.Events.TRASHCAN_OPEN) {
+          trashScroll.scrollLeft = 0;
+          trashWs.scrollX = 0;
+          setTimeout(updateTrashScroll, 50);   // 中身が並ぶのを待つ
+        }
+      });
+      window.addEventListener('resize', () => setTimeout(updateTrashScroll, 50));
+
+      // Shift + ホイールでも横にスクロールできるようにする
+      trashWs.getParentSvg().addEventListener('wheel', (e) => {
+        if (!e.shiftKey || trashScroll.style.display === 'none') return;
+        trashScroll.scrollLeft += e.deltaY;
+        e.preventDefault();
+        e.stopPropagation();
+      }, true);
+    }
 
     // 上の帯に結果を表示する
     function showStatus(type, text) {
@@ -1432,6 +1681,7 @@
       div.className = 'message ' + type;
       div.textContent = (mark ? mark + ' ' : '') + text;
       document.getElementById('messages').appendChild(div);
+      return div;
     }
   </script>
 </body>
