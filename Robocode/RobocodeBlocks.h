@@ -65,6 +65,7 @@
 //                                  選ぶ欄。{画面に出る文字, Java に入る文字} の組で書く
 //     .valueInput("名前", "Number") 値ブロックをはめる穴（"Number" か "Boolean"）
 //     .statements("名前")           中にブロックを入れる口
+//     .textField("名前", "最初の文字")  文字を入力する欄（入力した文字がそのまま Java に入る）
 //
 //   ブロックの種類（何も書かなければ「命令ブロック」になる）
 //     .output("Number")            値ブロックにする（"Number" か "Boolean"）
@@ -148,6 +149,7 @@ public:
     BlockDef& dropdown(const std::string& name, const Options& options);
     BlockDef& valueInput(const std::string& name, const std::string& type = "Number");
     BlockDef& statements(const std::string& name);
+    BlockDef& textField(const std::string& name, const std::string& initial = "");
 
     // ブロックの種類
     BlockDef& output(const std::string& type = "Number");
@@ -164,10 +166,11 @@ public:
 
     // ===== ここから下は RobocodeBlocksCore.cpp が使うもの（読まなくてOK）=====
     struct Arg {
-        enum Kind { Number, Dropdown, Value, Statements };
+        enum Kind { Number, Dropdown, Value, Statements, Text };
         Kind kind = Number;
         std::string name;
         double initial = 0;
+        std::string initialText;  // Text のときの最初の文字
         bool hasMin = false;
         bool hasMax = false;
         double min = 0;
@@ -236,8 +239,31 @@ struct JavaResult {
 std::string GetBlocklySetupJson();
 
 // Blockly のブロック（Blockly.serialization.workspaces.save の JSON）を Java にする
+//   packageName を省略すると "student" になる
 JavaResult ConvertToJava(const std::string& workspaceJson, const std::string& robotName,
-    const std::string& packageName = "student");
+                         const std::string& packageName = "student");
+
+// Java（.java ファイルの中身）をブロックにもどした結果
+struct ImportResult {
+    bool ok = false;                 // ブロックにできたら true
+    std::string workspaceJson;       // Blockly.serialization.workspaces.load に渡す JSON
+    std::string robotName;           // class の名前
+    std::string packageName;         // package の名前（なければ空）
+    int convertedBlocks = 0;         // ふつうのブロックにもどせた数
+    int rawBlocks = 0;               // 「Java をそのまま書く」ブロックになった数
+    std::vector<std::string> notes;  // そのまま書くブロックになった Java など（画面に出す説明）
+    std::string error;               // ok が false のときの理由
+};
+
+// Java をブロックにもどす（JavaToBlocks.cpp）
+//   各ブロックの .java("…") を型紙にして、当てはまるブロックをさがす。
+//   当てはまらないところは「Java をそのまま書く」ブロックになる。
+ImportResult ConvertFromJava(const std::string& javaSource);
+
+// JavaToBlocks.cpp が使う（読まなくてOK）：登録されている全部のブロック（同じ名前は最初の1つ）
+namespace detail {
+std::vector<const BlockDef::Info*> RegisteredBlocks();
+}
 
 // =====================================================================
 //  ROBOCODE_BLOCKS のしくみ（読まなくてOK）

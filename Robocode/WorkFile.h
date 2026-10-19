@@ -32,3 +32,7 @@ WorkFileResult SaveWorkFile(HWND owner, const std::string& path,
 
 // 作品を開く（「開く」の画面を出して、中身を読み込む）
 WorkFileResult OpenWorkFile(HWND owner);
+
+// Java のファイル（.java）を開く（「Java を読みこむ」ボタン用）
+//   中身は UTF-8 にそろえて返す（Shift-JIS で保存されたファイルも読める）
+WorkFileResult OpenJavaFile(HWND owner);

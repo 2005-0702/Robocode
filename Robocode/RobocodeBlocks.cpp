@@ -105,6 +105,12 @@ static json MessagesToJson(const std::vector<rb::Message>& list) {
 //     返す形：{ "kind": "opened", "ok": true, "canceled": false, "path": "...", "error": "",
 //               "work": { "robotName": "...", "package": "...", "workspace": {...} } }
 //
+//   「Java を読みこむ」ボタン
+//     届く形：{ "kind": "importJava" }
+//     返す形：{ "kind": "imported", "ok": true, "canceled": false, "path": "...", "error": "",
+//               "workspace": {...}, "robotName": "...", "package": "...",
+//               "converted": 10, "raw": 2, "notes": ["命令：…", ...] }
+//
 //   「Robocode の場所」ボタン
 //     届く形：{ "kind": "chooseFolder" }
 //     返す形：{ "kind": "folder", "path": "C:\\robocode" }（キャンセルなら ""）
@@ -201,6 +207,31 @@ static std::string HandleMessageFromBlockly(const std::string& text) {
                 reply["error"] = "このファイルは作品のファイルではないか、こわれています";
             } else {
                 reply["work"] = work;
+            }
+        }
+    }
+
+    // 「Java を読みこむ」ボタン：.java を選んで、ブロックにもどす
+    else if (kind == "importJava") {
+        WorkFileResult r = OpenJavaFile(g_hWnd);
+        reply["kind"] = "imported";
+        reply["ok"] = r.ok;
+        reply["canceled"] = r.canceled;
+        reply["path"] = r.path;
+        reply["error"] = r.error;
+
+        if (r.ok) {
+            rb::ImportResult imported = rb::ConvertFromJava(r.content);
+            if (!imported.ok) {
+                reply["ok"] = false;
+                reply["error"] = "ブロックにできませんでした：" + imported.error;
+            } else {
+                reply["workspace"] = json::parse(imported.workspaceJson);
+                reply["robotName"] = imported.robotName;
+                reply["package"] = imported.packageName;
+                reply["converted"] = imported.convertedBlocks;
+                reply["raw"] = imported.rawBlocks;
+                reply["notes"] = imported.notes;
             }
         }
     }
