@@ -150,6 +150,8 @@ public:
     BlockDef& valueInput(const std::string& name, const std::string& type = "Number");
     BlockDef& statements(const std::string& name);
     BlockDef& textField(const std::string& name, const std::string& initial = "");
+    BlockDef& variableField(const std::string& name,
+        const std::string& initial = "score");
 
     // ブロックの種類
     BlockDef& output(const std::string& type = "Number");
@@ -166,7 +168,7 @@ public:
 
     // ===== ここから下は RobocodeBlocksCore.cpp が使うもの（読まなくてOK）=====
     struct Arg {
-        enum Kind { Number, Dropdown, Value, Statements, Text };
+        enum Kind { Number, Dropdown, Value, Statements, Text, Variable };
         Kind kind = Number;
         std::string name;
         double initial = 0;

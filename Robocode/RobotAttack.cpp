@@ -37,6 +37,7 @@ ROBOCODE_BLOCKS(RobotAttack)
         "    fire({POWER});\n"                                                       // 撃つ
         "    scan();\n"                                                              // もう一度探す
         "}");                           // 作られるJava（{POWER} に入力した数字が入る）
+
     //体当たりして打つ
     Block("body_blow_fire")
         .category("攻撃")
@@ -52,6 +53,7 @@ ROBOCODE_BLOCKS(RobotAttack)
         fire(3);
         scan();})")                                         //もう一度敵を探して追いかける
         .onlyIn("robot_event_enemyDetected");
+
     // 距離と残りエネルギーに合わせて、弾の強さを自動で決めて撃つ
     Block("smart_fire")
         .category("攻撃")

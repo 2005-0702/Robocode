@@ -256,6 +256,13 @@ namespace rb {
                     case BlockDef::Arg::Text:
                         out += (f && f->is_string()) ? f->get<std::string>() : arg.initialText;
                         break;
+                    case BlockDef::Arg::Variable:
+                        out += (f && f->is_string())
+                            ? f->get<std::string>()
+                            : arg.initialText;
+                        break;
+
+
                     }
                     continue;
                 }
@@ -447,6 +454,10 @@ namespace rb {
                     a["type"] = "field_input";
                     a["text"] = arg.initialText;
                     a["spellcheck"] = false;
+                    break;
+                case BlockDef::Arg::Variable:
+                    a["type"] = "field_variable";
+                    a["variable"] = arg.initialText;
                     break;
                 }
                 args.push_back(a);
@@ -704,6 +715,15 @@ namespace rb {
             const json* f = fieldOf(*impl_->block, name);
             return (f && f->is_string()) ? f->get<std::string>() : arg->initialText;
         }
+        case BlockDef::Arg::Variable: {
+            const json* f = fieldOf(*impl_->block, name);
+
+            if (f && f->is_string()) {
+                return f->get<std::string>();
+            }
+
+            return arg->initialText;
+        }
         }
         return "";
     }
@@ -788,6 +808,18 @@ namespace rb {
         arg.name = name;
         arg.initialText = initial;
         info.args.push_back(arg);
+        return *this;
+    }
+
+    BlockDef& BlockDef::variableField(const std::string& name, const std::string& initial)
+    {
+        Arg arg;
+        arg.kind = Arg::Variable;
+        arg.name = name;
+        arg.initialText = initial;
+
+        info.args.push_back(arg);
+
         return *this;
     }
 
@@ -950,7 +982,7 @@ namespace rb {
                 if (!m.blockLabel.empty()) s += "【" + m.blockLabel + "】";
                 s += m.text + "\n";
             }
-            };
+         };
         put("エラー（直さないと動きません）", errors);
         if (!errors.empty() && !warnings.empty()) s += "\n";
         put("注意", warnings);
