@@ -87,4 +87,12 @@ ROBOCODE_BLOCKS(GetGameInfomation)
         .output("Number")
         .tooltip("敵の方向です")
         .java("e.getBearing()");
+    //弾のスピード
+    Block("rule_bullet_speed")
+        .category("ゲーム情報2")
+        .text("パワー %1 の弾の速さ")
+        .valueInput("POWER", "Number")
+        .output("Number")
+        .tooltip("弾の速さです( 20 - 3 × パワー)。パワーが大きいほど遅くなります")
+        .java("Rules.getBulletSpeed({POWER})");
 }
