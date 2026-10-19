@@ -49,7 +49,7 @@ ROBOCODE_BLOCKS(RobotEvent)
         .number("R", 0, 0, 255)
         .number("G", 0, 0, 255)
         .number("B", 0, 0, 255)
-        .java("setBodyColor(new java.awt.Color({R}, {G}, {B}));");
+        .java("setBodyColor(new Color({R}, {G}, {B}));");
 
     // 砲塔の色を変更
     Block("robot_color_gunColor")
@@ -59,7 +59,7 @@ ROBOCODE_BLOCKS(RobotEvent)
         .number("R", 0, 0, 255)
         .number("G", 0, 0, 255)
         .number("B", 0, 0, 255)
-        .java("setGunColor(new java.awt.Color({R}, {G}, {B}));");
+        .java("setGunColor(new Color({R}, {G}, {B}));");
 
     // レーダーの色を変更
     Block("robot_color_radarColor")
@@ -69,7 +69,7 @@ ROBOCODE_BLOCKS(RobotEvent)
         .number("R", 0, 0, 255)
         .number("G", 0, 0, 255)
         .number("B", 0, 0, 255)
-        .java("setRadarColor(new java.awt.Color({R}, {G}, {B}));");
+        .java("setRadarColor(new Color({R}, {G}, {B}));");
 
     // 弾の色を変更
     Block("robot_color_bulletColor")
@@ -79,7 +79,7 @@ ROBOCODE_BLOCKS(RobotEvent)
         .number("R", 0, 0, 255)
         .number("G", 0, 0, 255)
         .number("B", 0, 0, 255)
-        .java("setBulletColor(new java.awt.Color({R}, {G}, {B}));");
+        .java("setBulletColor(new Color({R}, {G}, {B}));");
 
 
     // 索敵時の色を変更
@@ -90,6 +90,6 @@ ROBOCODE_BLOCKS(RobotEvent)
         .number("R", 0, 0, 255)
         .number("G", 0, 0, 255)
         .number("B", 0, 0, 255)
-        .java("setScanColor(new java.awt.Color({R}, {G}, {B}));");
+        .java("setScanColor(new Color({R}, {G}, {B}));");
 
 }

@@ -36,6 +36,9 @@ namespace rb {
         // ---------------------------------------------------------------------
         const char* const kJavaPackage = "student";   // Java の package 名（robots\student に保存する）
         const char* const kNumberBlock = "rb_number";  // 数字ブロック（穴に最初から入っている）
+        const char* const kRawStatementBlock = "java_raw_statement";    // Java をそのまま書く（命令）
+        const char* const kRawExpressionBlock = "java_raw_expression";  // Java をそのまま書く（式）
+        const char* const kRawMemberBlock = "java_raw_member";          // Java をそのまま書く（メソッド・変数）
 
         // ツールボックスに並ぶ順番と色（ここにないカテゴリは後ろに並ぶ）
         struct CategoryColor {
@@ -249,6 +252,9 @@ namespace rb {
                         break;
                     case BlockDef::Arg::Statements:
                         break;
+                    case BlockDef::Arg::Text:
+                        out += (f && f->is_string()) ? f->get<std::string>() : arg.initialText;
+                        break;
                     }
                     continue;
                 }
@@ -359,6 +365,31 @@ namespace rb {
                 .output("Number")
                 .tooltip("数字")
                 .java("{NUM}");
+
+            // ---- Java からブロックにもどしたとき、当てはまるブロックがなかった部分 ----
+            //   入力した Java がそのまま入る。自分で Java を書きたいときにも使える。
+            Block(kRawStatementBlock)
+                .category("Java")
+                .text("Java %1")
+                .textField("CODE", "")
+                .tooltip("書いた Java がそのまま入ります（例：ahead(100);）")
+                .java("{CODE}");
+
+            Block(kRawExpressionBlock)
+                .category("Java")
+                .text("Java の式 %1")
+                .textField("CODE", "0")
+                .output("")                      // どの穴にもはまる
+                .tooltip("書いた Java の式がそのまま入ります（例：getX() * 2）")
+                .java("{CODE}");
+
+            Block(kRawMemberBlock)
+                .category("Java")
+                .text("Java（メソッド・変数） %1")
+                .textField("CODE", "")
+                .event()                         // 一番上に置く（クラスの中にそのまま入る）
+                .tooltip("ロボットのクラスの中に、書いた Java がそのまま入ります（メソッドや変数）")
+                .java("{CODE}");
         }
 
         // 全部のブロックを集める（最初に1回だけ）
@@ -410,6 +441,11 @@ namespace rb {
                 case BlockDef::Arg::Statements:
                     a["type"] = "input_statement";
                     hasStatements = true;
+                    break;
+                case BlockDef::Arg::Text:
+                    a["type"] = "field_input";
+                    a["text"] = arg.initialText;
+                    a["spellcheck"] = false;
                     break;
                 }
                 args.push_back(a);
@@ -663,6 +699,10 @@ namespace rb {
             return impl_->conv->valueInput(*impl_->block, def, *arg);
         case BlockDef::Arg::Statements:
             return impl_->conv->statementInput(*impl_->block, def, *arg);
+        case BlockDef::Arg::Text: {
+            const json* f = fieldOf(*impl_->block, name);
+            return (f && f->is_string()) ? f->get<std::string>() : arg->initialText;
+        }
         }
         return "";
     }
@@ -741,6 +781,15 @@ namespace rb {
         return *this;
     }
 
+    BlockDef& BlockDef::textField(const std::string& name, const std::string& initial) {
+        Arg arg;
+        arg.kind = Arg::Text;
+        arg.name = name;
+        arg.initialText = initial;
+        info.args.push_back(arg);
+        return *this;
+    }
+
     BlockDef& BlockDef::output(const std::string& type) {
         info.isOutput = true;
         info.outputType = type;
@@ -774,6 +823,17 @@ namespace rb {
     // =====================================================================
     //  アプリ側が使う関数
     // =====================================================================
+    std::vector<const BlockDef::Info*> detail::RegisteredBlocks() {
+        ensureLoaded();
+        std::vector<const BlockDef::Info*> list;
+        std::set<std::string> added;
+        for (const auto& p : registry().blocks) {
+            if (p->info.type.empty() || !added.insert(p->info.type).second) continue;
+            list.push_back(&p->info);
+        }
+        return list;
+    }
+
     std::string GetBlocklySetupJson() {
         ensureLoaded();
         const Registry& r = registry();
@@ -825,7 +885,7 @@ namespace rb {
                 else if (!def->isEvent) {
                     conv.warning(b, def, "どのイベントにもつながっていないので、動きません");
                 }
-                else if (!seen.insert(type).second) {
+                else if (type != kRawMemberBlock && !seen.insert(type).second) {   // そのまま書くブロックは何個でも置ける
                     conv.error(b, def, "このイベントブロックは1つだけにしてください");
                 }
                 else {

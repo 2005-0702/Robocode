@@ -142,6 +142,7 @@
   <ItemGroup>
     <ClCompile Include="GetGameInfo.cpp" />
     <ClCompile Include="GetGameSystem.cpp" />
+    <ClCompile Include="JavaToBlocks.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="RobocodeBlocks.cpp" />
     <ClCompile Include="RobocodeBlocksCore.cpp" />

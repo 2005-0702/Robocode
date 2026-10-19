@@ -115,6 +115,71 @@ WorkFileResult SaveWorkFile(HWND owner, const std::string& path,
 // ---------------------------------------------------------------------
 //  開く
 // ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+//  Java のファイルを開く
+// ---------------------------------------------------------------------
+static const COMDLG_FILTERSPEC kJavaFileTypes[] = {
+    {L"Java のファイル (*.java)", L"*.java"},
+};
+
+// 中身が UTF-8 として正しいか
+static bool IsValidUtf8(const std::string& s) {
+    if (s.empty()) return true;
+    return MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, s.c_str(), (int)s.size(), nullptr, 0) > 0;
+}
+
+WorkFileResult OpenJavaFile(HWND owner) {
+    WorkFileResult r;
+
+    IFileOpenDialog* dialog = nullptr;
+    if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER,
+                                IID_PPV_ARGS(&dialog)))) {
+        r.error = "開く画面を開けませんでした";
+        return r;
+    }
+    dialog->SetFileTypes(ARRAYSIZE(kJavaFileTypes), kJavaFileTypes);
+    dialog->SetDefaultExtension(L"java");
+    dialog->SetTitle(L"ブロックにする Java を選ぶ");
+
+    std::wstring target;
+    if (SUCCEEDED(dialog->Show(owner))) {
+        target = ResultPath(dialog);
+    }
+    dialog->Release();
+
+    if (target.empty()) {
+        r.canceled = true;
+        return r;
+    }
+
+    std::ifstream in(target.c_str(), std::ios::binary);
+    if (!in) {
+        r.error = "ファイルを開けませんでした";
+        return r;
+    }
+    std::stringstream ss;
+    ss << in.rdbuf();
+    std::string content = ss.str();
+
+    // 先頭の BOM（UTF-8 の印）を取りのぞく
+    if (content.size() >= 3 && (unsigned char)content[0] == 0xEF && (unsigned char)content[1] == 0xBB &&
+        (unsigned char)content[2] == 0xBF) {
+        content.erase(0, 3);
+    }
+    // UTF-8 でなければ、Shift-JIS（Windows の日本語）として読んで UTF-8 にする
+    if (!IsValidUtf8(content)) {
+        int len = MultiByteToWideChar(CP_ACP, 0, content.c_str(), (int)content.size(), nullptr, 0);
+        std::wstring w(len, L'\0');
+        MultiByteToWideChar(CP_ACP, 0, content.c_str(), (int)content.size(), &w[0], len);
+        content = ToUtf8(w);
+    }
+
+    r.ok = true;
+    r.path = ToUtf8(target);
+    r.content = content;
+    return r;
+}
+
 WorkFileResult OpenWorkFile(HWND owner) {
     WorkFileResult r;
 
