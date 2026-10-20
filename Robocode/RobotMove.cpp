@@ -27,42 +27,6 @@ ROBOCODE_BLOCKS(RobotMove)
         .warnIfZero("DIST", "距離が0なので、ロボットは動きません")
         .java("back({DIST});");
 
-    // 右／左に〇〇度回る
-    Block("robot_turn")
-        .category("動き")
-        .text("ロボットが %1 に %2 度回る")
-        .dropdown("DIR", {
-            {"右", "turnRight"},
-            {"左", "turnLeft"}
-        })  // {画面に出る文字, Java に入る文字}
-        .number("ANGLE", 90, 0, 360)
-        .tooltip("ロボットの向きを変えます")
-        .java("{DIR}({ANGLE});");
-
-    //砲塔旋回
-    Block("robot_turn_gun")
-        .category("動き")
-        .text("砲塔が %1 に %2 度回る")
-        .dropdown("DIR", { 
-            {"右", "turnGunRight"}, 
-            {"左", "turnGunLeft"} 
-        })
-        .number("ANGLE", 90, 0, 360)
-        .tooltip("砲塔の向きを変えます")
-        .java("{DIR}({ANGLE});");
-
-    //レーダー旋回
-    Block("robot_turn_rader")
-        .category("動き")
-        .text("レーダーが %1 に %2 度回る")
-        .dropdown("DIR", { 
-            {"右", "turnRadarRight"}, 
-            {"左", "turnRadarLeft"} 
-        })
-        .number("ANGLE", 90, 0, 360)
-        .tooltip("レーダーの向きを変えます")
-        .java("{DIR}({ANGLE});");
-
     //砲塔固定
     Block("robot_gun_keep_direction")
         .category("動き")
@@ -91,7 +55,7 @@ ROBOCODE_BLOCKS(RobotMove)
 
     // 前進・後退しながら砲塔を回す
     Block("robot_sample_aheadAndBack")
-        .category("動き2")
+        .category("動き")
         .text("前進・後退しながら砲塔を回す")
         .tooltip("前進、砲塔の回転、後退を組み合わせたサンプルです")
         .color(210)
@@ -104,7 +68,7 @@ ROBOCODE_BLOCKS(RobotMove)
 
     //ぐにゃぐにゃ動く
     Block("robot_sample_limpRunnning")
-        .category("動き2")
+        .category("動き")
         .text("ぐにゃぐにゃ動く")
         .tooltip("前進、車体の回転、待機を組み合わせたサンプルです")
         .color(210)
@@ -126,7 +90,7 @@ ROBOCODE_BLOCKS(RobotMove)
 
     // ぐるぐる走行
     Block("robot_sample_spinRunning")
-        .category("動き2")
+        .category("動き")
         .text("ぐるぐる走行")
         .tooltip("車体を旋回させながら前進するサンプルです")
         .color(210)
@@ -136,7 +100,7 @@ ROBOCODE_BLOCKS(RobotMove)
 
     // 勝利のダンス
     Block("robot_sample_victoryDance")
-        .category("動き2")
+        .category("動き")
         .text("勝利のダンス")
         .tooltip("右回転と左回転を繰り返して、勝利を表現します")
         .java(R"(
@@ -148,7 +112,7 @@ ROBOCODE_BLOCKS(RobotMove)
 
     // 勝利の回転
     Block("robot_sample_victorySpin")
-        .category("動き2")
+        .category("動き")
         .text("勝利の回転")
         .tooltip("車体を大きく回転させて、勝利を表現します")
         .java(R"(
