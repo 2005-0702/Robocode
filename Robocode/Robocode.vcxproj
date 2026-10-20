@@ -140,11 +140,14 @@
     <ClInclude Include="WorkFile.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ActionValue.cpp" />
     <ClCompile Include="AdvancedMove.cpp" />
+    <ClCompile Include="ControlPlus.cpp" />
     <ClCompile Include="GetGameInfo.cpp" />
     <ClCompile Include="GetGameSystem.cpp" />
     <ClCompile Include="JavaToBlocks.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="MathBlocks.cpp" />
     <ClCompile Include="RobocodeBlocks.cpp" />
     <ClCompile Include="RobocodeBlocksCore.cpp" />
     <ClCompile Include="RobotAttack.cpp" />
@@ -157,6 +160,7 @@
     <ClCompile Include="RobotSample.cpp" />
     <ClCompile Include="RobotVariable.cpp" />
     <ClCompile Include="Sensor.cpp" />
+    <ClCompile Include="SensorPlus.cpp" />
     <ClCompile Include="WorkFile.cpp" />
   </ItemGroup>
   <ItemGroup>

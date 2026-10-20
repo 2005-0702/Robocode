@@ -10,13 +10,14 @@
 
 ROBOCODE_BLOCKS(AdvancedMove)
 {
-    // 〇 進む（予約）
+    // 〇 進む／下がる（予約）
     Block("adv_set_ahead")
         .category("同時に動く")
-        .text("予約：%1 進む")
+        .text("予約：%1 %2")
         .valueInput("DIST", "Number")
-        .tooltip("進む動きを予約します（マイナスで下がる）。「まとめて動かす」で動き始めます")
-        .java("setAhead({DIST});");
+        .dropdown("DIR", { {"進む", "setAhead"}, {"下がる", "setBack"} })
+        .tooltip("進む（下がる）動きを予約します。「まとめて動かす」で動き始めます")
+        .java("{DIR}({DIST});");
 
     // 車体・砲塔・レーダーを 〇 度 右に回す（予約）
     Block("adv_set_turn")

@@ -1,8 +1,9 @@
-﻿// =====================================================================
+// =====================================================================
 //  RobocodeBlocksCore.cpp  ―  ブロックのしくみ（難しい部分）
 // 
 // 2026/10/16 片山　カテゴリー色に色とサンプル戦術追加,Javaコードの親クラス名を修正。
 // 2026/10/20 片山　staticを使えるようにする
+// 2026/10/20 関数（イベントの情報 e を受け取る関数）と、static の変数宣言を1つにまとめた
 // =====================================================================
 //
 //  ブロックを作る人は読まなくてOK。ここでやっていること：
@@ -39,7 +40,8 @@ namespace rb {
         const char* const kRawStatementBlock = "java_raw_statement";    // Java をそのまま書く（命令）
         const char* const kRawExpressionBlock = "java_raw_expression";  // Java をそのまま書く（式）
         const char* const kRawMemberBlock = "java_raw_member";          // Java をそのまま書く（メソッド・変数）
-        const char* const kVariableCategory = "変数";   // Blockly にもともとある変数のしくみを使うカテゴリ
+        const char* const kReturnBlock = "rb_return";       // ここで終わる（return;）
+        //const char* const kVariableCategory = "変数";   // Blockly にもともとある変数のしくみを使うカテゴリ
         const char* const kFunctionCategory = "関数";   // Blockly にもともとある関数のしくみを使うカテゴリ
 
         // ツールボックスに並ぶ順番と色（ここにないカテゴリは後ろに並ぶ）
@@ -237,7 +239,7 @@ namespace rb {
                     }
                     i = j - 1;
                     if (n < 1 || n > static_cast<int>(def.args.size())) continue;
-                    const BlockDef::Arg& arg = def.args[n - 1];
+                    const BlockDef::Arg& arg = def.args[static_cast<size_t>(n) - 1];
                     const json* f = block ? fieldOf(*block, arg.name) : nullptr;
                     switch (arg.kind) {
                     case BlockDef::Arg::Number:
@@ -260,13 +262,8 @@ namespace rb {
                     case BlockDef::Arg::Text:
                         out += (f && f->is_string()) ? f->get<std::string>() : arg.initialText;
                         break;
-                    //========
-                    //追加
-                    //========
-                    case BlockDef::Arg::Variable:
-                        out += (f && f->is_string())
-                            ? f->get<std::string>()
-                            : arg.initialText;
+                    case BlockDef::Arg::Variable:   // 変数を選ぶ欄
+                        out += (f && f->is_string()) ? f->get<std::string>() : arg.initialText;
                         break;
                     }
                     continue;
@@ -281,8 +278,6 @@ namespace rb {
             }
             return trim(collapsed);
         }
-
-        ///////////////////////////////////////////////
 
         // 変数の名前を、Java で使える名前にする（例：当たった回数 → v_当たった回数）
         //   Java で使えない文字（空白・記号など）は _ にする。日本語（ひらがな・カタカナ・漢字）はそのまま使える。
@@ -314,9 +309,6 @@ namespace rb {
         std::string variableJavaName(const std::string& name) { return javaSafeName("v_", name); }
         // 関数の名前を、Java で使える名前にする（例：前に進んで撃つ → f_前に進んで撃つ）
         std::string functionJavaName(const std::string& name) { return javaSafeName("f_", name); }
-
-
-        //////////////////////////////////////
 
         // カテゴリの色（kCategories から探す。なければ kOtherColor）
         int categoryColor(const std::string& category) {
@@ -439,6 +431,42 @@ namespace rb {
                 .event()                         // 一番上に置く（クラスの中にそのまま入る）
                 .tooltip("ロボットのクラスの中に、書いた Java がそのまま入ります（メソッドや変数）")
                 .java("{CODE}");
+
+            // ---- 関数やイベントを、とちゅうで終わりにする（Java の return;）----
+            //   このブロックの下には、ブロックをつなげられない（つなげるとエラー）
+            Block(kReturnBlock)
+                .category("制御")
+                .text("ここで終わる")
+                .tooltip("今の関数（またはイベント）を、ここで終わりにします。下にはブロックをつなげられません")
+                .java("return;");
+        }
+
+        // イベントブロックの Java（public void onHitWall(HitWallEvent e) {）から、
+        // イベントの情報の型（HitWallEvent）と名前（e）を取り出す。run() のように何もなければ false
+        bool eventParameter(const BlockDef::Info& ev, std::string& className, std::string& name) {
+            const std::string& t = ev.javaTemplate;
+            size_t open = t.find('(');
+            size_t close = open == std::string::npos ? open : t.find(')', open);
+            if (close == std::string::npos) return false;
+            std::istringstream in(t.substr(open + 1, close - open - 1));
+            className.clear();
+            name.clear();
+            in >> className >> name;
+            return !className.empty() && !name.empty();
+        }
+
+        // Java のコードの中に、e という名前（e.getBearing() の e など）が出てくるか
+        bool usesEventName(const std::string& code) {
+            auto identChar = [](char c) {
+                return std::isalnum(static_cast<unsigned char>(c)) || c == '_' || static_cast<unsigned char>(c) >= 0x80;
+            };
+            for (size_t i = 0; i < code.size(); ++i) {
+                if (code[i] != 'e') continue;
+                bool before = i > 0 && (identChar(code[i - 1]) || code[i - 1] == '.');
+                bool after = i + 1 < code.size() && identChar(code[i + 1]);
+                if (!before && !after) return true;
+            }
+            return false;
         }
 
         // 全部のブロックを集める（最初に1回だけ）
@@ -447,7 +475,8 @@ namespace rb {
             if (r.loaded) return;
             r.loaded = true;
             addBuiltinBlocks();   // 数字ブロックを最初に作る（消さないこと！）
-            auto sets = r.sets;
+            // 並べかえるためにコピーする（元の順番は変えない）
+            std::vector<std::pair<std::string, BlockSetFunction>> sets = r.sets;
             std::stable_sort(sets.begin(), sets.end(),
                 [](const std::pair<std::string, BlockSetFunction>& a,
                     const std::pair<std::string, BlockSetFunction>& b) { return a.first < b.first; });
@@ -496,8 +525,7 @@ namespace rb {
                     a["text"] = arg.initialText;
                     a["spellcheck"] = false;
                     break;
-                //追加
-                case BlockDef::Arg::Variable:
+                case BlockDef::Arg::Variable:   // 変数を選ぶ欄
                     a["type"] = "field_variable";
                     a["variable"] = arg.initialText;
                     break;
@@ -529,13 +557,13 @@ namespace rb {
 
             json contents = json::array();
             for (const auto& cat : order) {
-                // 「変数」カテゴリ：Blockly が「変数を作る」ボタンとブロックを自動で出す
-                if (cat == kVariableCategory || cat == kFunctionCategory) {
+                //// 「変数」カテゴリ：Blockly が「変数を作る」ボタンとブロックを自動で出す
+                if (cat == kFunctionCategory) {
                     // 「関数」カテゴリ：Blockly が「関数を作る」ブロックと、作った関数を呼ぶブロックを自動で出す
                     contents.push_back({ {"kind", "category"},
                                         {"name", cat},
                                         {"colour", std::to_string(categoryColor(cat))},
-                                        {"custom", cat == kVariableCategory ? "VARIABLE" : "PROCEDURE"} });
+                                        {"custom", "PROCEDURE"} });
                     continue;
                 }
                 json items = json::array();
@@ -574,7 +602,7 @@ namespace rb {
         JavaResult result;
         const BlockDef::Info* currentEvent = nullptr;
 
-        // クラス直下に出力する変数宣言を保存する
+        // クラス直下に出力する変数宣言（static の変数）をためておく場所
         std::string* classMembers = nullptr;
 
         const BlockDef::Info* find(const std::string& type) const {
@@ -605,8 +633,6 @@ namespace rb {
 
         // 1つのブロックを Java にする
         std::string render(const BlockDef::Info& def, const json& block);
-
-        /////////////////////////////////////////////////////////////////////////
 
         // ---- 変数（Blockly にもともとあるブロック） ----
         //   variables_set：〇 を △ にする     → v_名前 = △;
@@ -643,14 +669,146 @@ namespace rb {
         }
 
         // ---- 関数（Blockly にもともとあるブロック） ----
-        //   procedures_defnoreturn：関数を作る          → void f_名前(double v_引数) { … }
-        //   procedures_defreturn  ：値を返す関数を作る  → double f_名前(double v_引数) { … return 値; }
+        //   procedures_defnoreturn：関数を作る          → private void f_名前(double v_引数) { … }
+        //   （private：このロボットの中だけで使う関数。ほかのクラスからは呼べない）
+        //   procedures_defreturn  ：値を返す関数を作る  → private double f_名前(double v_引数) { … return 値; }
         //   procedures_callnoreturn：関数を呼ぶ（命令）  → f_名前(値);
         //   procedures_callreturn ：関数を呼ぶ（値）    → f_名前(値)
         //   procedures_ifreturn   ：もし〇なら値を返す  → if (〇) { return 値; }
         bool insideReturnFunction = false;   // 今、値を返す関数の中を変換しているか
 
-        // 関数を呼ぶ：f_名前(引数1, 引数2)
+        // ---- イベントの情報（e）を使う関数 ----
+        //   関数の中に「敵までの距離」のような、あるイベントの中でしか使えないブロックがあると、
+        //   その関数は private void f_名前(ScannedRobotEvent e, …) のように、イベントの情報 e を受け取る。
+        //   呼ぶほうも f_名前(e, …) になる（ブロックでは e のことは考えなくてよい）。
+        //   どのイベントの e かは、中のブロック → 中で呼んでいる関数 → 呼ばれている場所 の順に決める。
+        struct FunctionInfo {
+            const json* def = nullptr;
+            std::set<std::string> directEvents;   // 中のブロックの onlyIn
+            bool rawUsesEvent = false;            // そのまま書く Java や、onlyIn のないブロックの Java で e を使っている
+            std::set<std::string> callees;        // 中で呼んでいる関数
+            std::set<std::string> callerEvents;   // この関数を呼んでいるイベント
+            std::set<std::string> callerFunctions;// この関数を呼んでいる関数
+            bool needsEvent = false;
+            std::set<std::string> eventTypes;
+            const BlockDef::Info* event = nullptr;  // 受け取るイベント（1つに決まったとき）
+        };
+        std::map<std::string, FunctionInfo> functionInfos;   // Blockly での関数の名前 → ようす
+
+        static std::string nameOfFunctionBlock(const json& block) {
+            const json* f = nullptr;
+            auto fields = block.find("fields");
+            if (fields != block.end() && fields->is_object()) {
+                auto it = fields->find("NAME");
+                if (it != fields->end()) f = &*it;
+            }
+            return (f && f->is_string()) ? f->get<std::string>() : "";
+        }
+        std::string calledName(const json& block) {
+            auto it = block.find("extraState");
+            return (it != block.end() && it->is_object()) ? stringOf(*it, "name") : "";
+        }
+
+        // ブロックの中を全部たどって、onlyIn・e を使うそのまま書く Java・呼んでいる関数を集める
+        void collectUses(const json& block, std::set<std::string>& events, bool& rawUsesEvent,
+                         std::set<std::string>& callees) {
+            if (!block.is_object() || isDisabled(block)) return;
+            std::string type = stringOf(block, "type");
+            if (type == "procedures_callnoreturn" || type == "procedures_callreturn") callees.insert(calledName(block));
+            if (type == kRawStatementBlock || type == kRawExpressionBlock) {
+                const json* code = fieldOf(block, "CODE");
+                if (code && code->is_string() && usesEventName(code->get<std::string>())) rawUsesEvent = true;
+            }
+            if (const BlockDef::Info* def = find(type)) {
+                if (!def->onlyIn.empty()) events.insert(def->onlyIn);
+                // onlyIn が書かれていなくても、Java のひな形で e（e.getBearing() など）を使っているブロック
+                else if (usesEventName(def->javaTemplate)) rawUsesEvent = true;
+            }
+            auto inputs = block.find("inputs");
+            if (inputs != block.end() && inputs->is_object()) {
+                for (const auto& in : inputs->items()) {
+                    if (!in.value().is_object()) continue;
+                    auto b = in.value().find("block");
+                    if (b != in.value().end()) collectUses(*b, events, rawUsesEvent, callees);
+                }
+            }
+            if (const json* next = nextOf(block)) collectUses(*next, events, rawUsesEvent, callees);
+        }
+
+        void analyzeFunctions(const std::vector<std::pair<const BlockDef::Info*, const json*>>& events,
+                              const std::vector<const json*>& functions) {
+            for (const json* f : functions) {
+                FunctionInfo& info = functionInfos[nameOfFunctionBlock(*f)];
+                info.def = f;
+                collectUses(*f, info.directEvents, info.rawUsesEvent, info.callees);
+            }
+            for (const auto& e : events) {
+                std::set<std::string> dummyEvents, callees;
+                bool dummyRaw = false;
+                collectUses(*e.second, dummyEvents, dummyRaw, callees);
+                std::string cls, prm;
+                for (const auto& c : callees) {
+                    auto it = functionInfos.find(c);
+                    if (it != functionInfos.end() && eventParameter(*e.first, cls, prm)) it->second.callerEvents.insert(e.first->type);
+                }
+            }
+            for (auto& f : functionInfos) {
+                for (const auto& c : f.second.callees) {
+                    auto it = functionInfos.find(c);
+                    if (it != functionInfos.end()) it->second.callerFunctions.insert(f.first);
+                }
+            }
+            // 決まるまでくり返す（関数が関数を呼んでいることがあるため）
+            for (int round = 0; round < 50; ++round) {
+                bool changed = false;
+                for (auto& f : functionInfos) {
+                    FunctionInfo& info = f.second;
+                    bool needs = !info.directEvents.empty() || info.rawUsesEvent;
+                    std::set<std::string> types = info.directEvents;
+                    for (const auto& c : info.callees) {
+                        auto it = functionInfos.find(c);
+                        if (it == functionInfos.end() || !it->second.needsEvent) continue;
+                        needs = true;
+                        types.insert(it->second.eventTypes.begin(), it->second.eventTypes.end());
+                    }
+                    if (needs && types.empty()) {   // 中では決まらない → 呼ばれている場所で決める
+                        types = info.callerEvents;
+                        for (const auto& c : info.callerFunctions) {
+                            const FunctionInfo& caller = functionInfos[c];
+                            types.insert(caller.eventTypes.begin(), caller.eventTypes.end());
+                        }
+                    }
+                    if (needs != info.needsEvent || types != info.eventTypes) {
+                        info.needsEvent = needs;
+                        info.eventTypes = types;
+                        changed = true;
+                    }
+                }
+                if (!changed) break;
+            }
+            for (auto& f : functionInfos) {
+                FunctionInfo& info = f.second;
+                if (!info.needsEvent) continue;
+                if (info.eventTypes.size() == 1) {
+                    info.event = find(*info.eventTypes.begin());
+                    continue;
+                }
+                if (info.eventTypes.empty()) {
+                    error(info.def, nullptr, "関数「" + f.first + "」はイベントの情報（e）を使っていますが、"
+                          "どのイベントから呼ばれるのか分かりません。イベントの中から呼んでください");
+                    continue;
+                }
+                std::string names;
+                for (const auto& t : info.eventTypes) {
+                    const BlockDef::Info* ev = find(t);
+                    names += "「" + (ev ? labelOf(*ev, nullptr) : t) + "」";
+                }
+                error(info.def, nullptr, "関数「" + f.first + "」の中に、ちがうイベント" + names +
+                      "でしか使えないブロックがまざっています。1つのイベントのものだけにしてください");
+            }
+        }
+
+        // 関数を呼ぶ：f_名前(引数1, 引数2)（イベントの情報を使う関数なら f_名前(e, 引数1, …)）
         std::string functionCall(const json& block) {
             const json* state = nullptr;
             auto it = block.find("extraState");
@@ -659,13 +817,25 @@ namespace rb {
             size_t count = 0;
             if (state && state->contains("params") && (*state)["params"].is_array()) count = (*state)["params"].size();
             std::string args;
+            auto info = functionInfos.find(name);
+            if (info != functionInfos.end() && info->second.needsEvent && info->second.event) {
+                const BlockDef::Info* need = info->second.event;
+                std::string cls, prm;
+                if (!currentEvent || currentEvent->type != need->type || !eventParameter(*currentEvent, cls, prm)) {
+                    error(&block, nullptr, "関数「" + name + "」は「" + labelOf(*need, nullptr) +
+                          "」の情報を使うので、「" + labelOf(*need, nullptr) + "」の中でしか呼べません");
+                    prm = "e";
+                }
+                args = insideFunction ? "e" : prm;
+            }
             for (size_t i = 0; i < count; ++i) {
-                if (i > 0) args += ", ";
+                if (!args.empty()) args += ", ";
                 std::string input = "ARG" + std::to_string(i);
                 args += valueOfInput(block, input.c_str());
             }
             return functionJavaName(name) + "(" + args + ")";
         }
+        bool insideFunction = false;   // 今、関数の中を変換しているか
 
         // 関数を作るブロックを、Java のメソッドにする
         std::string renderFunction(const json& def) {
@@ -673,6 +843,13 @@ namespace rb {
             const json* nameField = fieldOf(def, "NAME");
             std::string name = (nameField && nameField->is_string()) ? nameField->get<std::string>() : "";
             std::string params;
+            // イベントの情報を使う関数は、最初に e を受け取る
+            const FunctionInfo& info = functionInfos[name];
+            currentEvent = info.event;
+            if (info.needsEvent && info.event) {
+                std::string cls, prm;
+                if (eventParameter(*info.event, cls, prm)) params = cls + " e";
+            }
             auto st = def.find("extraState");
             if (st != def.end() && st->is_object() && st->contains("params") && (*st)["params"].is_array()) {
                 for (const auto& prm : (*st)["params"]) {
@@ -682,13 +859,16 @@ namespace rb {
                 }
             }
             insideReturnFunction = returns;
-            std::string body = statementChain(inputOf(def, "STACK"),*classMembers);
+            insideFunction = true;
+            std::string body = statementChain(inputOf(def, "STACK"));
             if (returns) {
                 std::string value = valueOfInput(def, "RETURN");
                 body += (body.empty() ? "" : "\n") + std::string("return ") + value + ";";
             }
             insideReturnFunction = false;
-            std::string out = std::string(returns ? "double " : "void ") + functionJavaName(name) + "(" + params + ") {\n";
+            insideFunction = false;
+            currentEvent = nullptr;
+            std::string out = std::string(returns ? "private double " : "private void ") + functionJavaName(name) + "(" + params + ") {\n";
             for (const std::string& line : splitLines(body)) out += (line.empty() ? "" : "    " + line) + "\n";
             return out + "}";
         }
@@ -733,11 +913,8 @@ namespace rb {
             return var + " += " + valueOfInput(block, "DELTA") + ";";
         }
 
-        ///////////////////////////////////////////////////////////////////////
-
         // つながっている命令ブロックを順番に Java にする
-        std::string statementChain(const json* first,
-            std::string& classMembers) {
+        std::string statementChain(const json* first) {
             std::vector<std::string> parts;
             for (const json* b = first; b != nullptr; b = nextOf(*b)) {
                 if (isDisabled(*b)) continue;
@@ -756,30 +933,23 @@ namespace rb {
                     error(b, def, "このブロックはここには置けません");
                     continue;
                 }
-                // 変数宣言ブロックの場合
+                // 変数宣言ブロック：static の変数はクラス直下に移す（ふつうの変数はその場に残す）
                 if (type == "robot_variable_declare") {
-                 
-                    // 変数宣言を Java コードに変換する
                     std::string code = render(*def, *b);
-           
-                    // STATIC の選択値を取得する
-                    std::string staticText = getBlockText(*b, *def, "STATIC");
-
-                    if (staticText == "static") {
-                        // static 変数はクラス直下に移動する
-                        classMembers += "    " + code + "\n";
+                    if (getBlockText(*b, *def, "STATIC") == "static" && classMembers) {
+                        *classMembers += "    " + code + "\n";
                     }
-                    else {
-                        // 通常の変数はイベント内に残す
-                        if (!code.empty()) {
-                            parts.push_back(code);
-                        }
+                    else if (!code.empty()) {
+                        parts.push_back(code);
                     }
-
-
                     continue;
                 }
-
+                if (type == kReturnBlock) {
+                    const json* next = nextOf(*b);
+                    while (next && isDisabled(*next)) next = nextOf(*next);
+                    if (next) error(b, def, "このブロックの下には、ブロックをつなげられません（ここで終わるので、下は動きません）");
+                    if (insideReturnFunction) error(b, def, "値を返す関数の中では使えません。「もし〇なら値を返す」を使ってください");
+                }
                 std::string code = render(*def, *b);
                 if (!code.empty()) parts.push_back(code);
             }
@@ -797,39 +967,22 @@ namespace rb {
         }
 
         // 口の中の命令ブロックを Java にする
-        std::string statementInput(
-            const json& block,
-            const BlockDef::Info& def,
-            const BlockDef::Arg& arg,
-            std::string& classMembers)
-        {
+        //   （static の変数宣言だけが入っているときは、中身が空でも注意を出さない）
+        std::string statementInput(const json& block, const BlockDef::Info& def, const BlockDef::Arg& arg) {
             const json* first = inputOf(block, arg.name);
-
-            if (!first || isDisabled(*first)) {
-                warning(&block, &def, "中にブロックが入っていません");
-            }
-
-            std::string code = statementChain(first, classMembers);
-            return code;
-          
+            if (!first || isDisabled(*first)) warning(&block, &def, "中にブロックが入っていません");
+            return statementChain(first);
         }
 
-        std::string getBlockText(
-            const json& block,
-            const BlockDef::Info& def,
-            const std::string& name)
-        {
+        // 選ぶ欄で選ばれている値（Java に入る文字）
+        std::string getBlockText(const json& block, const BlockDef::Info& def, const std::string& name) {
             const BlockDef::Arg* arg = def.findArg(name);
             if (!arg || arg->kind != BlockDef::Arg::Dropdown) {
                 mistake(def, "に「" + name + "」という選択欄がありません");
                 return "";
             }
-
             const json* field = fieldOf(block, name);
-            if (field && field->is_string()) {
-                return field->get<std::string>();
-            }
-
+            if (field && field->is_string()) return field->get<std::string>();
             return arg->options.empty() ? "" : arg->options[0].second;
         }
 
@@ -902,22 +1055,13 @@ namespace rb {
         Converter* conv;
         const json* block;
         const BlockDef::Info* def;
-        std::string* classMembers = nullptr;
     };
 
-    std::string Converter::render(
-        const BlockDef::Info& def,
-        const json& block)
-    {
-        BlockData::Impl impl{ this, &block, &def, classMembers };
+    std::string Converter::render(const BlockDef::Info& def, const json& block) {
+        BlockData::Impl impl{ this, &block, &def };
         BlockData data(&impl);
-
         runChecks(def, block, data);
-
-        if (def.javaFunction) {
-            return def.javaFunction(data);
-        }
-
+        if (def.javaFunction) return def.javaFunction(data);
         return fillTemplate(def, data);
     }
 
@@ -952,18 +1096,21 @@ namespace rb {
         case BlockDef::Arg::Value:
             return impl_->conv->valueInput(*impl_->block, def, *arg);
         case BlockDef::Arg::Statements:
-            if (!impl_->classMembers) {
-                impl_->conv->mistake(
-                    def,
-                    "命令ブロックの変換に classMembers が設定されていません");
-                return "";
-            }
-
-            return impl_->conv->statementInput(
-                *impl_->block, def, *arg, *impl_->classMembers);
+            return impl_->conv->statementInput(*impl_->block, def, *arg);
         case BlockDef::Arg::Text: {
             const json* f = fieldOf(*impl_->block, name);
             return (f && f->is_string()) ? f->get<std::string>() : arg->initialText;
+        }
+        case BlockDef::Arg::Variable: {   // 変数を選ぶ欄 → その変数の Java の名前
+            const json* f = fieldOf(*impl_->block, name);
+            if (f && f->is_object()) {
+                auto it = impl_->conv->variableJavaNames.find(stringOf(*f, "id"));
+                if (it != impl_->conv->variableJavaNames.end()) return it->second;
+                std::string shown = stringOf(*f, "name");
+                if (!shown.empty()) return variableJavaName(shown);
+            }
+            if (f && f->is_string()) return f->get<std::string>();
+            return arg->initialText;
         }
         }
         return "";
@@ -1052,6 +1199,15 @@ namespace rb {
         return *this;
     }
 
+    BlockDef& BlockDef::variableField(const std::string& name, const std::string& initial) {
+        Arg arg;
+        arg.kind = Arg::Variable;
+        arg.name = name;
+        arg.initialText = initial;
+        info.args.push_back(arg);
+        return *this;
+    }
+
     BlockDef& BlockDef::output(const std::string& type) {
         info.isOutput = true;
         info.outputType = type;
@@ -1059,11 +1215,7 @@ namespace rb {
     }
 
     BlockDef& BlockDef::event() { info.isEvent = true; return *this; }
-    BlockDef& BlockDef::classMember()
-    {
-        info.isClassMember = true;
-        return *this;
-    }
+    BlockDef& BlockDef::classMember() { info.isClassMember = true; return *this; }
     BlockDef& BlockDef::java(const std::string& javaTemplate) { info.javaTemplate = javaTemplate; return *this; }
     BlockDef& BlockDef::javaFunction(JavaFunction function) { info.javaFunction = function; return *this; }
     BlockDef& BlockDef::onlyIn(const std::string& eventType) { info.onlyIn = eventType; return *this; }
@@ -1081,7 +1233,6 @@ namespace rb {
         r.blocks.push_back(std::unique_ptr<BlockDef>(new BlockDef(type)));
         r.blocks.back()->info.order = static_cast<int>(r.blocks.size());
         return *r.blocks.back();
-
     }
 
     AutoRegister::AutoRegister(const char* name, BlockSetFunction function) {
@@ -1155,10 +1306,10 @@ namespace rb {
                 }
             }
 
-            //クラス直下に出力する変数宣言
-            //※static変数のjavaコードを一時的に保存する
+            // クラス直下に出力する変数宣言（static の変数の Java をためておく）
             std::string classMembers;
             conv.classMembers = &classMembers;
+
             // イベントブロックを選び出す
             std::vector<std::pair<const BlockDef::Info*, const json*>> events;
             std::vector<const json*> functions;   // 「関数」カテゴリで作った関数
@@ -1175,21 +1326,13 @@ namespace rb {
                     conv.error(b, nullptr, "知らないブロックです（" + type + "）");
                 }
                 else if (type == "robot_variable_declare") {
-                    // 変数宣言ブロックの内容を取得する
+                    // 一番上に置いた変数宣言：static ならクラス直下に出す
                     std::string declaration = conv.render(*def, *b);
-
-                    // STATIC の選択値を取得する
-                    BlockData::Impl impl{ &conv, b, def };
-                    BlockData data(&impl);
-
-                    if (data.text("STATIC") == "static") {
-                        // static 変数はクラス直下に出力する
+                    if (conv.getBlockText(*b, *def, "STATIC") == "static") {
                         classMembers += "    " + declaration + "\n";
                     }
                     else {
-                        // 通常の変数はイベント内で使うため、今回は警告を出す
-                        conv.warning(b, def,
-                            "通常の変数宣言はイベント内に置いてください");
+                        conv.warning(b, def, "通常の変数宣言はイベント内に置いてください");
                     }
                 }
                 else if (!def->isEvent) {
@@ -1210,6 +1353,9 @@ namespace rb {
                     const std::pair<const BlockDef::Info*, const json*>& b) {
                         return a.first->order < b.first->order;
                 });
+
+            // 関数がイベントの情報（e）を使うか調べる
+            conv.analyzeFunctions(events, functions);
 
             // イベントごとに Java のメソッドを作る
             std::string body;
@@ -1242,12 +1388,12 @@ namespace rb {
                 << "\n"
                 << "// Generated by Robocode Blocks\n"
                 << "public class " << name << " extends AdvancedRobot {\n";
-            if (!classMembers.empty()) java << "\n" << classMembers;1061;
-                if (!fieldNames.empty()) {
-                    java << "\n";
-                    java << "    // 「変数」カテゴリで作った変数（ラウンドが変わると 0 にもどる）\n";
-                    for (const auto& f : fieldNames) java << "    double " << f << " = 0;\n";
-                }
+            if (!classMembers.empty()) java << "\n" << classMembers;   // static の変数
+            if (!fieldNames.empty()) {
+                java << "\n";
+                java << "    // 「変数」カテゴリで作った変数（ラウンドが変わると 0 にもどる）\n";
+                for (const auto& f : fieldNames) java << "    double " << f << " = 0;\n";
+            }
             if (!body.empty()) java << "\n" << body;
             java << "}\n";
             conv.result.java = java.str();
