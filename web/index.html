@@ -642,7 +642,6 @@
     let colorTarget = null;
     let colorH = 0, colorS = 1, colorV = 1;
     let colorDragging = false;
-    let pendingColorBlock = null;
     // 起動時の自動復元で発生するブロック作成イベントでは開かない
     let restoringStartupColors = true;
 
@@ -811,34 +810,6 @@
     }, true);
     document.addEventListener('pointercancel', () => { colorClickStart = null; }, true);
 
-    // 右クリックメニューから、何度でも選び直せるようにする
-    workspace.addChangeListener(e=>{
-      if (e.type!==Blockly.Events.BLOCK_CREATE || loading || !restored || restoringStartupColors) return;
-      for(const id of e.ids || []) {
-        const b=workspace.getBlockById(id);
-        if(b && COLOR_BLOCK_TYPES.has(b.type)) { pendingColorBlock=id; break; }
-      }
-    });
-    // 配置操作が終わった後に表示する（ドラッグ中には開かない）
-    document.addEventListener('pointerup',()=>{
-      if (!pendingColorBlock || loading || restoringStartupColors) return;
-      const id=pendingColorBlock; pendingColorBlock=null;
-      setTimeout(()=>{ if (!loading && !Blockly.Gesture.inProgress()) openColorPicker(workspace.getBlockById(id)); },100);
-    });
-    // クリックで置く方式など、pointerup後に生成イベントが届く場合への対応
-    workspace.addChangeListener(e=>{
-      if(e.type!==Blockly.Events.BLOCK_CREATE || loading || !restored) return;
-      for(const id of e.ids || []) {
-        const b=workspace.getBlockById(id);
-        if(!b || !COLOR_BLOCK_TYPES.has(b.type)) continue;
-        setTimeout(()=>{
-          if(loading || Blockly.Gesture.inProgress() || colorOverlay.classList.contains('open')) return;
-          if(pendingColorBlock===id) pendingColorBlock=null;
-          openColorPicker(workspace.getBlockById(id));
-        },350);
-        break;
-      }
-    });
     if (Blockly.ContextMenuRegistry && Blockly.ContextMenuRegistry.registry) {
       Blockly.ContextMenuRegistry.registry.register({
         id:'robocode_color_wheel', scopeType:Blockly.ContextMenuRegistry.ScopeType.BLOCK,
