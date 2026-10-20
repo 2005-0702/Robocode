@@ -370,6 +370,8 @@
     #colorPickerDialog { background:#fff; border-radius:14px; padding:20px; width:350px; box-sizing:border-box; box-shadow:0 12px 45px #0005; }
     #colorPickerDialog h3 { margin:0 0 12px; font-size:17px; }
     #colorWheelCanvas { display:block; margin:auto; width:300px; height:300px; cursor:crosshair; touch-action:none; }
+    #colorBrightnessRow { display:flex; align-items:center; gap:10px; margin:12px 0 4px; font-size:13px; }
+    #colorBrightness { flex:1; accent-color:#2563eb; }
     #colorPickerValues { display:flex; gap:12px; align-items:center; margin:14px 0; }
     #colorPickerPreview { width:64px; height:44px; border:1px solid #aaa; border-radius:6px; flex:none; }
     #colorPickerNumbers { font-family:Consolas,monospace; font-size:13px; line-height:1.7; }
@@ -450,7 +452,8 @@
     <div id="colorPickerDialog" role="dialog" aria-modal="true" aria-labelledby="colorPickerTitle">
       <h3 id="colorPickerTitle">色を選択</h3>
       <canvas id="colorWheelCanvas" width="300" height="300"></canvas>
-      <div id="colorPickerHint">円の角度：色相 ／ 中心からの距離：彩度 ／ ホイール：明度</div>
+      <div id="colorPickerHint">円の角度：色相 ／ 中心からの距離：彩度</div>
+      <div id="colorBrightnessRow"><label for="colorBrightness">明るさ</label><input id="colorBrightness" type="range" min="0" max="100" value="100" step="1"><span id="colorBrightnessValue">100%</span></div>
       <div id="colorPickerValues"><div id="colorPickerPreview"></div><div id="colorPickerNumbers"></div></div>
       <div class="actions"><button id="colorPickerCancel">キャンセル</button><button id="colorPickerApply">決定</button></div>
     </div>
@@ -663,6 +666,8 @@
       return [h, max === 0 ? 0 : d/max, max];
     }
     function drawColorWheel() {
+      document.getElementById('colorBrightness').value = String(Math.round(colorV * 100));
+      document.getElementById('colorBrightnessValue').textContent = Math.round(colorV * 100) + '%';
       const w = colorCanvas.width, radius = w/2;
       const image = colorCtx.createImageData(w,w), data = image.data;
       for (let y=0; y<w; y++) for (let x=0; x<w; x++) {
@@ -720,9 +725,13 @@
       colorTarget=block;
       const rgb=['R','G','B'].map(name => Math.max(0,Math.min(255,Number(block.getFieldValue(name))||0)));
       [colorH,colorS,colorV]=rgbToHsv(...rgb);
-      // RGBが黒(0,0,0)でも、色を選び始められるよう明度を最大にする。
-      // 黒を選びたい場合はホイールを下に回して明度を下げられる。
-      if (colorV === 0) colorV = 1;
+      // RGBの初期値が黒の場合は、ホイールを見やすい白（明度100%）から表示する。
+      // 決定するまではノードのRGB値を変更しない。
+      if (rgb.every(value => value === 0)) {
+        colorH = 0;
+        colorS = 0;
+        colorV = 1;
+      }
       colorOverlay.classList.add('open');
       drawColorWheel();
     }
@@ -743,6 +752,10 @@
     colorCanvas.addEventListener('pointermove',e=>{ if(colorDragging) pickWheelPosition(e); });
     colorCanvas.addEventListener('pointerup',()=>{ colorDragging=false; });
     colorCanvas.addEventListener('pointercancel',()=>{ colorDragging=false; });
+    document.getElementById('colorBrightness').addEventListener('input', e => {
+      colorV = clamp01(Number(e.target.value) / 100);
+      drawColorWheel();
+    });
     colorCanvas.addEventListener('wheel',e=>{
       e.preventDefault(); e.stopPropagation();
       colorV=clamp01(colorV+(e.deltaY<0?0.05:-0.05)); drawColorWheel();
