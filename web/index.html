@@ -21,12 +21,12 @@
     /* 上のバー（ロボット名とボタン） */
     #toolbar {
       position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 56px;
+      top: 0; left: 0;
+      right: var(--panel-width, 400px);   /* 右の結果の欄は一番上まであるので、その手前まで */
       display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 0 12px;
+      flex-direction: column;  /* 2段にする（1段目：作品・編集・検索／2段目：フォルダから右） */
+      gap: 4px;
+      padding: 6px 12px;
       background: #2c3e50;
       color: #fff;
       box-sizing: border-box;
@@ -46,6 +46,14 @@
       margin: 0 4px;
     }
     #toolbar .dot { font-weight: bold; }
+    #toolbar .row {
+      display: flex;
+      flex-wrap: wrap;         /* とてもせまいときは、さらに折り返す */
+      align-items: center;
+      gap: 6px 8px;
+    }
+    #toolbar .row .spacer { flex: 1; }
+    #toolbar [data-tip] { position: relative; }
     #toolbar label,
     #toolbar button {
       white-space: nowrap;    /* 文字が2行に折り返さないように */
@@ -76,13 +84,14 @@
     /* 左：ブロックを組む場所 */
     #blocklyDiv {
       position: absolute;
-      top: 56px; left: 0; bottom: 0;
-      right: 400px;
+      top: var(--bar-height, 104px); left: 0; bottom: 0;   /* 上のバーの高さ */
+      right: var(--panel-width, 400px);                    /* 右の結果の欄の幅 */
     }
 
     /* ブロックを置くあいだだけ、上のバーと右の結果を消して、ブロックの画面を広くする */
     body.focus-mode #toolbar,
-    body.focus-mode #resultPanel {
+    body.focus-mode #resultPanel,
+    body.focus-mode #panelTab {
       display: none;
     }
     body.focus-mode #blocklyDiv {
@@ -181,13 +190,75 @@
     /* 右：結果を表示する場所 */
     #resultPanel {
       position: absolute;
-      top: 56px; right: 0; bottom: 0;
-      width: 400px;
+      top: 0; right: 0; bottom: 0;           /* 一番上から一番下まで */
+      width: var(--panel-width, 400px);
+      box-sizing: border-box;
       display: flex;
       flex-direction: column;
       border-left: 1px solid #ccc;
       background: #fafafa;
     }
+    /* 結果の欄の一番上（タイトルと、かくすボタン） */
+    #panelHeader {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 0 8px 0 14px;
+      background: #2c3e50;
+      color: #fff;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+    #panelHeader span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #panelHideButton {
+      width: 36px; height: 32px;
+      border: none; border-radius: 4px;
+      background: #5d6d7e; color: #fff;
+      font-size: 18px; cursor: pointer;
+    }
+    #panelHideButton:hover { background: #7f8c8d; }
+    /* 結果の欄の左はし：ドラッグして幅を変える */
+    #panelResizer {
+      position: absolute;
+      top: 0; bottom: 0; left: -4px;
+      width: 8px;
+      cursor: col-resize;
+      z-index: 5;
+    }
+    #panelResizer:hover, #panelResizer.dragging { background: rgba(41, 128, 185, 0.35); }
+    body.panel-resizing, body.panel-resizing * { cursor: col-resize !important; user-select: none; }
+    /* 結果の欄をかくしたときに、右はしに出る矢印 */
+    #panelTab {
+      display: none;
+      position: absolute;
+      top: 0; right: 0; bottom: 0;
+      width: 24px;
+      padding: 0;
+      border: none;
+      border-left: 1px solid #1b2631;
+      background: #2c3e50;
+      color: #fff;
+      font-size: 18px;
+      cursor: pointer;
+      z-index: 90;
+    }
+    #panelTab:hover { background: #3d566e; }
+    body.panel-collapsed #resultPanel { display: none; }
+    body.panel-collapsed #panelTab { display: block; }
+    /* 保存した場所のボタン */
+    .message .folderButton {
+      margin-left: 6px;
+      padding: 3px 10px;
+      border: none;
+      border-radius: 4px;
+      background: #2980b9;
+      color: #fff;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .message .folderButton:hover { background: #3498db; }
+    .message .savedPath { display: block; word-break: break-all; margin-bottom: 4px; }
     #status {
       padding: 8px 12px;
       font-weight: bold;
@@ -317,11 +388,12 @@
     }
 
     /* ブロックの検索 */
-    #searchBox {
-      width: 80px !important;
-      border-radius: 12px;
-      border: none;
-    }
+      #searchBox {
+          width: 220px !important;
+          border-radius: 12px;
+          border: none;
+          margin-left: 20px;
+      }
 
     /* ゴミ箱の中身の横スクロールバー（横に長いブロックがあるときだけ出る） */
     /* ゴミ箱を開いたときに、中身の一覧の上に出る「ゴミ箱を空にする」ボタン */
@@ -383,6 +455,7 @@
 </head>
 <body>
   <div id="toolbar">
+    <div class="row">
     <!-- 作品のファイル -->
     <button id="newButton" class="sub icon tip-left" data-tip="新しく作る" aria-label="新しく作る"><svg viewBox="0 0 24 24"><path d="M13 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9z"/><path d="M13 3v6h6"/><path d="M12 12v6M9 15h6"/></svg></button>
     <button id="openButton" class="sub icon" data-tip="保存した作品を開く" aria-label="開く"><svg viewBox="0 0 24 24"><path d="M3 7a1 1 0 0 1 1-1h5l2 2h8a1 1 0 0 1 1 1v2"/><path d="M3 7v12a1 1 0 0 0 1 1h14l3-9H7l-3 8"/></svg></button>
@@ -402,11 +475,10 @@
     <span class="sep"></span>
 
     <!-- ブロックを名前で探す -->
-    <input id="searchBox" type="search" placeholder="🔍 検索"
+    <input id="searchBox" type="search" placeholder="🔍ブロックを検索 "
            title="ブロックの名前の一部を入れると、当てはまるブロックが出てきます（Esc で閉じる）">
-
-    <span class="sep"></span>
-
+    </div>
+    <div class="row">
     <!-- パッケージ名とロボットの名前 → Robocode では「パッケージ名.ロボットの名前」で表示される -->
     <label for="packageName">フォルダ</label>
     <input id="packageName" value="student" maxlength="16"
@@ -415,11 +487,10 @@
     <label for="robotName">ロボットの名前</label>
     <input id="robotName" value="MyRobot" maxlength="32"
            title="英字で始まり、英字・数字・_ だけ。32文字まで">
-    <button id="convertButton">ロボットを作る</button>
     <button id="importJavaButton" class="sub icon" data-tip="Java（.java）を読みこんでブロックにする" aria-label="Java を読みこむ"><svg viewBox="0 0 24 24"><path d="M13 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9z"/><path d="M13 3v6h6"/><path d="M10 12l-2.5 2.5L10 17M14 12l2.5 2.5L14 17"/></svg></button>
-
-    <span style="flex: 1"></span>
+    <button id="convertButton" data-tip="ブロックを Java にして、Robocode で使えるロボットを作ります">ロボットを作る</button>
     <button id="launchButton" title="Robocode を起動する（このアプリから開いた Robocode なら開き直す）">Robocode を開く</button>
+    </div>
   </div>
 
   <div id="blocklyDiv"></div>
@@ -435,8 +506,15 @@
     <button id="focusHideButton" class="hide" title="画面の横にかくす（矢印を押すとまた出てきます）">⇥</button>
   </div>
   <button id="focusTab" class="right" title="ボタンを出す">‹</button>
+  <!-- 結果の欄をかくしているあいだだけ、画面の右はしに出る矢印 -->
+  <button id="panelTab" title="結果の欄を出す">‹</button>
 
   <div id="resultPanel">
+    <div id="panelResizer" title="ドラッグして、結果の欄の幅を変えられます（ダブルクリックで元の幅）"></div>
+    <div id="panelHeader">
+      <span>結果・できた Java</span>
+      <button id="panelHideButton" title="結果の欄を、画面の右にかくす（右はしの矢印でまた出せます）">⇥</button>
+    </div>
     <div id="status">ブロックを組んで「Java を作る」を押してください（Shift + ドラッグで囲んで Delete でまとめて消す／Ctrl + D で複製／Ctrl + Z・Ctrl + Y で戻す・やり直す）</div>
     <div id="messages"></div>
     <div id="javaHeader">
@@ -1099,11 +1177,19 @@
         if (build && build.ok) {
           showStatus('ok', build.message + (msg.warnings.length > 0
             ? '（注意が ' + msg.warnings.length + ' 件あります）' : ''));
-          const where = addMessage('info link', '📂', '保存した場所：' + build.javaPath + '（クリックで開く）');
-          where.title = 'エクスプローラーで、保存したフォルダを開きます';
-          where.addEventListener('click', () => {
+          // 保存した場所と、そのフォルダを開くボタン
+          const where = addMessage('info', '📂', '');
+          const pathText = document.createElement('span');
+          pathText.className = 'savedPath';
+          pathText.textContent = '保存した場所：' + build.javaPath;
+          const folderButton = document.createElement('button');
+          folderButton.className = 'folderButton';
+          folderButton.textContent = '📂 フォルダを開く';
+          folderButton.title = 'エクスプローラーで、保存したフォルダを開きます';
+          folderButton.addEventListener('click', () => {
             window.chrome.webview.postMessage({ kind: 'showInFolder', path: build.javaPath });
           });
+          where.append(pathText, folderButton);
           addMessage('info', '💡', 'Robocode を開いていたら、「Robocode を開く」で開き直すと一覧に出ます');
         } else if (build) {
           showStatus('error', build.message);
@@ -1623,6 +1709,15 @@
         setTimeout(updateTrashScroll, 0);
       };
 
+      // 中身の一覧を「ゴミ箱を空にする」ボタンの分だけ下にずらす（ボタンとブロックが重ならないように）
+      const TRASH_BUTTON_SPACE = 48;
+      const originalPositionAt = trashFlyout.positionAt_;
+      if (typeof originalPositionAt === 'function') {
+        trashFlyout.positionAt_ = function (width, height, x, y) {
+          originalPositionAt.call(this, width, Math.max(0, height - TRASH_BUTTON_SPACE), x, y + TRASH_BUTTON_SPACE);
+        };
+      }
+
       // 横にずらす（scrollX はマイナスにするほど左にずれる）
       const scrollTrashTo = (left) => {
         trashWs.scrollX = -left;
@@ -1642,7 +1737,7 @@
         const flyoutRect = trashWs.getParentSvg().getBoundingClientRect();
         emptyTrashButton.style.display = 'block';
         emptyTrashButton.style.left = (flyoutRect.left + 10) + 'px';
-        emptyTrashButton.style.top = (flyoutRect.top + 10) + 'px';
+        emptyTrashButton.style.top = (flyoutRect.top - TRASH_BUTTON_SPACE + 8) + 'px';   // 中身の一覧のすぐ上
         const box = trashWs.getBlocksBoundingBox();
         const contentWidth = (box.right + 20) * trashWs.scale;                    // 中身の幅
         const viewWidth = trashFlyout.getWidth() - Blockly.Scrollbar.scrollbarThickness;  // 見えている幅
@@ -1681,6 +1776,101 @@
         e.stopPropagation();
       }, true);
     }
+
+    // ------------------------------------------------------------
+    // 右の結果の欄
+    //   ・左はしをドラッグすると幅を変えられる（ダブルクリックで元の幅）
+    //   ・⇥ を押すと画面の右にかくれて、右はしに矢印だけが出る（矢印を押すとまた出る）
+    //   ・幅とかくしているかどうかは覚えておく
+    // 上のバー
+    //   ・2段（とてもせまいときは3段以上）。高さが変わったら、ブロックの画面をその分ずらす
+    // ------------------------------------------------------------
+    const PANEL_KEY = 'robocodeBlocks.resultPanel';
+    const PANEL_DEFAULT_WIDTH = 400, PANEL_MIN_WIDTH = 240, PANEL_TAB_WIDTH = 24;
+    let panelState = { width: PANEL_DEFAULT_WIDTH, collapsed: false };
+    try { panelState = Object.assign(panelState, JSON.parse(localStorage.getItem(PANEL_KEY) || '{}')); } catch (err) { /* 読めなくても動く */ }
+
+    // ブロックの画面の大きさが変わったことを Blockly に伝える（ブロックが画面の上で動いて見えないように、ずれた分スクロールする）
+    function relayoutWorkspace(change) {
+      const div = document.getElementById('blocklyDiv');
+      const old = div.getBoundingClientRect();
+      change();
+      Blockly.svgResize(workspace);
+      const now = div.getBoundingClientRect();
+      const dy = old.top - now.top;
+      if (dy !== 0) workspace.scroll(workspace.scrollX, workspace.scrollY + dy);
+      if (trashFlyout && trashFlyout.isVisible()) trashFlyout.position();
+      if (typeof updateTrashScroll === 'function') setTimeout(updateTrashScroll, 0);
+    }
+
+    function clampPanelWidth(w) {
+      // ブロックの画面が 420 より細くならないように（画面が大きければ、7割まで広げられる）
+      const max = Math.max(PANEL_MIN_WIDTH, Math.min(Math.floor(window.innerWidth * 0.7), window.innerWidth - 420));
+      return Math.max(PANEL_MIN_WIDTH, Math.min(max, Math.round(w)));
+    }
+    function applyPanel(save) {
+      const width = panelState.collapsed ? PANEL_TAB_WIDTH : clampPanelWidth(panelState.width);
+      relayoutWorkspace(() => {
+        document.body.classList.toggle('panel-collapsed', panelState.collapsed);
+        document.documentElement.style.setProperty('--panel-width', width + 'px');
+      });
+      updateBarHeight();
+      if (save) {
+        try { localStorage.setItem(PANEL_KEY, JSON.stringify(panelState)); } catch (err) { /* 保存できなくても動く */ }
+      }
+    }
+
+    document.getElementById('panelHideButton').addEventListener('click', () => {
+      panelState.collapsed = true;
+      applyPanel(true);
+    });
+    document.getElementById('panelTab').addEventListener('click', () => {
+      panelState.collapsed = false;
+      applyPanel(true);
+    });
+
+    // 幅を変える（左はしをドラッグ）
+    const panelResizer = document.getElementById('panelResizer');
+    let panelDrag = null;
+    panelResizer.addEventListener('pointerdown', (e) => {
+      panelDrag = { startX: e.clientX, startWidth: clampPanelWidth(panelState.width) };
+      panelResizer.setPointerCapture(e.pointerId);
+      panelResizer.classList.add('dragging');
+      document.body.classList.add('panel-resizing');
+      e.preventDefault();
+    });
+    panelResizer.addEventListener('pointermove', (e) => {
+      if (!panelDrag) return;
+      panelState.width = clampPanelWidth(panelDrag.startWidth + (panelDrag.startX - e.clientX));   // 左に動かすと広くなる
+      applyPanel(false);
+    });
+    const endPanelDrag = () => {
+      if (!panelDrag) return;
+      panelDrag = null;
+      panelResizer.classList.remove('dragging');
+      document.body.classList.remove('panel-resizing');
+      applyPanel(true);
+    };
+    panelResizer.addEventListener('pointerup', endPanelDrag);
+    panelResizer.addEventListener('pointercancel', endPanelDrag);
+    panelResizer.addEventListener('dblclick', () => {
+      panelState.width = PANEL_DEFAULT_WIDTH;
+      applyPanel(true);
+    });
+
+    // 上のバーの高さに合わせて、ブロックの画面の上をずらす
+    const toolbarEl = document.getElementById('toolbar');
+    let lastBarHeight = -1;
+    function updateBarHeight() {
+      if (document.body.classList.contains('focus-mode')) return;   // 画面を広くしているあいだはバーがない
+      const h = toolbarEl.offsetHeight;
+      if (h === lastBarHeight || h === 0) return;
+      lastBarHeight = h;
+      relayoutWorkspace(() => document.documentElement.style.setProperty('--bar-height', h + 'px'));
+    }
+    if (window.ResizeObserver) new ResizeObserver(updateBarHeight).observe(toolbarEl);
+    window.addEventListener('resize', () => applyPanel(false));   // 画面がせまくなったら、結果の欄も広すぎないように
+    applyPanel(false);
 
     // 上の帯に結果を表示する
     function showStatus(type, text) {
