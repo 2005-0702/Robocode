@@ -157,6 +157,9 @@ public:
     BlockDef& output(const std::string& type = "Number");
     BlockDef& event();
 
+    // クラス内のフィールドとして出力する
+    BlockDef& classMember();
+
     // Java
     BlockDef& java(const std::string& javaTemplate);
     BlockDef& javaFunction(JavaFunction function);
@@ -165,6 +168,8 @@ public:
     BlockDef& warnIfZero(const std::string& name, const std::string& message);
     BlockDef& onlyIn(const std::string& eventType);
     BlockDef& check(CheckFunction function);
+
+   
 
     // ===== ここから下は RobocodeBlocksCore.cpp が使うもの（読まなくてOK）=====
     struct Arg {
@@ -185,6 +190,10 @@ public:
         int color = -1;
         int order = 0;
         bool isEvent = false;
+        
+        // クラス内のフィールドとして出力するブロックかどうか
+        bool isClassMember = false;
+
         bool isOutput = false;
         std::vector<Arg> args;
         JavaFunction javaFunction;
