@@ -324,6 +324,22 @@
     }
 
     /* ゴミ箱の中身の横スクロールバー（横に長いブロックがあるときだけ出る） */
+    /* ゴミ箱を開いたときに、中身の一覧の上に出る「ゴミ箱を空にする」ボタン */
+    #emptyTrashButton {
+      display: none;
+      position: fixed;
+      z-index: 95;
+      padding: 6px 12px;
+      border: none;
+      border-radius: 6px;
+      background: #c0392b;
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+    #emptyTrashButton:hover { background: #e74c3c; }
+
     #trashScroll {
       display: none;
       position: fixed;
@@ -354,6 +370,8 @@
     #colorPickerDialog { background:#fff; border-radius:14px; padding:20px; width:350px; box-sizing:border-box; box-shadow:0 12px 45px #0005; }
     #colorPickerDialog h3 { margin:0 0 12px; font-size:17px; }
     #colorWheelCanvas { display:block; margin:auto; width:300px; height:300px; cursor:crosshair; touch-action:none; }
+    #colorBrightnessRow { display:flex; align-items:center; gap:10px; margin:12px 0 4px; font-size:13px; }
+    #colorBrightness { flex:1; accent-color:#2563eb; }
     #colorPickerValues { display:flex; gap:12px; align-items:center; margin:14px 0; }
     #colorPickerPreview { width:64px; height:44px; border:1px solid #aaa; border-radius:6px; flex:none; }
     #colorPickerNumbers { font-family:Consolas,monospace; font-size:13px; line-height:1.7; }
@@ -368,7 +386,7 @@
     <!-- 作品のファイル -->
     <button id="newButton" class="sub icon tip-left" data-tip="新しく作る" aria-label="新しく作る"><svg viewBox="0 0 24 24"><path d="M13 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9z"/><path d="M13 3v6h6"/><path d="M12 12v6M9 15h6"/></svg></button>
     <button id="openButton" class="sub icon" data-tip="保存した作品を開く" aria-label="開く"><svg viewBox="0 0 24 24"><path d="M3 7a1 1 0 0 1 1-1h5l2 2h8a1 1 0 0 1 1 1v2"/><path d="M3 7v12a1 1 0 0 0 1 1h14l3-9H7l-3 8"/></svg></button>
-    <button id="saveButton" class="sub icon" data-tip="保存する（Ctrl + S）" aria-label="保存"><svg viewBox="0 0 24 24"><path d="M5 3h11l4 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M8 3v5h7V3"/><rect x="7" y="13" width="10" height="7"/></svg></button>
+    <button id="saveButton" class="sub icon" data-tip="ブロックの内容保存する（Ctrl + S）" aria-label="保存"><svg viewBox="0 0 24 24"><path d="M5 3h11l4 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M8 3v5h7V3"/><rect x="7" y="13" width="10" height="7"/></svg></button>
     <button id="saveAsButton" class="sub icon" data-tip="別の名前で保存する" aria-label="別名で保存"><svg viewBox="0 0 24 24"><path d="M12 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h11l4 4v4"/><path d="M8 3v5h7V3"/><path d="M7 21v-7h6"/><path d="M19.5 13.5l2 2L16 21h-2v-2z"/></svg></button>
     <span id="fileName">（まだ保存していません）</span>
 
@@ -406,6 +424,7 @@
 
   <div id="blocklyDiv"></div>
   <div id="trashScroll"><div></div></div>
+  <button id="emptyTrashButton" title="ゴミ箱の中のブロックを全部消します（元に戻せません）">🗑 ゴミ箱を空にする</button>
 
   <!-- 画面を広くしているあいだだけ出るボタン（右上） -->
   <div id="focusBar">
@@ -433,7 +452,8 @@
     <div id="colorPickerDialog" role="dialog" aria-modal="true" aria-labelledby="colorPickerTitle">
       <h3 id="colorPickerTitle">色を選択</h3>
       <canvas id="colorWheelCanvas" width="300" height="300"></canvas>
-      <div id="colorPickerHint">円の角度：色相 ／ 中心からの距離：彩度 ／ ホイール：明度</div>
+      <div id="colorPickerHint">円の角度：色相 ／ 中心からの距離：彩度</div>
+      <div id="colorBrightnessRow"><label for="colorBrightness">明るさ</label><input id="colorBrightness" type="range" min="0" max="100" value="100" step="1"><span id="colorBrightnessValue">100%</span></div>
       <div id="colorPickerValues"><div id="colorPickerPreview"></div><div id="colorPickerNumbers"></div></div>
       <div class="actions"><button id="colorPickerCancel">キャンセル</button><button id="colorPickerApply">決定</button></div>
     </div>
@@ -622,7 +642,6 @@
     let colorTarget = null;
     let colorH = 0, colorS = 1, colorV = 1;
     let colorDragging = false;
-    let pendingColorBlock = null;
     // 起動時の自動復元で発生するブロック作成イベントでは開かない
     let restoringStartupColors = true;
 
@@ -646,6 +665,8 @@
       return [h, max === 0 ? 0 : d/max, max];
     }
     function drawColorWheel() {
+      document.getElementById('colorBrightness').value = String(Math.round(colorV * 100));
+      document.getElementById('colorBrightnessValue').textContent = Math.round(colorV * 100) + '%';
       const w = colorCanvas.width, radius = w/2;
       const image = colorCtx.createImageData(w,w), data = image.data;
       for (let y=0; y<w; y++) for (let x=0; x<w; x++) {
@@ -703,9 +724,13 @@
       colorTarget=block;
       const rgb=['R','G','B'].map(name => Math.max(0,Math.min(255,Number(block.getFieldValue(name))||0)));
       [colorH,colorS,colorV]=rgbToHsv(...rgb);
-      // RGBが黒(0,0,0)でも、色を選び始められるよう明度を最大にする。
-      // 黒を選びたい場合はホイールを下に回して明度を下げられる。
-      if (colorV === 0) colorV = 1;
+      // RGBの初期値が黒の場合は、ホイールを見やすい白（明度100%）から表示する。
+      // 決定するまではノードのRGB値を変更しない。
+      if (rgb.every(value => value === 0)) {
+        colorH = 0;
+        colorS = 0;
+        colorV = 1;
+      }
       colorOverlay.classList.add('open');
       drawColorWheel();
     }
@@ -726,6 +751,10 @@
     colorCanvas.addEventListener('pointermove',e=>{ if(colorDragging) pickWheelPosition(e); });
     colorCanvas.addEventListener('pointerup',()=>{ colorDragging=false; });
     colorCanvas.addEventListener('pointercancel',()=>{ colorDragging=false; });
+    document.getElementById('colorBrightness').addEventListener('input', e => {
+      colorV = clamp01(Number(e.target.value) / 100);
+      drawColorWheel();
+    });
     colorCanvas.addEventListener('wheel',e=>{
       e.preventDefault(); e.stopPropagation();
       colorV=clamp01(colorV+(e.deltaY<0?0.05:-0.05)); drawColorWheel();
@@ -781,34 +810,6 @@
     }, true);
     document.addEventListener('pointercancel', () => { colorClickStart = null; }, true);
 
-    // 右クリックメニューから、何度でも選び直せるようにする
-    workspace.addChangeListener(e=>{
-      if (e.type!==Blockly.Events.BLOCK_CREATE || loading || !restored || restoringStartupColors) return;
-      for(const id of e.ids || []) {
-        const b=workspace.getBlockById(id);
-        if(b && COLOR_BLOCK_TYPES.has(b.type)) { pendingColorBlock=id; break; }
-      }
-    });
-    // 配置操作が終わった後に表示する（ドラッグ中には開かない）
-    document.addEventListener('pointerup',()=>{
-      if (!pendingColorBlock || loading || restoringStartupColors) return;
-      const id=pendingColorBlock; pendingColorBlock=null;
-      setTimeout(()=>{ if (!loading && !Blockly.Gesture.inProgress()) openColorPicker(workspace.getBlockById(id)); },100);
-    });
-    // クリックで置く方式など、pointerup後に生成イベントが届く場合への対応
-    workspace.addChangeListener(e=>{
-      if(e.type!==Blockly.Events.BLOCK_CREATE || loading || !restored) return;
-      for(const id of e.ids || []) {
-        const b=workspace.getBlockById(id);
-        if(!b || !COLOR_BLOCK_TYPES.has(b.type)) continue;
-        setTimeout(()=>{
-          if(loading || Blockly.Gesture.inProgress() || colorOverlay.classList.contains('open')) return;
-          if(pendingColorBlock===id) pendingColorBlock=null;
-          openColorPicker(workspace.getBlockById(id));
-        },350);
-        break;
-      }
-    });
     if (Blockly.ContextMenuRegistry && Blockly.ContextMenuRegistry.registry) {
       Blockly.ContextMenuRegistry.registry.register({
         id:'robocode_color_wheel', scopeType:Blockly.ContextMenuRegistry.ScopeType.BLOCK,
@@ -1577,6 +1578,32 @@
     //   ・幅を広げすぎないようにして、横に長いブロックは横スクロールで見る
     // ------------------------------------------------------------
     const trashFlyout = workspace.trashcan && workspace.trashcan.flyout;
+    const emptyTrashButton = document.getElementById('emptyTrashButton');
+
+    // ゴミ箱を空にする（確かめてから）
+    function emptyTrashWithConfirm() {
+      if (!workspace.trashcan || !workspace.trashcan.hasContents()) {
+        showStatus('', 'ゴミ箱はもう空です');
+        return;
+      }
+      if (!confirm('ゴミ箱の中のブロックを全部消します。元に戻せません。よろしいですか？')) return;
+      workspace.trashcan.emptyContents();   // 開いていた中身の一覧も閉じる
+      emptyTrashButton.style.display = 'none';
+      trashScroll.style.display = 'none';
+      showStatus('ok', 'ゴミ箱を空にしました');
+    }
+
+    // ブロックの画面の何もないところを右クリックしたときのメニューにも「ゴミ箱を空にする」を出す
+    if (Blockly.ContextMenuRegistry && Blockly.ContextMenuRegistry.registry) {
+      Blockly.ContextMenuRegistry.registry.register({
+        id: 'robocode_empty_trash',
+        scopeType: Blockly.ContextMenuRegistry.ScopeType.WORKSPACE,
+        displayText: () => '🗑 ゴミ箱を空にする',
+        weight: 100,
+        preconditionFn: () => (workspace.trashcan && workspace.trashcan.hasContents()) ? 'enabled' : 'disabled',
+        callback: () => emptyTrashWithConfirm()
+      });
+    }
     const trashScroll = document.getElementById('trashScroll');
     const TRASH_MAX_WIDTH = 360;   // ゴミ箱の中身の一覧の、いちばん広いときの幅
 
@@ -1608,8 +1635,14 @@
       function updateTrashScroll() {
         if (!trashFlyout.isVisible()) {
           trashScroll.style.display = 'none';
+          emptyTrashButton.style.display = 'none';
           return;
         }
+        // 「ゴミ箱を空にする」ボタンを、中身の一覧の上（左上）に出す
+        const flyoutRect = trashWs.getParentSvg().getBoundingClientRect();
+        emptyTrashButton.style.display = 'block';
+        emptyTrashButton.style.left = (flyoutRect.left + 10) + 'px';
+        emptyTrashButton.style.top = (flyoutRect.top + 10) + 'px';
         const box = trashWs.getBlocksBoundingBox();
         const contentWidth = (box.right + 20) * trashWs.scale;                    // 中身の幅
         const viewWidth = trashFlyout.getWidth() - Blockly.Scrollbar.scrollbarThickness;  // 見えている幅
@@ -1636,6 +1669,9 @@
         }
       });
       window.addEventListener('resize', () => setTimeout(updateTrashScroll, 50));
+
+      // 「ゴミ箱を空にする」ボタン
+      emptyTrashButton.addEventListener('click', emptyTrashWithConfirm);
 
       // Shift + ホイールでも横にスクロールできるようにする
       trashWs.getParentSvg().addEventListener('wheel', (e) => {

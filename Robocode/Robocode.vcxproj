@@ -140,6 +140,7 @@
     <ClInclude Include="WorkFile.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="AdvancedMove.cpp" />
     <ClCompile Include="GetGameInfo.cpp" />
     <ClCompile Include="GetGameSystem.cpp" />
     <ClCompile Include="JavaToBlocks.cpp" />
