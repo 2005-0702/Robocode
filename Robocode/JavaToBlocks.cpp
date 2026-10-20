@@ -151,7 +151,23 @@ Toks tokenize(const std::string& src) {
         }
         cleaned.push_back(out[k]);
     }
-    return cleaned;
+    // robocode.util.Utils.normalRelativeAngleDegrees(…) と normalRelativeAngleDegrees(…)（import static したもの）を
+    // 同じものとして読む（Java にするときは import static が付いているので、短いほうにそろえる）
+    Toks shortened;
+    for (size_t k = 0; k < cleaned.size(); ++k) {
+        auto is = [&](size_t at, const char* s) { return at < cleaned.size() && cleaned[at].s == s; };
+        if (is(k, "robocode") && is(k + 1, ".") && is(k + 2, "util") && is(k + 3, ".") && is(k + 4, "Utils") &&
+            is(k + 5, ".") && is(k + 6, "normalRelativeAngleDegrees")) {
+            k += 5;
+            continue;
+        }
+        if (is(k, "Utils") && is(k + 1, ".") && is(k + 2, "normalRelativeAngleDegrees") && !(k > 0 && is(k - 1, "."))) {
+            k += 1;
+            continue;
+        }
+        shortened.push_back(cleaned[k]);
+    }
+    return shortened;
 }
 
 bool isOpen(const std::string& s) { return s == "(" || s == "[" || s == "{"; }
@@ -466,6 +482,26 @@ bool buildPattern(const Info& info, Pattern& p) {
             ++i;
         }
     }
+    // robocode.util.Utils.normalRelativeAngleDegrees → normalRelativeAngleDegrees（Java を読むときと同じにする）
+    {
+        std::vector<Piece> shortened;
+        auto lit = [&](size_t at, const char* s) {
+            return at < p.pieces.size() && p.pieces[at].kind == PieceKind::Literal && p.pieces[at].text == s;
+        };
+        for (size_t k = 0; k < p.pieces.size(); ++k) {
+            if (lit(k, "robocode") && lit(k + 1, ".") && lit(k + 2, "util") && lit(k + 3, ".") && lit(k + 4, "Utils") &&
+                lit(k + 5, ".") && lit(k + 6, "normalRelativeAngleDegrees")) {
+                k += 5;
+                continue;
+            }
+            if (lit(k, "Utils") && lit(k + 1, ".") && lit(k + 2, "normalRelativeAngleDegrees") && !(k > 0 && lit(k - 1, "."))) {
+                k += 1;
+                continue;
+            }
+            shortened.push_back(p.pieces[k]);
+        }
+        p.pieces = shortened;
+    }
     int depth = 0;
     p.statementCount = 0;
     for (const auto& piece : p.pieces) {
@@ -559,6 +595,8 @@ bool captureFits(const Pattern& p, size_t pieceIndex, const Toks& toks, size_t f
     case Arg::Statements:
     case Arg::Text:
         return true;
+    case Arg::Variable:   // 変数を選ぶ欄のある型紙は、Java からはもどさない
+        return false;
     }
     return false;
 }
@@ -751,22 +789,79 @@ public:
     }
 
     // メソッドの中で「double x = …;」のように作られている変数の名前を集める
+    //   double x = 式; の形（1つだけ作っているもの）は、Blockly の変数ブロックにする（scopeVariables に入れる）。
+    //   それ以外（int i、for の中、クラスの変数と同じ名前など）は、変数ブロックにしない（shadowedNames）
     void collectShadowed(const Toks& m, size_t from, size_t to) {
         static const std::set<std::string> types = {"double", "int", "float", "long", "boolean", "String"};
         shadowedNames.clear();
+        std::set<std::string> fieldIds;
+        for (const auto& v : variableIds) fieldIds.insert(v.second);
+        std::set<std::string> locals, others;
         for (size_t k = from; k + 2 < to; ++k) {
             bool startOfStatement = k == from || m[k - 1].s == ";" || m[k - 1].s == "{" || m[k - 1].s == "}" ||
                                     m[k - 1].s == "(";
-            if (startOfStatement && types.count(m[k].s) && m[k + 1].kind == TokKind::Ident &&
-                (m[k + 2].s == "=" || m[k + 2].s == ";" || m[k + 2].s == "," || m[k + 2].s == ":" ||
-                 m[k + 2].s == ")")) {
-                shadowedNames.insert(m[k + 1].s);
+            if (!(startOfStatement && types.count(m[k].s) && m[k + 1].kind == TokKind::Ident &&
+                  (m[k + 2].s == "=" || m[k + 2].s == ";" || m[k + 2].s == "," || m[k + 2].s == ":" ||
+                   m[k + 2].s == ")"))) continue;
+            const std::string& name = m[k + 1].s;
+            bool simple = m[k].s == "double" && (k == from || m[k - 1].s != "(") && (m[k + 2].s == "=" || m[k + 2].s == ";");
+            if (simple && m[k + 2].s == "=") {
+                // ; までに , がない（double a = 1, b = 2; ではない）
+                int depth = 0;
+                for (size_t j = k + 3; j < to; ++j) {
+                    if (m[j].kind == TokKind::Op && isOpen(m[j].s)) ++depth;
+                    if (m[j].kind == TokKind::Op && isClose(m[j].s)) --depth;
+                    if (depth == 0 && m[j].s == ";") break;
+                    if (depth == 0 && m[j].s == ",") { simple = false; break; }
+                    if (depth < 0) { simple = false; break; }
+                }
             }
+            if (simple && !scopeVariables.count(name)) {
+                auto same = idByDisplayName.find(displayName(name, "v_"));
+                if (variableIds.count(name) || (same != idByDisplayName.end() && fieldIds.count(same->second))) {
+                    simple = false;   // クラスの変数と同じ名前
+                }
+            }
+            (simple ? locals : others).insert(name);
         }
+        for (const auto& name : others) shadowedNames.insert(name);
+        for (const auto& name : locals) {
+            if (others.count(name) || scopeVariables.count(name)) { shadowedNames.insert(name); continue; }
+            std::string id = newVariableId(displayName(name, "v_"));
+            scopeVariables[name] = id;
+            localNames.insert(name);
+            localIds.insert(id);
+        }
+    }
+    std::set<std::string> localNames;   // 今のメソッドの中で作られていて、変数ブロックにしたもの
+    std::set<std::string> localIds;     // そういう変数の id（使われなかったら、最後に消す）
+    std::set<std::string> rawUsedIds;   // そのまま書くブロックの中で使われた変数の id
+
+    // メソッドの中で作った変数のうち、ブロックで使われなかったもの（型紙のブロックの中で作っているものなど）を消す
+    void removeUnusedLocals(const json& tops) {
+        std::string all = tops.dump();
+        json kept = json::array();
+        for (const auto& v : variableList) {
+            std::string id = v.value("id", "");
+            bool unused = localIds.count(id) && !rawUsedIds.count(id) &&
+                          all.find("\"" + id + "\"") == std::string::npos;
+            if (!unused) kept.push_back(v);
+        }
+        variableList = kept;
     }
 
     // 変数の命令（v_x = 式; / v_x += 式; / v_x++;）なら、Blockly の変数ブロックにする
-    bool convertVariableStatement(const Toks& toks, const std::string& eventType, int& rawCount, json& out) {
+    bool convertVariableStatement(const Toks& input, const std::string& eventType, int& rawCount, json& out) {
+        // double x = 式; → x = 式;（メソッドの中で作った変数も、変数ブロックにする）
+        if (input.size() >= 3 && input[0].s == "double" && localNames.count(input[1].s) && isVariable(input[1])) {
+            if (input.size() == 3 && input[2].s == ";") {   // double x; だけ → ブロックはいらない
+                out = json();
+                return true;
+            }
+            Toks rest(input.begin() + 1, input.end());
+            return convertVariableStatement(rest, eventType, rawCount, out);
+        }
+        const Toks& toks = input;
         if (toks.size() < 3 || !isVariable(toks[0]) || toks.back().s != ";") return false;
         json var = {{"id", variableIdOf(toks[0].s)}};
         const std::string& op = toks[1].s;
@@ -802,7 +897,11 @@ public:
         std::vector<std::string> paramIds;      // 引数の変数の id
         std::vector<std::string> paramJava;     // 引数の Java での名前
         size_t bodyOpen = 0;                    // { の位置
+        std::string eventType;                  // イベントの情報（ScannedRobotEvent e など）を受け取るなら、そのイベント
+        int eventParamIndex = -1;               // そのイベントの情報が、何番目の引数か
+        std::string eventParamName;             // その名前（e など）
     };
+    std::map<std::string, std::string> eventTypeByClass;   // ScannedRobotEvent → robot_event_enemyDetected
     std::map<std::string, FunctionSig> functions;   // Java の名前 → 関数のようす
     const FunctionSig* currentFunction = nullptr;   // 今、関数の中を変換しているか
 
@@ -848,7 +947,23 @@ public:
         sig.returns = m[0].s == "double";
         sig.bodyOpen = start + close + 1;
         size_t k = 3;
+        int index = 0;
         while (k < close) {
+            // イベントの情報（ScannedRobotEvent e など）。1つだけ受け取れる
+            auto ev = eventTypeByClass.find(m[k].s);
+            if (ev != eventTypeByClass.end() && k + 1 < close && m[k + 1].kind == TokKind::Ident &&
+                sig.eventParamIndex < 0) {
+                sig.eventType = ev->second;
+                sig.eventParamIndex = index++;
+                sig.eventParamName = m[k + 1].s;
+                k += 2;
+                if (k < close) {
+                    if (m[k].s != ",") return false;
+                    ++k;
+                }
+                continue;
+            }
+            ++index;
             if (k + 1 >= close || m[k].s != "double" || m[k + 1].kind != TokKind::Ident) return false;
             std::string display = displayName(m[k + 1].s, "v_");
             sig.paramJava.push_back(m[k + 1].s);
@@ -892,7 +1007,13 @@ public:
             current.push_back(t);
         }
         if (!current.empty()) args.push_back(current);
-        if (args.size() != sig.paramDisplay.size()) return false;
+        if (args.size() != sig.paramDisplay.size() + (sig.eventParamIndex >= 0 ? 1 : 0)) return false;
+        if (sig.eventParamIndex >= 0) {
+            // イベントの情報（e）は、ブロックでは書かない（Java にするときに自動で入る）
+            const Toks& ev = args[sig.eventParamIndex];
+            if (ev.size() != 1 || ev[0].kind != TokKind::Ident) return false;
+            args.erase(args.begin() + sig.eventParamIndex);
+        }
         out = {{"type", asValue ? "procedures_callreturn" : "procedures_callnoreturn"},
                {"extraState", {{"name", sig.display}, {"params", sig.paramDisplay}}}};
         for (size_t i = 0; i < args.size(); ++i) {
@@ -919,9 +1040,19 @@ public:
     }
 
     // 関数を、関数を作るブロックにする
-    json convertFunction(const Toks& m) {
-        size_t start = skipModifiers(m);
-        const FunctionSig& sig = functions[m[start + 1].s];
+    json convertFunction(const Toks& original) {
+        size_t start = skipModifiers(original);
+        const FunctionSig& sig = functions[original[start + 1].s];
+        // イベントの情報の名前が e でなければ、e に直す（ブロックの型紙は e.getBearing() のように e を使うため）
+        Toks m = original;
+        if (sig.eventParamIndex >= 0 && sig.eventParamName != "e") {
+            for (size_t k = 0; k < m.size(); ++k) {
+                if (m[k].kind == TokKind::Ident && m[k].s == sig.eventParamName && !(k > 0 && m[k - 1].s == ".")) {
+                    m[k].s = "e";
+                }
+            }
+        }
+        const std::string& eventType = sig.eventType;
         currentFunction = &sig;
         int rawCount = 0;
         // 引数は、この関数の中だけで使える変数
@@ -932,7 +1063,7 @@ public:
         json returnValue;
         if (sig.returns && !list.empty() && list.back().size() >= 3 && list.back()[0].s == "return") {
             Toks expr(list.back().begin() + 1, list.back().end() - 1);
-            returnValue = valueOrNumber(expr, "", "", rawCount);
+            returnValue = valueOrNumber(expr, "", eventType, rawCount);
             list.pop_back();
         }
         json block = {{"type", sig.returns ? "procedures_defreturn" : "procedures_defnoreturn"},
@@ -944,12 +1075,13 @@ public:
             }
             block["extraState"]["params"] = params;
         }
-        json chain = chainStatements(list, "", rawCount);
+        json chain = chainStatements(list, eventType, rawCount);
         if (!chain.is_null()) block["inputs"]["STACK"]["block"] = chain;
         if (!returnValue.is_null()) block["inputs"]["RETURN"]["block"] = returnValue;
         currentFunction = nullptr;
         scopeVariables.clear();
         shadowedNames.clear();
+        localNames.clear();
         ++converted;
         return block;
     }
@@ -965,7 +1097,17 @@ public:
                 info->type == kNumberBlock) continue;
             Pattern p;
             if (!buildPattern(*info, p)) continue;
-            if (info->isEvent) events.push_back(p);
+            if (info->isEvent) {
+                events.push_back(p);
+                // public void onHitWall(HitWallEvent e) { … } の HitWallEvent を覚える
+                const std::string& t = info->javaTemplate;
+                size_t open = t.find('('), close = t.find(')');
+                if (open != std::string::npos && close != std::string::npos && close > open) {
+                    std::istringstream in(t.substr(open + 1, close - open - 1));
+                    std::string cls, name;
+                    if (in >> cls >> name) eventTypeByClass.emplace(cls, info->type);
+                }
+            }
             else if (info->isOutput) values.push_back(p);
             else statements.push_back(p);
         }
@@ -991,6 +1133,7 @@ public:
                 t.s = "f_" + functions[t.s].display;
             } else if (!isCall && isVariable(t)) {
                 std::string id = variableIdOf(t.s);
+                rawUsedIds.insert(id);
                 for (const auto& v : variableList) {
                     if (v.value("id", "") == id) t.s = "v_" + v.value("name", "");
                 }
@@ -1037,6 +1180,8 @@ public:
             }
             case Arg::Text:
                 block["fields"][arg.name] = joinTokens(toks, from, to);
+                break;
+            case Arg::Variable:   // 変数を選ぶ欄（型紙で使うことはないので、何もしない）
                 break;
             case Arg::Value: {
                 Toks sub(toks.begin() + from, toks.begin() + to);
@@ -1204,6 +1349,7 @@ public:
         // 下からつないでいく
         json chain;
         for (auto it = blocks.rbegin(); it != blocks.rend(); ++it) {
+            if (it->is_null()) continue;   // double x; のように、ブロックがいらない文
             json b = *it;
             if (!chain.is_null()) b["next"]["block"] = chain;
             chain = b;
@@ -1214,11 +1360,15 @@ public:
     // class の中の1つ分（メソッドや変数）をブロックにする
     json convertMember(const Toks& toks) {
         int rawCount = 0;
+        scopeVariables.clear();
+        localNames.clear();
         collectShadowed(toks, 0, toks.size());
         struct ClearShadow {
             std::set<std::string>& s;
-            ~ClearShadow() { s.clear(); }
-        } clearShadow{shadowedNames};
+            std::map<std::string, std::string>& scope;
+            std::set<std::string>& locals;
+            ~ClearShadow() { s.clear(); scope.clear(); locals.clear(); }
+        } clearShadow{shadowedNames, scopeVariables, localNames};
         // ① イベントの型紙にまるごと当てはまるか
         for (const Pattern& p : events) {
             Captures caps;
@@ -1350,6 +1500,7 @@ ImportResult ConvertFromJava(const std::string& javaSource) {
         tops.push_back(block);
     }
 
+    importer.removeUnusedLocals(tops);
     json workspace = {{"blocks", {{"languageVersion", 0}, {"blocks", tops}}}};
     if (!importer.variableList.empty()) workspace["variables"] = importer.variableList;
     result.workspaceJson = workspace.dump(-1, ' ', false, json::error_handler_t::replace);
