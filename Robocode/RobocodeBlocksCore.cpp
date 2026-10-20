@@ -2,7 +2,7 @@
 //  RobocodeBlocksCore.cpp  ―  ブロックのしくみ（難しい部分）
 // 
 // 2026/10/16 片山　カテゴリー色に色とサンプル戦術追加,Javaコードの親クラス名を修正。
-// 
+// 2026/10/20 片山　staticを使えるようにする
 // =====================================================================
 //
 //  ブロックを作る人は読まなくてOK。ここでやっていること：
@@ -523,6 +523,9 @@ namespace rb {
         JavaResult result;
         const BlockDef::Info* currentEvent = nullptr;
 
+        // クラス直下に出力する変数宣言を保存する
+        std::string* classMembers = nullptr;
+
         const BlockDef::Info* find(const std::string& type) const {
             const auto& m = registry().byType;
             auto it = m.find(type);
@@ -553,7 +556,8 @@ namespace rb {
         std::string render(const BlockDef::Info& def, const json& block);
 
         // つながっている命令ブロックを順番に Java にする
-        std::string statementChain(const json* first) {
+        std::string statementChain(const json* first,
+            std::string& classMembers) {
             std::vector<std::string> parts;
             for (const json* b = first; b != nullptr; b = nextOf(*b)) {
                 if (isDisabled(*b)) continue;
@@ -567,6 +571,30 @@ namespace rb {
                     error(b, def, "このブロックはここには置けません");
                     continue;
                 }
+                // 変数宣言ブロックの場合
+                if (type == "robot_variable_declare") {
+                 
+                    // 変数宣言を Java コードに変換する
+                    std::string code = render(*def, *b);
+           
+                    // STATIC の選択値を取得する
+                    std::string staticText = getBlockText(*b, *def, "STATIC");
+
+                    if (staticText == "static") {
+                        // static 変数はクラス直下に移動する
+                        classMembers += "    " + code + "\n";
+                    }
+                    else {
+                        // 通常の変数はイベント内に残す
+                        if (!code.empty()) {
+                            parts.push_back(code);
+                        }
+                    }
+
+
+                    continue;
+                }
+
                 std::string code = render(*def, *b);
                 if (!code.empty()) parts.push_back(code);
             }
@@ -594,10 +622,40 @@ namespace rb {
         }
 
         // 口の中の命令ブロックを Java にする
-        std::string statementInput(const json& block, const BlockDef::Info& def, const BlockDef::Arg& arg) {
-            std::string code = statementChain(inputOf(block, arg.name));
-            if (code.empty()) warning(&block, &def, "中にブロックが入っていません");
+        std::string statementInput(
+            const json& block,
+            const BlockDef::Info& def,
+            const BlockDef::Arg& arg,
+            std::string& classMembers)
+        {
+            const json* first = inputOf(block, arg.name);
+
+            if (!first || isDisabled(*first)) {
+                warning(&block, &def, "中にブロックが入っていません");
+            }
+
+            std::string code = statementChain(first, classMembers);
             return code;
+          
+        }
+
+        std::string getBlockText(
+            const json& block,
+            const BlockDef::Info& def,
+            const std::string& name)
+        {
+            const BlockDef::Arg* arg = def.findArg(name);
+            if (!arg || arg->kind != BlockDef::Arg::Dropdown) {
+                mistake(def, "に「" + name + "」という選択欄がありません");
+                return "";
+            }
+
+            const json* field = fieldOf(block, name);
+            if (field && field->is_string()) {
+                return field->get<std::string>();
+            }
+
+            return arg->options.empty() ? "" : arg->options[0].second;
         }
 
     private:
@@ -669,13 +727,22 @@ namespace rb {
         Converter* conv;
         const json* block;
         const BlockDef::Info* def;
+        std::string* classMembers = nullptr;
     };
 
-    std::string Converter::render(const BlockDef::Info& def, const json& block) {
-        BlockData::Impl impl{ this, &block, &def };
+    std::string Converter::render(
+        const BlockDef::Info& def,
+        const json& block)
+    {
+        BlockData::Impl impl{ this, &block, &def, classMembers };
         BlockData data(&impl);
+
         runChecks(def, block, data);
-        if (def.javaFunction) return def.javaFunction(data);
+
+        if (def.javaFunction) {
+            return def.javaFunction(data);
+        }
+
         return fillTemplate(def, data);
     }
 
@@ -710,7 +777,15 @@ namespace rb {
         case BlockDef::Arg::Value:
             return impl_->conv->valueInput(*impl_->block, def, *arg);
         case BlockDef::Arg::Statements:
-            return impl_->conv->statementInput(*impl_->block, def, *arg);
+            if (!impl_->classMembers) {
+                impl_->conv->mistake(
+                    def,
+                    "命令ブロックの変換に classMembers が設定されていません");
+                return "";
+            }
+
+            return impl_->conv->statementInput(
+                *impl_->block, def, *arg, *impl_->classMembers);
         case BlockDef::Arg::Text: {
             const json* f = fieldOf(*impl_->block, name);
             return (f && f->is_string()) ? f->get<std::string>() : arg->initialText;
@@ -830,6 +905,11 @@ namespace rb {
     }
 
     BlockDef& BlockDef::event() { info.isEvent = true; return *this; }
+    BlockDef& BlockDef::classMember()
+    {
+        info.isClassMember = true;
+        return *this;
+    }
     BlockDef& BlockDef::java(const std::string& javaTemplate) { info.javaTemplate = javaTemplate; return *this; }
     BlockDef& BlockDef::javaFunction(JavaFunction function) { info.javaFunction = function; return *this; }
     BlockDef& BlockDef::onlyIn(const std::string& eventType) { info.onlyIn = eventType; return *this; }
@@ -905,6 +985,10 @@ namespace rb {
                 }
             }
 
+            //クラス直下に出力する変数宣言
+            //※static変数のjavaコードを一時的に保存する
+            std::string classMembers;
+            conv.classMembers = &classMembers;
             // イベントブロックを選び出す
             std::vector<std::pair<const BlockDef::Info*, const json*>> events;
             std::set<std::string> seen;
@@ -914,6 +998,24 @@ namespace rb {
                 const BlockDef::Info* def = conv.find(type);
                 if (!def) {
                     conv.error(b, nullptr, "知らないブロックです（" + type + "）");
+                }
+                else if (type == "robot_variable_declare") {
+                    // 変数宣言ブロックの内容を取得する
+                    std::string declaration = conv.render(*def, *b);
+
+                    // STATIC の選択値を取得する
+                    BlockData::Impl impl{ &conv, b, def };
+                    BlockData data(&impl);
+
+                    if (data.text("STATIC") == "static") {
+                        // static 変数はクラス直下に出力する
+                        classMembers += "    " + declaration + "\n";
+                    }
+                    else {
+                        // 通常の変数はイベント内で使うため、今回は警告を出す
+                        conv.warning(b, def,
+                            "通常の変数宣言はイベント内に置いてください");
+                    }
                 }
                 else if (!def->isEvent) {
                     conv.warning(b, def, "どのイベントにもつながっていないので、動きません");
@@ -956,6 +1058,7 @@ namespace rb {
                 << "\n"
                 << "// Generated by Robocode Blocks\n"
                 << "public class " << name << " extends AdvancedRobot {\n";
+            if (!classMembers.empty()) java << "\n" << classMembers;
             if (!body.empty()) java << "\n" << body;
             java << "}\n";
             conv.result.java = java.str();
