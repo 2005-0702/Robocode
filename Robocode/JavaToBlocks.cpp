@@ -1404,6 +1404,43 @@ public:
 
     // class の中の1つ分（メソッドや変数）をブロックにする
     json convertMember(const Toks& toks) {
+        // 「private String targetName = null;」のような単純な String フィールドは、
+       // そのまま書くブロックではなく、変数宣言ブロックとして読み込みます。
+       // まず public / private / static などの修飾子を読み取ります。
+        {
+            size_t k = 0;
+            std::string access;
+            std::string staticText;
+            while (k < toks.size()) {
+                if (toks[k].s == "public" || toks[k].s == "private" || toks[k].s == "protected") {
+                    access = toks[k].s;
+                    ++k;
+                }
+                else if (toks[k].s == "static") {
+                    staticText = "static";
+                    ++k;
+                }
+                else {
+                    break;
+                }
+            }
+            if (k + 4 < toks.size() && toks[k].s == "String" &&
+                toks[k + 1].kind == TokKind::Ident && toks[k + 2].s == "=" &&
+                toks[k + 3].s == "null" && toks[k + 4].s == ";" && k + 5 == toks.size()) {
+                ++converted;
+                return json{
+                    {"type", "robot_variable_declare"},
+                    {"fields", {
+                        {"ACCESS", access},
+                        {"STATIC", staticText},
+                        {"NAME", toks[k + 1].s},
+                        {"TYPE", "String"},
+                        {"INITIAL_VALUE", "null"}
+                    }}
+                };
+            }
+        }
+
         int rawCount = 0;
         scopeVariables.clear();
         localNames.clear();
