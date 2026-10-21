@@ -133,6 +133,7 @@ ROBOCODE_BLOCKS(RobotControl)
         .output("Boolean")
         .tooltip("2つの条件をANDまたはORでつなぎます")
         .java("({A} {OP} {B})");
+
     // はい / いいえ（true / false）
     Block("logic_boolean_value")
         .category("制御")

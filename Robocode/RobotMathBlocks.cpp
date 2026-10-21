@@ -1,9 +1,9 @@
 // =====================================================================
-//  MathBlocks.cpp  ―  「計算」のブロック
+//  RobotMathBlocks.cpp  ―  「計算」のブロック
 // =====================================================================
 #include "RobocodeBlocks.h"
 
-ROBOCODE_BLOCKS(MathBlocks)
+ROBOCODE_BLOCKS(RobotMathBlocks)
 {
     // 〇 + 〇
     Block("math_arith")

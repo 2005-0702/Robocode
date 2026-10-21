@@ -1,6 +1,6 @@
 #include "RobocodeBlocks.h"
 
-ROBOCODE_BLOCKS(GetGameInfomation)
+ROBOCODE_BLOCKS(RobotInformation)
 {
     // 自分のロボットの名前
     Block("robot_name")

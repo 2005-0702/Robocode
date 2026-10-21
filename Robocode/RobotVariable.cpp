@@ -13,7 +13,7 @@ ROBOCODE_BLOCKS(RobotVariable)
 
     Block("robot_variable_declare")
         .category("変数")
-        .text("公開範囲 %1 %2 変数名 %3 型 %4 初期値 %5")
+        .text("公開範囲 %1 %2 型 %3 変数名 %4 初期値 %5")
         .dropdown("ACCESS", {
             {"指定なし", ""},
             {"どこからでも使える", "public"},
@@ -23,7 +23,6 @@ ROBOCODE_BLOCKS(RobotVariable)
             {"個別の変数", ""},
             {"クラスで共有", "static"}
             })
-        .textField("NAME", "item")
         .dropdown("TYPE", {
             {"整数", "int"},
             {"小数", "float"},
@@ -31,6 +30,7 @@ ROBOCODE_BLOCKS(RobotVariable)
             {"文字列", "String"},
             {"真偽値", "boolean"}
             })
+        .textField("NAME", "item")
         .textField("INITIAL_VALUE", "0")
         .javaFunction([](BlockData& data) -> std::string {
         const std::string accessText = data.text("ACCESS");
@@ -171,4 +171,11 @@ ROBOCODE_BLOCKS(RobotVariable)
             "使用する Java ファイルの先頭に java.util.List と java.util.ArrayList の import が必要です。"
         );
 
+    // null（何も参照していない状態）
+    Block("java_null")
+        .category("変数")
+        .text("null")
+        .output("String")
+        .tooltip("変数が何も参照していない状態を表します")
+        .java("null");
 }
