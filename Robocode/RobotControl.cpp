@@ -105,7 +105,7 @@ ROBOCODE_BLOCKS(RobotControl)
     Block("robot_compare")
         .category("制御")
         .text("%1 %2 %3")
-        .valueInput("A", "Number")              // 数字のブロックをはめる穴（左）
+        .valueInput("A", "")              // 数字のブロックをはめる穴（左）
         .dropdown("OP", {
             {"<", "<"},
             {">", ">"},
@@ -114,7 +114,7 @@ ROBOCODE_BLOCKS(RobotControl)
             {"≧",">="},
             {"≠","!="},
             })
-        .valueInput("B", "Number")              // 数字のブロックをはめる穴（右）
+        .valueInput("B", "")              // 数字のブロックをはめる穴（右）
         .output("Boolean")                      // 比べた結果は「はい／いいえ」
         .tooltip("2つの数字を比べます")
         .java("({A} {OP} {B})");

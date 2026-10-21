@@ -1,5 +1,5 @@
 // =====================================================================
-//  RobotCalculation.cpp  ―  「色」のブロック
+//  RobotCalculation.cpp  ―  「計算」のブロック
 // 
 // 2026/10/16 片山　計算クラスの作成
 //
@@ -56,5 +56,22 @@ ROBOCODE_BLOCKS(RobotCalculation)
         .output("Number")
         .tooltip("2つの数を指定した演算子で計算します")
         .java("({A} {OP} {B})");
+
+    // null（何も参照していない状態）
+    Block("java_null")
+        .category("Java")
+        .text("null")
+        .output("String")
+        .tooltip("変数が何も参照していない状態を表します")
+        .java("null");
+
+    // 角度をラジアンに変換する
+    Block("math_to_radians")
+        .category("計算")
+        .text("角度 %1 をラジアンに変換")
+        .valueInput("ANGLE", "Number")
+        .output("Number")
+        .tooltip("度数法の角度をラジアンに変換します")
+        .java("Math.toRadians({ANGLE})");
 }
 

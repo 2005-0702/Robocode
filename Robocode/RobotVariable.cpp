@@ -1,4 +1,4 @@
-// =====================================================================
+﻿// =====================================================================
 //  RobotVariable.cpp  ―  「変数」のブロック
 // 
 // 
@@ -13,21 +13,27 @@ ROBOCODE_BLOCKS(RobotVariable)
 
     Block("robot_variable_declare")
         .category("変数")
-        .text("%1 変数名 %2 型 %3 初期値 %4")
+        .text("公開範囲 %1 %2 変数名 %3 型 %4 初期値 %5")
+        .dropdown("ACCESS", {
+            {"指定なし", ""},
+            {"どこからでも使える", "public"},
+            {"このクラス内だけ", "private"}
+            })
         .dropdown("STATIC", {
             {"個別の変数", ""},
-            {"クラスで共有(static)", "static"}
+            {"クラスで共有", "static"}
             })
         .textField("NAME", "item")
         .dropdown("TYPE", {
-            {"整数（int）", "int"},
-            {"小数（float）", "float"},
-            {"倍精度の小数（double）", "double"},
-            {"文字列（String）", "String"},
-            {"真偽値（boolean）", "boolean"}
+            {"整数", "int"},
+            {"小数", "float"},
+            {"倍精度の小数", "double"},
+            {"文字列", "String"},
+            {"真偽値", "boolean"}
             })
         .textField("INITIAL_VALUE", "0")
         .javaFunction([](BlockData& data) -> std::string {
+        const std::string accessText = data.text("ACCESS");
         const std::string staticText = data.text("STATIC");
         const std::string name = data.text("NAME");
         const std::string type = data.text("TYPE");
@@ -42,10 +48,12 @@ ROBOCODE_BLOCKS(RobotVariable)
             }
         }
         else if (type.compare("String") == 0) {
-            // 文字列をダブルクォーテーションで囲む
-            if (initialValue.size() < 2 ||
-                initialValue.front() != '"' ||
-                initialValue.back() != '"') {
+            // null は「文字列 null」ではなく、値がまだないことを表す Java の特別な値です。
+            // そのため、ダブルクォーテーションで囲まず、そのまま出力します。
+            if (initialValue.compare("null") != 0 &&
+                (initialValue.size() < 2 ||
+                 initialValue.front() != '"' ||
+                 initialValue.back() != '"')) {
                 initialValue = std::string("\"") + initialValue + "\"";
             }
         }
@@ -74,6 +82,12 @@ ROBOCODE_BLOCKS(RobotVariable)
 
         // Java の変数宣言を作成
         std::string result;
+
+        // public / private は、クラスの中に置く変数につける言葉です。
+        // そのため、アクセス範囲 → static → 型 → 名前 の順に出力します。
+        if (!accessText.empty()) {
+            result += accessText + " ";
+        }
 
         if (staticText.compare("static") == 0) {
             result += "static ";
@@ -109,5 +123,52 @@ ROBOCODE_BLOCKS(RobotVariable)
         .java("{NAME}")
         .tooltip("変数に保存されている値を取得し、計算や比較に使います");
 
+
+
+    // ④-② 特殊な初期値を持つ変数（Double.MAX_VALUE）
+    // Java クラス直下のフィールドとして出力します。
+    Block("robot_variable_target_distance")
+        .category("変数")
+        .text("敵までの距離の初期値を最大値にする")
+        .classMember()
+        .java("private double targetDistance = Double.MAX_VALUE;")
+        .tooltip(
+            "targetDistance を double 型で宣言し、初期値に Double.MAX_VALUE を設定します。\n"
+            "Double.MAX_VALUE は double 型で表せる最大の有限値です。"
+        );
+
+    // ④-③ 敵の情報をまとめる内部クラス
+    // Java クラス直下に配置する必要があるため、classMember を指定します。
+    Block("robot_enemy_info_class")
+        .category("変数")
+        .text("敵の情報をまとめる EnemyInfo クラス")
+        .classMember()
+        .java(
+            "private static class EnemyInfo {\n"
+            "    String name;\n"
+            "    double v_x;\n"
+            "    double v_y;\n"
+            "    double v_distance;\n"
+            "    double v_energy;\n"
+            "    long lastSeen;\n"
+            "}"
+        )
+        .tooltip(
+            "敵の名前、位置、距離、エネルギー、最後に確認した時刻をまとめるクラスです。\n"
+            "ロボット本体のクラスの中に配置してください。"
+        );
+
+    // ④-④ EnemyInfo を複数保存するリスト
+    Block("robot_enemy_info_list")
+        .category("変数")
+        .text("敵の情報を保存する enemies リスト")
+        .classMember()
+        .java(
+            "private final List<EnemyInfo> enemies = new ArrayList<EnemyInfo>();"
+        )
+        .tooltip(
+            "EnemyInfo を複数保存するリストです。\n"
+            "使用する Java ファイルの先頭に java.util.List と java.util.ArrayList の import が必要です。"
+        );
 
 }
