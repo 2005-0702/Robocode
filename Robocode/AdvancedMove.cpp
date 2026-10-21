@@ -19,13 +19,17 @@ ROBOCODE_BLOCKS(AdvancedMove)
         .tooltip("進む（下がる）動きを予約します。「まとめて動かす」で動き始めます")
         .java("{DIR}({DIST});");
 
-    // 車体・砲塔・レーダーを 〇 度 右に回す（予約）
+    // 車体・砲塔・レーダーを 〇 度 回す（予約）
     Block("adv_set_turn")
         .category("予約して動く")
-        .text("予約：%1 を右に %2 度回す")
-        .dropdown("PART", { {"車体", "setTurnRight"}, {"砲塔", "setTurnGunRight"}, {"レーダー", "setTurnRadarRight"} })
+        .text("予約：%1 に %2 度回す")
+        .dropdown("PART", {
+            {"車体を右", "setTurnRight"},     {"車体を左", "setTurnLeft"},
+            {"砲塔を右", "setTurnGunRight"},  {"砲塔を左", "setTurnGunLeft"},
+            {"レーダーを右", "setTurnRadarRight"}, {"レーダーを左", "setTurnRadarLeft"}
+            })
         .valueInput("ANGLE", "Number")
-        .tooltip("回る動きを予約します（マイナスで左に回る）。「まとめて動かす」で動き始めます")
+        .tooltip("回る動きを予約します。「まとめて動かす」で動き始めます")
         .java("{PART}({ANGLE});");
 
     // 〇 のパワーで撃つ（予約）
@@ -64,4 +68,17 @@ ROBOCODE_BLOCKS(AdvancedMove)
         .output("Number")
         .tooltip("予約した動きが、あとどれだけ残っているかです（0 なら終わっている）")
         .java("{WHAT}()");
+
+    //動きが終わるまで待つ
+    Block("adv_wait_for")
+        .category("予約して動く")
+        .text("%1 まで待つ")
+        .dropdown("COND", {
+            {"車体が回り終わる",     "TurnCompleteCondition"},
+            {"砲塔が回り終わる",     "GunTurnCompleteCondition"},
+            {"レーダーが回り終わる", "RadarTurnCompleteCondition"},
+            {"進み終わる",           "MoveCompleteCondition"}
+            })
+        .tooltip("予約した動きが終わるまで、ここで待ちます（待っているあいだも、予約した動きは続きます）")
+        .java("waitFor(new {COND}(this));");
 }
