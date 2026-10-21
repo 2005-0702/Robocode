@@ -133,6 +133,13 @@ ROBOCODE_BLOCKS(RobotControl)
         .output("Boolean")
         .tooltip("2つの条件をANDまたはORでつなぎます")
         .java("({A} {OP} {B})");
-
+    // はい / いいえ（true / false）
+    Block("logic_boolean_value")
+        .category("制御")
+        .text("%1")
+        .dropdown("BOOL", { {"はい（true）", "true"}, {"いいえ（false）", "false"} })
+        .output("Boolean")
+        .tooltip("「はい」か「いいえ」です。もしの条件や、くり返しの条件にはめられます")
+        .java("{BOOL}");
     
 }

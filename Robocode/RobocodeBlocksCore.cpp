@@ -59,7 +59,7 @@ namespace rb {
             {"計算", 230},
             {"変数", 330},     // Blockly の「変数」カテゴリ（ブロックの色は Blockly が決める 330）
             {"関数", 290},     // Blockly の「関数」カテゴリ（ブロックの色は Blockly が決める 290）
-            {"予約して動く", 60},  // AdvancedMove.cpp（setAhead などの予約して同時に動くブロック）
+            {"同時に動く", 60},  // AdvancedMove.cpp（setAhead などの予約して同時に動くブロック）
             {"ゲーム情報",180},
             {"ゲーム情報2",180},
             {"色",270},
@@ -71,7 +71,7 @@ namespace rb {
         //  登録されたブロック
         // ---------------------------------------------------------------------
         struct Registry {
-            std::vector<std::pair<std::string, BlockSetFunction>> sets;     //文字と関数をセットにする
+            std::vector<std::pair<std::string, BlockSetFunction>> sets;
             std::vector<std::unique_ptr<BlockDef>> blocks;
             std::map<std::string, const BlockDef::Info*> byType;
             std::vector<std::string> problems;  // ブロックの設定ミス
@@ -308,8 +308,19 @@ namespace rb {
         }
         // 「型 名前」の形（例：int 回数、double[] scores）なら、型と名前に分ける
         //   関数の引数と、値を返す関数の名前で使う。型が書かれていなければ double（false を返す）
+        const BlockDef::Info* eventOfClass(const std::string& className);   // 下で作る
         bool splitTypedName(const std::string& raw, std::string& type, std::string& name) {
             static const std::set<std::string> kTypes = { "double", "int", "float", "long", "boolean", "String" };
+            // イベントの情報（例：ScannedRobotEvent e）も型として読む
+            {
+                std::string s0 = trim(raw);
+                size_t sp = s0.find(' ');
+                if (sp != std::string::npos && eventOfClass(s0.substr(0, sp))) {
+                    type = s0.substr(0, sp);
+                    name = trim(s0.substr(sp + 1));
+                    return true;
+                }
+            }
             std::string s = trim(raw);
             size_t space = s.find(' ');
             if (space != std::string::npos) {
@@ -478,6 +489,16 @@ namespace rb {
             return !className.empty() && !name.empty();
         }
 
+        // イベントの情報の型（ScannedRobotEvent など）から、そのイベントブロックをさがす（なければ nullptr）
+        const BlockDef::Info* eventOfClass(const std::string& className) {
+            if (className.empty()) return nullptr;
+            for (const auto& p : registry().blocks) {
+                std::string cls, prm;
+                if (p->info.isEvent && eventParameter(p->info, cls, prm) && cls == className) return &p->info;
+            }
+            return nullptr;
+        }
+
         // Java のコードの中に、e という名前（e.getBearing() の e など）が出てくるか
         bool usesEventName(const std::string& code) {
             auto identChar = [](char c) {
@@ -494,7 +515,7 @@ namespace rb {
 
         // 全部のブロックを集める（最初に1回だけ）
         void ensureLoaded() {
-            Registry& r = registry();      //名簿から探す
+            Registry& r = registry();
             if (r.loaded) return;
             r.loaded = true;
             addBuiltinBlocks();   // 数字ブロックを最初に作る（消さないこと！）
@@ -715,6 +736,7 @@ namespace rb {
             bool needsEvent = false;
             std::set<std::string> eventTypes;
             const BlockDef::Info* event = nullptr;  // 受け取るイベント（1つに決まったとき）
+            bool explicitEventParam = false;       // 引数に「ScannedRobotEvent e」のように書いてある
         };
         std::map<std::string, FunctionInfo> functionInfos;   // Blockly での関数の名前 → ようす
 
@@ -763,6 +785,18 @@ namespace rb {
             for (const json* f : functions) {
                 FunctionInfo& info = functionInfos[nameOfFunctionBlock(*f)];
                 info.def = f;
+                // 引数に「ScannedRobotEvent e」と書いてあれば、そのイベントの情報を受け取る関数
+                auto st = f->find("extraState");
+                if (st != f->end() && st->is_object() && st->contains("params") && (*st)["params"].is_array()) {
+                    for (const auto& prm : (*st)["params"]) {
+                        std::string t, n;
+                        splitTypedName(stringOf(prm, "name"), t, n);
+                        if (const BlockDef::Info* ev = eventOfClass(t)) {
+                            info.directEvents.insert(ev->type);
+                            info.explicitEventParam = true;
+                        }
+                    }
+                }
                 collectUses(*f, info.directEvents, info.rawUsesEvent, info.callees);
             }
             for (const auto& e : events) {
@@ -840,6 +874,7 @@ namespace rb {
             size_t count = 0;
             if (state && state->contains("params") && (*state)["params"].is_array()) count = (*state)["params"].size();
             std::string args;
+            std::string eventArg;   // イベントの情報として渡すもの（e）
             auto info = functionInfos.find(name);
             if (info != functionInfos.end() && info->second.needsEvent && info->second.event) {
                 const BlockDef::Info* need = info->second.event;
@@ -849,10 +884,19 @@ namespace rb {
                           "」の情報を使うので、「" + labelOf(*need, nullptr) + "」の中でしか呼べません");
                     prm = "e";
                 }
-                args = insideFunction ? "e" : prm;
+                eventArg = insideFunction ? "e" : prm;
+                if (!info->second.explicitEventParam) args = eventArg;   // 引数に書いていなければ、最初に e を渡す
             }
             for (size_t i = 0; i < count; ++i) {
                 if (!args.empty()) args += ", ";
+                // 「ScannedRobotEvent e」の引数には、穴の中ではなく e を渡す（穴は空のままでよい）
+                std::string t, n;
+                const json& pv = state->at("params").at(i);
+                splitTypedName(pv.is_string() ? pv.get<std::string>() : "", t, n);
+                if (eventOfClass(t)) {
+                    args += eventArg.empty() ? "e" : eventArg;
+                    continue;
+                }
                 std::string input = "ARG" + std::to_string(i);
                 args += valueOfInput(block, input.c_str());
             }
@@ -869,7 +913,7 @@ namespace rb {
             // イベントの情報を使う関数は、最初に e を受け取る
             const FunctionInfo& info = functionInfos[name];
             currentEvent = info.event;
-            if (info.needsEvent && info.event) {
+            if (info.needsEvent && info.event && !info.explicitEventParam) {
                 std::string cls, prm;
                 if (eventParameter(*info.event, cls, prm)) params = cls + " e";
             }
@@ -878,6 +922,11 @@ namespace rb {
                 for (const auto& prm : (*st)["params"]) {
                     if (!params.empty()) params += ", ";
                     auto vt = variableJavaNames.find(stringOf(prm, "id"));
+                    // 「ScannedRobotEvent e」なら、そのまま e として受け取る
+                    if (eventOfClass(typeOfName(stringOf(prm, "name")))) {
+                        params += typeOfName(stringOf(prm, "name")) + " e";
+                        continue;
+                    }
                     // 引数の型：「int 回数」なら int（型が書かれていなければ double）
                     params += typeOfName(stringOf(prm, "name")) + " " +
                               (vt != variableJavaNames.end() ? vt->second : variableJavaName(stringOf(prm, "name")));

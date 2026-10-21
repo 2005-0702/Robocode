@@ -27,26 +27,17 @@ ROBOCODE_BLOCKS(RobotMove)
         .warnIfZero("DIST", "距離が0なので、ロボットは動きません")
         .java("back({DIST});");
 
-    //砲塔固定
-    Block("robot_gun_keep_direction")
+    // 車体・砲塔・レーダーを独立して動かす
+    Block("robot_keep_direction")
         .category("動き")
-        .text("砲塔がロボットから独立して動く")
-        .tooltip("砲塔がロボットから独立して動きます")
-        .java("setAdjustGunForRobotTurn(true);");
-
-    //レーダー固定ロボット旋回時
-    Block("robot_rader_keep_direction")
-        .category("動き")
-        .text("ロボット旋回時レーダーが独立して動く")
-        .tooltip("ロボット旋回時レーダーが独立して動きます")
-        .java("setAdjustRadarForRobotTurn(true);");
-
-    //レーダー固定砲塔旋回時
-    Block("Gun_rader_keep_direction")
-        .category("動き")
-        .text("砲塔旋回時レーダーが独立して動く")
-        .tooltip("砲塔旋回時レーダーが独立して動きます")
-        .java("setAdjustRadarForGunTurn(true);");
+        .text("%1 をする ")
+        .dropdown("PART", {
+            {"レーダーを車体から独立","setAdjustRadarForRobotTurn"},
+            {"砲塔を車体から独立","setAdjustGunForRobotTurn"},
+            {"レーダーを砲塔から独立","setAdjustRadarForGunTurn"} })
+            .tooltip("車体や砲塔が回っても、えらんだ部分はつられて回らなくなります。"
+                "「スタートしたら」の最初に置くと、ずっとその設定になります")
+        .java("{PART};");
 
 
     //===============

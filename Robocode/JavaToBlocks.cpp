@@ -986,6 +986,11 @@ public:
                 sig.eventType = ev->second;
                 sig.eventParamIndex = index++;
                 sig.eventParamName = m[k + 1].s;
+                // ブロックでも「ScannedRobotEvent e」という引数として見せる（どのイベントの情報かを覚えておくため）
+                std::string display = m[k].s + " e";
+                sig.paramJava.push_back("e");
+                sig.paramDisplay.push_back(display);
+                sig.paramIds.push_back(newVariableId(display));
                 k += 2;
                 if (k < close) {
                     if (m[k].s != ",") return false;
@@ -1042,16 +1047,16 @@ public:
             current.push_back(t);
         }
         if (!current.empty()) args.push_back(current);
-        if (args.size() != sig.paramDisplay.size() + (sig.eventParamIndex >= 0 ? 1 : 0)) return false;
+        if (args.size() != sig.paramDisplay.size()) return false;
         if (sig.eventParamIndex >= 0) {
-            // イベントの情報（e）は、ブロックでは書かない（Java にするときに自動で入る）
+            // イベントの情報（e）は、ブロックでは穴を空けておく（Java にするときに自動で e が入る）
             const Toks& ev = args[sig.eventParamIndex];
             if (ev.size() != 1 || ev[0].kind != TokKind::Ident) return false;
-            args.erase(args.begin() + sig.eventParamIndex);
         }
         out = {{"type", asValue ? "procedures_callreturn" : "procedures_callnoreturn"},
                {"extraState", {{"name", sig.display}, {"params", sig.paramDisplay}}}};
         for (size_t i = 0; i < args.size(); ++i) {
+            if (static_cast<int>(i) == sig.eventParamIndex) continue;
             out["inputs"]["ARG" + std::to_string(i)]["block"] = valueOrNumber(args[i], "", eventType, rawCount);
         }
         ++converted;
@@ -1094,7 +1099,10 @@ public:
         int rawCount = 0;
         // 引数は、この関数の中だけで使える変数
         scopeVariables.clear();
-        for (size_t i = 0; i < sig.paramJava.size(); ++i) scopeVariables[sig.paramJava[i]] = sig.paramIds[i];
+        for (size_t i = 0; i < sig.paramJava.size(); ++i) {
+            if (static_cast<int>(i) == sig.eventParamIndex) continue;   // e は変数ブロックにしない
+            scopeVariables[sig.paramJava[i]] = sig.paramIds[i];
+        }
         collectShadowed(m, sig.bodyOpen + 1, m.size() - 1);
         std::vector<Toks> list = splitStatements(m, sig.bodyOpen + 1, m.size() - 1);
         json returnValue;
@@ -1535,6 +1543,22 @@ ImportResult ConvertFromJava(const std::string& javaSource) {
         block["y"] = y;
         y += estimateHeight(block) + 30;
         tops.push_back(block);
+    }
+
+    // 関数を作るブロックを先に並べる（画面の場所は x, y で決まるので変わらない）
+    //   Blockly は上から順に読みこむ。関数を呼ぶブロックを先に読むと、Blockly が同じ名前の空の関数を
+    //   自動で作ってしまい、あとから読む本物の関数の名前が「shoot2」のように変わってしまうため
+    {
+        json ordered = json::array();
+        for (const auto& b : tops) {
+            std::string type = b.value("type", "");
+            if (type == "procedures_defnoreturn" || type == "procedures_defreturn") ordered.push_back(b);
+        }
+        for (const auto& b : tops) {
+            std::string type = b.value("type", "");
+            if (type != "procedures_defnoreturn" && type != "procedures_defreturn") ordered.push_back(b);
+        }
+        tops = ordered;
     }
 
     importer.removeUnusedLocals(tops);
