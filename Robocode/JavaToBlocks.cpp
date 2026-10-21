@@ -740,6 +740,28 @@ public:
         return javaName.compare(0, 2, prefix) == 0 && javaName.size() > 2 ? javaName.substr(2) : javaName;
     }
 
+    // 関数の引数・返す値に使える型（double 以外は、ブロックでは「int 回数」のように名前の前に書く）
+    static bool isTypeName(const std::string& t) {
+        static const std::set<std::string> kTypes = {"double", "int", "float", "long", "boolean", "String"};
+        std::string base = t;
+        while (base.size() >= 2 && base.compare(base.size() - 2, 2, "[]") == 0) base.resize(base.size() - 2);
+        return kTypes.count(base) > 0;
+    }
+    // m[k] から型を読む（double / int / double[] など）。読めたら次の位置、読めなければ k のまま
+    static size_t readType(const Toks& m, size_t k, size_t end, std::string& type) {
+        if (k >= end || !isTypeName(m[k].s)) return k;
+        type = m[k].s;
+        size_t j = k + 1;
+        while (j + 1 < end && m[j].s == "[" && m[j + 1].s == "]") { type += "[]"; j += 2; }
+        return j;
+    }
+    // 「int 回数」→「回数」（型が書かれていなければそのまま）
+    static std::string withoutType(const std::string& display) {
+        size_t space = display.find(' ');
+        if (space != std::string::npos && isTypeName(display.substr(0, space))) return display.substr(space + 1);
+        return display;
+    }
+
     // public / private / static などを飛ばした位置
     static size_t skipModifiers(const Toks& m) {
         static const std::set<std::string> mods = {"public", "private", "protected", "static", "final"};
@@ -934,8 +956,14 @@ public:
         size_t start = skipModifiers(all);
         if (all.size() < start + 6) return false;
         Toks m(all.begin() + start, all.end());
-        if ((m[0].s != "void" && m[0].s != "double") || m[1].kind != TokKind::Ident || m[2].s != "(" ||
-            m.back().s != "}") return false;
+        // 返す型（void / double / int / double[] など）
+        std::string returnType;
+        size_t afterType = m[0].s == "void" ? 1 : readType(m, 0, m.size(), returnType);
+        if (afterType == 0) return false;
+        if (m[0].s == "void") returnType = "void";
+        m.erase(m.begin() + 1, m.begin() + afterType);   // double[] f( → double f( のように1つにまとめる
+        start += afterType - 1;
+        if (m.size() < 6 || m[1].kind != TokKind::Ident || m[2].s != "(" || m.back().s != "}") return false;
         // Robocode のイベント（run や onScannedRobot など）は関数にしない
         const std::string& name = m[1].s;
         if (name == "run" || (name.size() > 2 && name.compare(0, 2, "on") == 0 &&
@@ -944,7 +972,9 @@ public:
         if (close >= m.size() || close + 1 >= m.size() || m[close + 1].s != "{") return false;
         FunctionSig sig;
         sig.display = displayName(name, "f_");
-        sig.returns = m[0].s == "double";
+        sig.returns = returnType != "void";
+        // double 以外を返す関数は、名前の前に型を書く（例：int 数える）
+        if (sig.returns && returnType != "double") sig.display = returnType + " " + sig.display;
         sig.bodyOpen = start + close + 1;
         size_t k = 3;
         int index = 0;
@@ -964,14 +994,19 @@ public:
                 continue;
             }
             ++index;
-            if (k + 1 >= close || m[k].s != "double" || m[k + 1].kind != TokKind::Ident) return false;
-            std::string display = displayName(m[k + 1].s, "v_");
-            sig.paramJava.push_back(m[k + 1].s);
+            std::string type;
+            size_t nameAt = readType(m, k, close, type);
+            if (nameAt == k || nameAt >= close || m[nameAt].kind != TokKind::Ident) return false;
+            const std::string& paramName = m[nameAt].s;
+            // double 以外の引数は、名前の前に型を書く（例：int 回数、double[] scores）
+            std::string display = displayName(paramName, "v_");
+            if (type != "double") display = type + " " + display;
+            sig.paramJava.push_back(paramName);
             sig.paramDisplay.push_back(display);
             // 同じ名前のクラスの変数があれば、同じ変数にする（Blockly では同じ名前の変数は1つ）
-            auto global = variableIds.find(m[k + 1].s);
-            sig.paramIds.push_back(global != variableIds.end() ? global->second : newVariableId(display));
-            k += 2;
+            auto global = variableIds.find(paramName);
+            sig.paramIds.push_back(global != variableIds.end() && type == "double" ? global->second : newVariableId(display));
+            k = nameAt + 1;
             if (k < close) {
                 if (m[k].s != ",") return false;
                 ++k;
@@ -1041,8 +1076,10 @@ public:
 
     // 関数を、関数を作るブロックにする
     json convertFunction(const Toks& original) {
-        size_t start = skipModifiers(original);
-        const FunctionSig& sig = functions[original[start + 1].s];
+        // 関数の名前は、最初の ( のすぐ前（double[] f( のように型が長いときもあるため）
+        size_t paren = 0;
+        while (paren < original.size() && original[paren].s != "(") ++paren;
+        const FunctionSig& sig = functions[original[paren - 1].s];
         // イベントの情報の名前が e でなければ、e に直す（ブロックの型紙は e.getBearing() のように e を使うため）
         Toks m = original;
         if (sig.eventParamIndex >= 0 && sig.eventParamName != "e") {
@@ -1130,12 +1167,12 @@ public:
             if (afterDot) continue;
             bool isCall = k + 1 < renamed.size() && toks[k + 1].s == "(";
             if (isCall && functions.count(t.s)) {
-                t.s = "f_" + functions[t.s].display;
+                t.s = "f_" + withoutType(functions[t.s].display);
             } else if (!isCall && isVariable(t)) {
                 std::string id = variableIdOf(t.s);
                 rawUsedIds.insert(id);
                 for (const auto& v : variableList) {
-                    if (v.value("id", "") == id) t.s = "v_" + v.value("name", "");
+                    if (v.value("id", "") == id) t.s = "v_" + withoutType(v.value("name", ""));
                 }
             }
         }

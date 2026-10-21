@@ -52,14 +52,16 @@ namespace rb {
         const CategoryColor kCategories[] = {
             {"イベント", 30},
             {"動き", 210},
+            {"動き2", 210},
             {"攻撃", 0},
             {"センサー", 160},
             {"制御", 120},
             {"計算", 230},
             {"変数", 330},     // Blockly の「変数」カテゴリ（ブロックの色は Blockly が決める 330）
             {"関数", 290},     // Blockly の「関数」カテゴリ（ブロックの色は Blockly が決める 290）
-            {"同時に動く", 60},  // AdvancedMove.cpp（setAhead などの予約して同時に動くブロック）
+            {"予約して動く", 60},  // AdvancedMove.cpp（setAhead などの予約して同時に動くブロック）
             {"ゲーム情報",180},
+            {"ゲーム情報2",180},
             {"色",270},
             {"サンプル戦術",330}
         };
@@ -69,7 +71,7 @@ namespace rb {
         //  登録されたブロック
         // ---------------------------------------------------------------------
         struct Registry {
-            std::vector<std::pair<std::string, BlockSetFunction>> sets;
+            std::vector<std::pair<std::string, BlockSetFunction>> sets;     //文字と関数をセットにする
             std::vector<std::unique_ptr<BlockDef>> blocks;
             std::map<std::string, const BlockDef::Info*> byType;
             std::vector<std::string> problems;  // ブロックの設定ミス
@@ -304,9 +306,32 @@ namespace rb {
             }
             return out;
         }
-        std::string variableJavaName(const std::string& name) { return javaSafeName("v_", name); }
-        // 関数の名前を、Java で使える名前にする（例：前に進んで撃つ → f_前に進んで撃つ）
-        std::string functionJavaName(const std::string& name) { return javaSafeName("f_", name); }
+        // 「型 名前」の形（例：int 回数、double[] scores）なら、型と名前に分ける
+        //   関数の引数と、値を返す関数の名前で使う。型が書かれていなければ double（false を返す）
+        bool splitTypedName(const std::string& raw, std::string& type, std::string& name) {
+            static const std::set<std::string> kTypes = { "double", "int", "float", "long", "boolean", "String" };
+            std::string s = trim(raw);
+            size_t space = s.find(' ');
+            if (space != std::string::npos) {
+                std::string t = s.substr(0, space);
+                std::string base = t;
+                while (base.size() >= 2 && base.compare(base.size() - 2, 2, "[]") == 0) base.resize(base.size() - 2);
+                if (kTypes.count(base)) {
+                    type = t;
+                    name = trim(s.substr(space + 1));
+                    return true;
+                }
+            }
+            type = "double";
+            name = s;
+            return false;
+        }
+        std::string typeOfName(const std::string& raw) { std::string t, n; splitTypedName(raw, t, n); return t; }
+        std::string nameWithoutType(const std::string& raw) { std::string t, n; splitTypedName(raw, t, n); return n; }
+
+        std::string variableJavaName(const std::string& name) { return javaSafeName("v_", nameWithoutType(name)); }
+        // 関数の名前を、Java で使える名前にする（例：前に進んで撃つ → f_前に進んで撃つ、int 数える → f_数える）
+        std::string functionJavaName(const std::string& name) { return javaSafeName("f_", nameWithoutType(name)); }
 
         // カテゴリの色（kCategories から探す。なければ kOtherColor）
         int categoryColor(const std::string& category) {
@@ -469,7 +494,7 @@ namespace rb {
 
         // 全部のブロックを集める（最初に1回だけ）
         void ensureLoaded() {
-            Registry& r = registry();
+            Registry& r = registry();      //名簿から探す
             if (r.loaded) return;
             r.loaded = true;
             addBuiltinBlocks();   // 数字ブロックを最初に作る（消さないこと！）
@@ -853,7 +878,9 @@ namespace rb {
                 for (const auto& prm : (*st)["params"]) {
                     if (!params.empty()) params += ", ";
                     auto vt = variableJavaNames.find(stringOf(prm, "id"));
-                    params += "double " + (vt != variableJavaNames.end() ? vt->second : variableJavaName(stringOf(prm, "name")));
+                    // 引数の型：「int 回数」なら int（型が書かれていなければ double）
+                    params += typeOfName(stringOf(prm, "name")) + " " +
+                              (vt != variableJavaNames.end() ? vt->second : variableJavaName(stringOf(prm, "name")));
                 }
             }
             insideReturnFunction = returns;
@@ -866,7 +893,11 @@ namespace rb {
             insideReturnFunction = false;
             insideFunction = false;
             currentEvent = nullptr;
-            std::string out = std::string(returns ? "private double " : "private void ") + functionJavaName(name) + "(" + params + ") {\n";
+            // 返す型：「int 数える」なら int（型が書かれていなければ double）。値を返さない関数は void
+            std::string typeName, plainName;
+            bool typed = splitTypedName(name, typeName, plainName);
+            if (typed && !returns) error(&def, nullptr, "関数「" + name + "」：値を返さない関数の名前には、型を書けません");
+            std::string out = "private " + (returns ? typeName : std::string("void")) + " " + functionJavaName(name) + "(" + params + ") {\n";
             for (const std::string& line : splitLines(body)) out += (line.empty() ? "" : "    " + line) + "\n";
             return out + "}";
         }
@@ -1288,6 +1319,9 @@ namespace rb {
                     std::string unique = javaName;
                     for (int n = 2; !usedNames.insert(unique).second; ++n) unique = javaName + "_" + std::to_string(n);
                     conv.variableJavaNames[stringOf(v, "id")] = unique;
+                    // 型を書いた変数（「int 回数」など）は関数の引数なので、クラスの変数は作らない
+                    std::string typeName, plainName;
+                    if (splitTypedName(stringOf(v, "name"), typeName, plainName)) continue;
                     fieldNames.push_back(unique);
                 }
             }

@@ -12,7 +12,7 @@ ROBOCODE_BLOCKS(AdvancedMove)
 {
     // 〇 進む／下がる（予約）
     Block("adv_set_ahead")
-        .category("同時に動く")
+        .category("予約して動く")
         .text("予約：%1 %2")
         .valueInput("DIST", "Number")
         .dropdown("DIR", { {"進む", "setAhead"}, {"下がる", "setBack"} })
@@ -21,7 +21,7 @@ ROBOCODE_BLOCKS(AdvancedMove)
 
     // 車体・砲塔・レーダーを 〇 度 右に回す（予約）
     Block("adv_set_turn")
-        .category("同時に動く")
+        .category("予約して動く")
         .text("予約：%1 を右に %2 度回す")
         .dropdown("PART", { {"車体", "setTurnRight"}, {"砲塔", "setTurnGunRight"}, {"レーダー", "setTurnRadarRight"} })
         .valueInput("ANGLE", "Number")
@@ -30,7 +30,7 @@ ROBOCODE_BLOCKS(AdvancedMove)
 
     // 〇 のパワーで撃つ（予約）
     Block("adv_set_fire")
-        .category("同時に動く")
+        .category("予約して動く")
         .text("予約：%1 のパワーで撃つ")
         .valueInput("POWER", "Number")
         .tooltip("弾を撃つのを予約します（パワー 0.1〜3）。「まとめて動かす」で撃ちます")
@@ -38,7 +38,7 @@ ROBOCODE_BLOCKS(AdvancedMove)
 
     // まとめて動かす
     Block("adv_execute")
-        .category("同時に動く")
+        .category("予約して動く")
         .text("まとめて動かす（1ターン進める）")
         .tooltip("予約した動きを全部いっしょに始めて、1ターン進めます。「ずっと」の中の最後に置きます")
         .java("execute();");
@@ -53,7 +53,7 @@ ROBOCODE_BLOCKS(AdvancedMove)
 
     // 予約の残り
     Block("adv_remaining")
-        .category("同時に動く")
+        .category("予約して動く")
         .text("予約の残り：%1")
         .dropdown("WHAT", {
             {"進む距離", "getDistanceRemaining"},
