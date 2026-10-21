@@ -1126,6 +1126,60 @@
           });
         }
         Blockly.defineBlocksWithJsonArray(msg.setup.blocks);
+
+        // 変数宣言ブロック：型に応じて初期値フィールドを文字入力／選択式に切り替える。
+        // C++ 側の Java 変換は INITIAL_VALUE の値を読むため、フィールド名は変更しない。
+        const variableDefinition = Blockly.Blocks['robot_variable_declare'];
+        if (variableDefinition && !variableDefinition._initialValueSwitchInstalled) {
+          const originalVariableInit = variableDefinition.init;
+          variableDefinition.init = function() {
+            originalVariableInit.call(this);
+
+            const updateInitialValueField = (type, preferredValue) => {
+              const block = this;
+              const oldField = block.getField('INITIAL_VALUE');
+              if (!oldField) return;
+
+              const input = block.inputList.find(item => item.fieldRow.includes(oldField));
+              if (!input) return;
+              const fieldIndex = input.fieldRow.indexOf(oldField);
+              const oldValue = preferredValue !== undefined ? preferredValue : oldField.getValue();
+              let newField;
+
+              if (type === 'boolean') {
+                const booleanValue = (oldValue === 'true' || oldValue === 'false') ? oldValue : 'false';
+                newField = new Blockly.FieldDropdown([
+                  ['true', 'true'],
+                  ['false', 'false']
+                ]);
+                newField.setValue(booleanValue);
+              } else {
+                let textValue = oldValue;
+                if (textValue === 'true' || textValue === 'false' || textValue === null || textValue === undefined) {
+                  if (type === 'float' || type === 'double') textValue = '0.0';
+                  else if (type === 'String') textValue = '';
+                  else textValue = '0';
+                }
+                newField = new Blockly.FieldTextInput(String(textValue));
+              }
+
+              input.removeField('INITIAL_VALUE', true);
+              input.insertFieldAt(fieldIndex, newField, 'INITIAL_VALUE');
+              block.render();
+            };
+
+            // 読み込み時も、保存された型に合う入力欄にする。
+            updateInitialValueField(this.getFieldValue('TYPE'), this.getFieldValue('INITIAL_VALUE'));
+
+            this.setOnChange(function(event) {
+              if (!event || event.type !== Blockly.Events.BLOCK_CHANGE ||
+                  event.blockId !== this.id || event.name !== 'TYPE') return;
+              updateInitialValueField(this.getFieldValue('TYPE'));
+            });
+          };
+          variableDefinition._initialValueSwitchInstalled = true;
+        }
+
         // ツールボックス（色カテゴリー）内でもRGB数値欄を表示しない。
         // ブロック生成時に隠すことで、作業領域とフライアウトの両方に適用する。
         for (const type of COLOR_BLOCK_TYPES) {
