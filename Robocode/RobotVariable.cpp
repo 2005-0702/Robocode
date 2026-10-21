@@ -3,19 +3,20 @@
 // 
 // 
 //  2026/10/19 片山 変数追加
+//  2026/10/20 片山 変数の初期化をできるようにする
 // =====================================================================
 #include "RobocodeBlocks.h"
 
 ROBOCODE_BLOCKS(RobotVariable)
 {
     // ① 変数を宣言する
+
     Block("robot_variable_declare")
         .category("変数")
-        //.classMember()
-        .text("%1 変数名 %2 型 %3")
+        .text("%1 変数名 %2 型 %3 初期値 %4")
         .dropdown("STATIC", {
-        {"個別の変数( )", ""},
-        {"クラスで共有(static)", "static"}
+            {"個別の変数", ""},
+            {"クラスで共有(static)", "static"}
             })
         .textField("NAME", "item")
         .dropdown("TYPE", {
@@ -23,52 +24,70 @@ ROBOCODE_BLOCKS(RobotVariable)
             {"小数（float）", "float"},
             {"倍精度の小数（double）", "double"},
             {"文字列（String）", "String"},
-            {"真偽値（boolean）", "boolean"},
-          
+            {"真偽値（boolean）", "boolean"}
             })
-        .javaFunction([](BlockData& data) {
+        .textField("INITIAL_VALUE", "0")
+        .javaFunction([](BlockData& data) -> std::string {
         const std::string staticText = data.text("STATIC");
         const std::string name = data.text("NAME");
         const std::string type = data.text("TYPE");
+        std::string initialValue = data.text("INITIAL_VALUE");
 
-        std::string initialValue;
+        // 型に合わせて初期値を整える
+        if (type.compare("boolean") == 0) {
+            // true または false 以外なら false にする
+            if (initialValue.compare("true") != 0 &&
+                initialValue.compare("false") != 0) {
+                initialValue = "false";
+            }
+        }
+        else if (type.compare("String") == 0) {
+            // 文字列をダブルクォーテーションで囲む
+            if (initialValue.size() < 2 ||
+                initialValue.front() != '"' ||
+                initialValue.back() != '"') {
+                initialValue = std::string("\"") + initialValue + "\"";
+            }
+        }
+        else if (type.compare("int") == 0) {
+            // 整数が空欄なら 0
+            if (initialValue.empty()) {
+                initialValue = "0";
+            }
+        }
+        else if (type.compare("float") == 0) {
+            // 小数が空欄なら 0.0f
+            if (initialValue.empty()) {
+                initialValue = "0.0f";
+            }
+            else if (initialValue.find_first_of(".fF") == std::string::npos) {
+                // 小数点も f もなければ .0f を追加
+                initialValue += ".0f";
+            }
+        }
+        else if (type.compare("double") == 0) {
+            // 倍精度の小数が空欄なら 0.0
+            if (initialValue.empty()) {
+                initialValue = "0.0";
+            }
+        }
 
-        if (type == "int") {
-            initialValue = "0";
-        }
-        else if (type == "float") {
-            initialValue = "0.0f";
-        }
-        else if (type == "double") {
-            initialValue = "0.0";
-        }
-        else if (type == "String") {
-            initialValue = "\"\"";
-        }
-        else if (type == "boolean") {
-            initialValue = "false";
-        }
-        else {
-            initialValue = "0";
-        }
-
+        // Java の変数宣言を作成
         std::string result;
 
-        if (staticText == "static") {
+        if (staticText.compare("static") == 0) {
             result += "static ";
         }
 
-        // 型、変数名、初期値を追加する
         result += type + " " + name + " = " + initialValue + ";";
 
-        // 完成した文字列を返す
         return result;
             })
         .tooltip(
             "変数を宣言するブロックです。\n"
-            "static：付けると、同じクラスのオブジェクト間で値を共有します。\n"
             "変数名：値を保存する場所につける名前です。\n"
-            "型：保存できる値の種類を指定します。"
+            "型：保存する値の種類です。\n"
+            "初期値：最初に入れておく値です。"
         );
 
 

@@ -136,19 +136,24 @@ using Options       = std::vector<std::pair<std::string, std::string>>;
 // ---------------------------------------------------------------------
 class BlockDef {
 public:
-    // 見た目
+    //カテゴリー
     BlockDef& category(const std::string& name);
+    //ブロックの中身
     BlockDef& text(const std::string& message);
+    //ブロックの説明
     BlockDef& tooltip(const std::string& message);
+    //色
     BlockDef& color(int hue);
 
     // 入力欄
     BlockDef& number(const std::string& name, double initial);
     BlockDef& number(const std::string& name, double initial, double min);
     BlockDef& number(const std::string& name, double initial, double min, double max);
+    //選択肢の中身
     BlockDef& dropdown(const std::string& name, const Options& options);
     BlockDef& valueInput(const std::string& name, const std::string& type = "Number");
     BlockDef& statements(const std::string& name);
+    //初期値
     BlockDef& textField(const std::string& name, const std::string& initial = "");
     BlockDef& variableField(const std::string& name,
         const std::string& initial = "score");
