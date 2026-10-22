@@ -28,25 +28,6 @@ ROBOCODE_BLOCKS(RobotSensorPlus)
         .java("robocode.util.Utils.normalAbsoluteAngleDegrees(getHeading() + e.getBearing())")
         .onlyIn("robot_event_enemyDetected");
 
-    // 敵の向き
-    Block("enemy_heading")
-        .category("センサー")
-        .text("敵の向き")
-        .output("Number")
-        .tooltip("敵の車体が向いている方位です（画面の上が 0 度、0〜360）")
-        .java("e.getHeading()")
-        .onlyIn("robot_event_enemyDetected");
-
-    // 敵が近い？
-    Block("enemy_is_near")
-        .category("センサー")
-        .text("敵との距離が %1 より近い")
-        .number("DIST", 150, 0)
-        .output("Boolean")
-        .tooltip("見つけた敵が、決めた距離より近いときに「はい」になります")
-        .java("(e.getDistance() < {DIST})")
-        .onlyIn("robot_event_enemyDetected");
-
     // 敵が止まっている？
     Block("enemy_is_stopped")
         .category("センサー")
@@ -105,31 +86,12 @@ ROBOCODE_BLOCKS(RobotSensorPlus)
         .java("Math.min(Math.min(getX(), getBattleFieldWidth() - getX()), "
               "Math.min(getY(), getBattleFieldHeight() - getY()))");
 
-    // 壁に近い？
-    Block("near_wall")
-        .category("センサー")
-        .text("壁まで %1 より近い")
-        .number("DIST", 100, 0)
-        .output("Boolean")
-        .tooltip("上下左右どれかの壁まで、決めた距離より近いときに「はい」になります")
-        .java("(getX() < {DIST} || getY() < {DIST} || "
-              "getX() > getBattleFieldWidth() - {DIST} || "
-              "getY() > getBattleFieldHeight() - {DIST})");
-
-    // 砲塔が撃てる？
-    Block("gun_ready")
-        .category("センサー")
-        .text("砲塔がすぐ撃てる")
-        .output("Boolean")
-        .tooltip("砲塔が冷えていて、すぐに弾を撃てるときに「はい」になります")
-        .java("(getGunHeat() == 0)");
-
     // バトル場のまん中の方向
     Block("center_bearing")
         .category("センサー")
-        .text("バトル場のまん中の方向")
+        .text("バトル場の真ん中の方向")
         .output("Number")
-        .tooltip("自分の向きから見て、バトル場のまん中が何度の方向にあるかです（-180〜180）")
+        .tooltip("自分の向きから見て、バトル場の真ん中が何度の方向にあるかです（-180〜180）")
         .java("robocode.util.Utils.normalRelativeAngleDegrees(Math.toDegrees(Math.atan2("
               "getBattleFieldWidth() / 2 - getX(), getBattleFieldHeight() / 2 - getY())) - getHeading())");
 }
