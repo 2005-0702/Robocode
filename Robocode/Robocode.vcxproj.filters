@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="ソース ファイル\category">
+      <UniqueIdentifier>{b715f5eb-6348-4fbd-895f-b6f0c894a3f2}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -41,65 +44,62 @@
     <ClCompile Include="main.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="RobotMove.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
     <ClCompile Include="RobocodeBlocksCore.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="GetGameInfo.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="RobotAttack.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="RobotControl.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="RobotEvent.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="RobotBuilder.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="RobotColor.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
     <ClCompile Include="WorkFile.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="RobotSample.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="GetGameSystem.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Sensor.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="RobotCalculation.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="RobotVariable.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="AdvancedMove.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="JavaToBlocks.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="ActionValue.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="RobotEvent.cpp">
+      <Filter>ソース ファイル\category</Filter>
     </ClCompile>
-    <ClCompile Include="ControlPlus.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="RobotMove.cpp">
+      <Filter>ソース ファイル\category</Filter>
     </ClCompile>
-    <ClCompile Include="MathBlocks.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="RobotAttack.cpp">
+      <Filter>ソース ファイル\category</Filter>
     </ClCompile>
-    <ClCompile Include="SensorPlus.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="RobotSample.cpp">
+      <Filter>ソース ファイル\category</Filter>
+    </ClCompile>
+    <ClCompile Include="RobotSensor.cpp">
+      <Filter>ソース ファイル\category</Filter>
+    </ClCompile>
+    <ClCompile Include="RobotControl.cpp">
+      <Filter>ソース ファイル\category</Filter>
+    </ClCompile>
+    <ClCompile Include="RobotInformation.cpp">
+      <Filter>ソース ファイル\category</Filter>
+    </ClCompile>
+    <ClCompile Include="RobotAdvancedMove.cpp">
+      <Filter>ソース ファイル\category</Filter>
+    </ClCompile>
+    <ClCompile Include="RobotSensorPlus.cpp">
+      <Filter>ソース ファイル\category</Filter>
+    </ClCompile>
+    <ClCompile Include="RobotVariable.cpp">
+      <Filter>ソース ファイル\category</Filter>
+    </ClCompile>
+    <ClCompile Include="RobotCalculation.cpp">
+      <Filter>ソース ファイル\category</Filter>
+    </ClCompile>
+    <ClCompile Include="RobotColor.cpp">
+      <Filter>ソース ファイル\category</Filter>
+    </ClCompile>
+    <ClCompile Include="RobotActionValue.cpp">
+      <Filter>ソース ファイル\category</Filter>
+    </ClCompile>
+    <ClCompile Include="RobotControlPlus.cpp">
+      <Filter>ソース ファイル\category</Filter>
+    </ClCompile>
+    <ClCompile Include="RobotMathBlocks.cpp">
+      <Filter>ソース ファイル\category</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

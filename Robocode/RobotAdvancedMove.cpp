@@ -1,5 +1,5 @@
 ﻿// =====================================================================
-//  AdvancedMove.cpp  ―  「同時に動く」のブロック（AdvancedRobot の set〜）
+//  RobotAdvancedMove.cpp  ―  「同時に動く」のブロック（AdvancedRobot の set〜）
 //
 //  ふつうの「〇 進む」「〇 度回す」は、1つ終わるまで次に進まない（そのあいだは何もできない）。
 //  ここのブロックは「予約」だけして、すぐ次に進む。
@@ -8,7 +8,7 @@
 // =====================================================================
 #include "RobocodeBlocks.h"
 
-ROBOCODE_BLOCKS(AdvancedMove)
+ROBOCODE_BLOCKS(RobotAdvancedMove)
 {
     // 〇 進む／下がる（予約）
     Block("adv_set_ahead")

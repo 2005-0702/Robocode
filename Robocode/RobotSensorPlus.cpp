@@ -6,7 +6,7 @@
 // =====================================================================
 #include "RobocodeBlocks.h"
 
-ROBOCODE_BLOCKS(SensorPlus)
+ROBOCODE_BLOCKS(RobotSensorPlus)
 {
     // ---------------- 敵を発見したとき に使えるもの ----------------
 

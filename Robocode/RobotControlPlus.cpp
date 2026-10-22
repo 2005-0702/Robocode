@@ -1,12 +1,12 @@
 // =====================================================================
-//  ControlPlus.cpp  ―  組み合わせて使う「制御」のブロック
+//  RobotControlPlus.cpp  ―  組み合わせて使う「制御」のブロック
 //
 //  「記憶」のブロックを使うには、RobocodeBlocksCore.cpp で
 //  ロボットのクラスに memA, memB, memC を用意しておく必要がある（説明を参照）。
 // =====================================================================
 #include "RobocodeBlocks.h"
 
-ROBOCODE_BLOCKS(ControlPlus)
+ROBOCODE_BLOCKS(RobotControlPlus)
 {
     // 〇 のあいだくり返す
     Block("control_while")
