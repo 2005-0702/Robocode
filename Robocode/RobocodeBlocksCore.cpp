@@ -1,4 +1,4 @@
-// =====================================================================
+﻿// =====================================================================
 //  RobocodeBlocksCore.cpp  ―  ブロックのしくみ（難しい部分）
 // 
 // 2026/10/16 片山　カテゴリー色に色とサンプル戦術追加,Javaコードの親クラス名を修正。
@@ -52,15 +52,15 @@ namespace rb {
         const CategoryColor kCategories[] = {
             {"イベント", 30},
             {"動き", 210},
+            {"同時に動く", 60},  // AdvancedMove.cpp（setAhead などの予約して同時に動くブロック）
             {"攻撃", 0},
             {"センサー", 160},
             {"制御", 120},
             {"計算", 230},
-            {"変数", 330},     // Blockly の「変数」カテゴリ（ブロックの色は Blockly が決める 330）
-            {"関数", 290},     // Blockly の「関数」カテゴリ（ブロックの色は Blockly が決める 290）
-            {"同時に動く", 60},  // AdvancedMove.cpp（setAhead などの予約して同時に動くブロック）
-            {"ゲーム情報",180},
             {"色",270},
+            {"ゲーム情報",180},
+            {"変数", 330},
+            {"関数", 290},
             {"サンプル戦術",330}
         };
         const int kOtherColor = 290;
@@ -253,6 +253,7 @@ namespace rb {
                         break;
                     }
                     case BlockDef::Arg::Value:
+                    case BlockDef::Arg::OptionalValue:
                         out += "( )";
                         break;
                     case BlockDef::Arg::Statements:
@@ -554,8 +555,17 @@ namespace rb {
                     break;
                 }
                 case BlockDef::Arg::Value:
+                case BlockDef::Arg::OptionalValue:
                     a["type"] = "input_value";
                     if (!arg.valueType.empty()) a["check"] = arg.valueType;
+                    // optionalValueInput は、接続を外しても編集可能な数字ブロックを初期表示する。
+                    // shadow block はユーザーが別の値ブロックを接続すると置き換わる。
+                    if (arg.kind == BlockDef::Arg::OptionalValue && arg.valueType == "Number") {
+                        a["shadow"] = {
+                            {"type", kNumberBlock},
+                            {"fields", {{"NUM", 0}}}
+                        };
+                    }
                     hasValue = true;
                     break;
                 case BlockDef::Arg::Statements:
@@ -1172,6 +1182,11 @@ namespace rb {
         }
         case BlockDef::Arg::Value:
             return impl_->conv->valueInput(*impl_->block, def, *arg);
+        case BlockDef::Arg::OptionalValue: {
+            const json* child = inputOf(*impl_->block, name);
+            if (!child || isDisabled(*child)) return "";
+            return impl_->conv->valueOfBlock(*child);
+        }
         case BlockDef::Arg::Statements:
             return impl_->conv->statementInput(*impl_->block, def, *arg);
         case BlockDef::Arg::Text: {
@@ -1191,6 +1206,17 @@ namespace rb {
         }
         }
         return "";
+    }
+
+    bool BlockData::hasConnectedValue(const std::string& name) {
+        const json* inputs = impl_->block->find("inputs") != impl_->block->end()
+            ? &*impl_->block->find("inputs") : nullptr;
+        if (!inputs || !inputs->is_object()) return false;
+        auto it = inputs->find(name);
+        if (it == inputs->end() || !it->is_object()) return false;
+        auto blockIt = it->find("block");
+        // Blockly の shadow（最初から入っている既定値）は「接続した値」とみなさない。
+        return blockIt != it->end() && blockIt->is_object();
     }
 
     void BlockData::error(const std::string& message) {
@@ -1253,6 +1279,15 @@ namespace rb {
     BlockDef& BlockDef::valueInput(const std::string& name, const std::string& type) {
         Arg arg;
         arg.kind = Arg::Value;
+        arg.name = name;
+        arg.valueType = type;
+        info.args.push_back(arg);
+        return *this;
+    }
+
+    BlockDef& BlockDef::optionalValueInput(const std::string& name, const std::string& type) {
+        Arg arg;
+        arg.kind = Arg::OptionalValue;
         arg.name = name;
         arg.valueType = type;
         info.args.push_back(arg);

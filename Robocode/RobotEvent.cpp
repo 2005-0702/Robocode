@@ -3,7 +3,7 @@
 // 
 // 2026/10/14 片山　ロボットイベントの作成
 // 2026/10/15 片山　public void の追加
-//
+// 2026/10/22 片山  イベントの順番をやりやすくする
 // =====================================================================
 
 /* ======== BlockDef ― ブロック設定関数一覧 =============
@@ -89,19 +89,20 @@ ROBOCODE_BLOCKS(RobotEvent)
             " {D0}\n"
             "}");
 
-    // はずれ時 
-    Block("robot_event_bulletMissed")
-        .category("イベント")
-        .text("弾がはずれたとき %1")
-        .tooltip("自分の弾が敵に命中しなかったときに実行します")
-        .statements("D0")
-        .event()
-        .java("public void onBulletMissed(BulletMissedEvent e) {\n"
-            " {D0}\n"
-            "}");
+   // はずれ時 
+   Block("robot_event_bulletMissed")
+       .category("イベント")
+       .text("弾がはずれたとき %1")
+       .tooltip("自分の弾が敵に命中しなかったときに実行します")
+       .statements("D0")
+       .event()
+       .java("public void onBulletMissed(BulletMissedEvent e) {\n"
+           " {D0}\n"
+           "}");
 
-    // 弾同士が衝突したとき 
-  /*  Block("robot_event_bulletCollision")
+
+   // 弾同士が衝突したとき 
+    /*  Block("robot_event_bulletCollision")
         .category("イベント")
         .text("弾同士が衝突したとき %1")
         .tooltip("自分の弾が敵の弾と衝突したときに実行します")
@@ -111,7 +112,7 @@ ROBOCODE_BLOCKS(RobotEvent)
             " {D0}\n"
             "}");*/
 
-            // 自機破壊時 
+    // 自機破壊時 
     Block("robot_event_destroyed")
         .category("イベント")
         .text("自分のロボットが破壊されたとき %1")
@@ -155,8 +156,6 @@ ROBOCODE_BLOCKS(RobotEvent)
             " {D0}\n"
             "}");
 
-
-   
     // 勝利時
     Block("robot_event_win")
         .category("イベント")

@@ -1,4 +1,4 @@
-﻿// =====================================================================
+// =====================================================================
 //  JavaToBlocks.cpp  ―  Java（.java ファイル）をブロックにもどす
 // =====================================================================
 //
@@ -1404,15 +1404,19 @@ public:
 
     // class の中の1つ分（メソッドや変数）をブロックにする
     json convertMember(const Toks& toks) {
-        // 「private String targetName = null;」のような単純な String フィールドは、
-       // そのまま書くブロックではなく、変数宣言ブロックとして読み込みます。
-       // まず public / private / static などの修飾子を読み取ります。
+        // 単純なフィールド宣言は、Java のままブロックにするのではなく
+        // 「変数を宣言する」ブロックへ変換する。
+        // 例: private static double targetDistance = Double.MAX_VALUE;
+        //     private String targetName = null;
+        //     private boolean isAlive = true;
         {
             size_t k = 0;
             std::string access;
             std::string staticText;
+
             while (k < toks.size()) {
-                if (toks[k].s == "public" || toks[k].s == "private" || toks[k].s == "protected") {
+                if (toks[k].s == "public" || toks[k].s == "private" ||
+                    toks[k].s == "protected") {
                     access = toks[k].s;
                     ++k;
                 }
@@ -1424,20 +1428,69 @@ public:
                     break;
                 }
             }
-            if (k + 4 < toks.size() && toks[k].s == "String" &&
-                toks[k + 1].kind == TokKind::Ident && toks[k + 2].s == "=" &&
-                toks[k + 3].s == "null" && toks[k + 4].s == ";" && k + 5 == toks.size()) {
-                ++converted;
-                return json{
-                    {"type", "robot_variable_declare"},
-                    {"fields", {
-                        {"ACCESS", access},
-                        {"STATIC", staticText},
-                        {"NAME", toks[k + 1].s},
-                        {"TYPE", "String"},
-                        {"INITIAL_VALUE", "null"}
-                    }}
-                };
+
+            // 変数ブロックで扱う基本型。複雑な型や内部クラスはここでは扱わない。
+            const std::set<std::string> supportedTypes = {
+                "int", "float", "double", "long", "String", "boolean"
+            };
+
+            if (k + 2 < toks.size() &&
+                supportedTypes.count(toks[k].s) != 0 &&
+                toks[k + 1].kind == TokKind::Ident) {
+                const std::string type = toks[k].s;
+                const std::string name = toks[k + 1].s;
+                size_t valueStart = k + 2;
+                std::string initialValue;
+
+                if (valueStart < toks.size() && toks[valueStart].s == "=") {
+                    ++valueStart;
+                    size_t valueEnd = valueStart;
+                    while (valueEnd < toks.size() && toks[valueEnd].s != ";") {
+                        // 配列・ラムダ・複数文などは安全に変換せず、通常のJavaブロックに任せる。
+                        if (toks[valueEnd].s == "{" || toks[valueEnd].s == "}") {
+                            initialValue.clear();
+                            break;
+                        }
+                        initialValue += toks[valueEnd].s;
+                        ++valueEnd;
+                    }
+
+                    if (valueEnd < toks.size() && toks[valueEnd].s == ";" &&
+                        valueEnd + 1 == toks.size() && !initialValue.empty()) {
+                        ++converted;
+                        return json{
+                            {"type", "robot_variable_declare"},
+                            {"fields", {
+                                {"ACCESS", access},
+                                {"STATIC", staticText},
+                                {"NAME", name},
+                                {"TYPE", type},
+                                {"INITIAL_VALUE", initialValue}
+                            }}
+                        };
+                    }
+                }
+                else if (valueStart < toks.size() && toks[valueStart].s == ";" &&
+                         valueStart + 1 == toks.size()) {
+                    // 初期値の省略は型ごとのJava既定値を入れてブロック化する。
+                    if (type == "String") initialValue = "null";
+                    else if (type == "boolean") initialValue = "false";
+                    else if (type == "float") initialValue = "0.0f";
+                    else if (type == "double") initialValue = "0.0";
+                    else initialValue = "0";
+
+                    ++converted;
+                    return json{
+                        {"type", "robot_variable_declare"},
+                        {"fields", {
+                            {"ACCESS", access},
+                            {"STATIC", staticText},
+                            {"NAME", name},
+                            {"TYPE", type},
+                            {"INITIAL_VALUE", initialValue}
+                        }}
+                    };
+                }
             }
         }
 

@@ -124,12 +124,12 @@ ROBOCODE_BLOCKS(RobotControl)
     Block("robot_logic")
         .category("制御")
         .text("%1 %2 %3")
-        .valueInput("A", "Boolean")
+        .valueInput("A", "")
         .dropdown("OP", {
             {"and", "&&"},
             {"or", "||"}
             })
-        .valueInput("B", "Boolean")
+        .valueInput("B", "")
         .output("Boolean")
         .tooltip("2つの条件をANDまたはORでつなぎます")
         .java("({A} {OP} {B})");
