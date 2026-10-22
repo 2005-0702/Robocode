@@ -8,24 +8,21 @@
 
 ROBOCODE_BLOCKS(RobotMove)
 {
-    // 前に〇〇進む
-    Block("robot_move_forward")
-        .category("動き")              // カテゴリー
-        .text("前に %1 進む")          //ブロックに表示する文
-        .number("DIST", 100, 0)        //↑%1に表示される数字の入力欄
-        .tooltip("ロボットを前に進めます（単位はピクセル）")    //マウスを乗せたときに出る説明
-        .warnIfZero("DIST", "距離が0なので、ロボットは動きません")   // 0のときに出す注意
-        .java("ahead({DIST});"); 
-    
-
-    // 後ろに〇〇下がる
-    Block("robot_move_backward")
+    //進む
+    Block("act_ahead")
         .category("動き")
-        .text("後ろに %1 下がる")
-        .number("DIST", 100, 0)
-        .tooltip("ロボットを後ろに下げます（単位はピクセル）")
-        .warnIfZero("DIST", "距離が0なので、ロボットは動きません")
-        .java("back({DIST});");
+        .text("%1 進む")
+        .valueInput("DIST","Number")
+        .tooltip("前に進みます。マイナスを入れると後ろに下がります")
+        .java("ahead({DIST});");
+
+    //下がる
+    Block("act_back")
+        .category("動き")
+        .text("%1 下がる")
+        .valueInput("DIST", "Number")
+        .tooltip("後ろに下がります。マイナスだと前に進みます")
+        .java("back({DIST})");
 
     // 車体・砲塔・レーダーを独立して動かす
     Block("robot_keep_direction")
