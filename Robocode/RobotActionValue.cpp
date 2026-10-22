@@ -8,13 +8,6 @@
 
 ROBOCODE_BLOCKS(RobotActionValue)
 {
-    // 〇 進む
-    Block("act_ahead")
-        .category("動き")
-        .text("%1 進む")
-        .valueInput("DIST", "Number")
-        .tooltip("前に進みます。マイナスを入れると後ろに下がります")
-        .java("ahead({DIST});");
 
     // 車体・砲塔・レーダーを 〇 度 右に回す
     Block("act_turn_right")
@@ -25,13 +18,7 @@ ROBOCODE_BLOCKS(RobotActionValue)
         .tooltip("右に回します。マイナスを入れると左に回ります")
         .java("{PART}({ANGLE});");
 
-    // パワー 〇 で撃つ
-    Block("act_fire")
-        .category("攻撃")
-        .text("%1 のパワーで撃つ")
-        .valueInput("POWER", "Number")
-        .tooltip("弾を撃ちます。パワーは 0.1〜3。計算した数もはめられます")
-        .java("fire({POWER});");
+    
 
     // 敵をもう一度探す
     Block("act_scan")
