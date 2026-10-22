@@ -24,34 +24,23 @@ ROBOCODE_BLOCKS(RobotInformation)
         .output("Number")                               // 数字を出す値ブロック
         .tooltip("自分のロボットの X 座標（左右の位置）か Y 座標（上下の位置）を調べます")
         .java("get{AXIS}()");                           // X を選ぶと getX()、Y を選ぶと getY() になる
+    //自分のロボット・砲塔・レーダーの向きを得る
+    Block("robot_heading")
+        .category("ゲーム情報")
+        .text("自分の%1 の向き")
+        .dropdown("PART", {
+            {"ロボット","getHeading())"},
+            {"砲塔","getGunHeading()"},
+            {"レーダー","getRadarHeading()"} })
+            .tooltip("自分のロボットの本体、砲塔、レーダーの向きの情報が分かります")
+        .java("{PART};");
     //自分のエネルギー残量を取得
     Block("robot_energy")
         .category("ゲーム情報")
-        .text("エネルギー残量")
+        .text("自分のエネルギー残量")
         .output("Number")
         .tooltip("自分のエネルギー残量が分かります")
         .java("getEnergy()");
-    //自分の向きを得る
-    Block("robot_heading")
-        .category("ゲーム情報")
-        .text("自分のロボットの向き")
-        .output("Number")
-        .tooltip("ロボットの向きがわかります")
-        .java("getHeading()");
-    //自分の砲塔の向きを得る
-    Block("robot_gun_heading")
-        .category("ゲーム情報")
-        .text("自分の砲塔の向き")
-        .output("Number")
-        .tooltip("自分の砲塔の向きがわかります")
-        .java("getGunHeading()");
-    //自分のレーダーの向きを得る
-    Block("robot_radar_heading")
-        .category("ゲーム情報")
-        .text("自分のレーダーの向き")
-        .output("Number")
-        .tooltip("自分のレーダーの向きがわかります")
-        .java("getRadarHeading()");
     //砲塔のクールタイムを得る
     Block("robot_gun_cooltime")
         .category("ゲーム情報")
@@ -80,13 +69,34 @@ ROBOCODE_BLOCKS(RobotInformation)
         .output("Number")
         .tooltip("残りの敵の数がわかります")
         .java("getOthers()");
-    //敵との方向
+    //敵との距離
+    Block("enemy_distance")
+        .category("ゲーム情報")
+        .text("敵との距離")
+        .output("Number")
+        .tooltip("見つけた敵までの距離です")
+        .java("e.getDistance()");
+    //自分から見る敵の方向
     Block("enemy_Bearing")
         .category("ゲーム情報")
-        .text("敵の方向")
+        .text("敵がいる方向")
         .output("Number")
-        .tooltip("敵の方向です")
+        .tooltip("自分から見て敵がいる方向です")
         .java("e.getBearing()");
+    //敵が向いてる方向
+    Block("enemy_heading")
+        .category("ゲーム情報")
+        .text("敵の向いてる方向")
+        .output("Number")
+        .tooltip("敵の車体が向いている方向です（画面の上が 0 度、0〜360）")
+        .java("e.getHeading()");
+    //敵の速さ
+    Block("enemy_velocity")
+        .category("ゲーム情報")
+        .text("敵の速さ")
+        .output("Number")
+        .tooltip("見つけた敵の速さです（止まっていると 0）")
+        .java("e.getVelocity()");
     //弾のスピード
     Block("rule_bullet_speed")
         .category("ゲーム情報")
@@ -95,7 +105,14 @@ ROBOCODE_BLOCKS(RobotInformation)
         .output("Number")
         .tooltip("弾の速さです( 20 - 3 × パワー)。パワーが大きいほど遅くなります")
         .java("Rules.getBulletSpeed({POWER})");
-    
+    //砲塔が撃てる？
+    Block("gun_ready")
+        .category("ゲーム情報")
+        .text("砲塔がすぐ撃てる")
+        .output("Boolean")
+        .tooltip("砲塔が冷えていて、すぐに弾を撃てるときに「はい」になります")
+        .java("(getGunHeat() == 0)");
+
 
 
     // バトル場の幅・高さ
