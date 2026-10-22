@@ -1153,6 +1153,29 @@
                   ['false', 'false']
                 ]);
                 newField.setValue(booleanValue);
+              } else if (type === 'double') {
+                // 型を真偽値などから切り替えた場合、以前の値を double の初期値として誤用しない。
+                let doubleValue = oldValue;
+                if (doubleValue === 'true' || doubleValue === 'false' ||
+                    doubleValue === null || doubleValue === undefined || doubleValue === '') {
+                  doubleValue = '0.0';
+                }
+                // 倍精度の小数でよく使う初期値を日本語で選べるようにする。
+                // 表示名は日本語、値はJavaに出力するコード。
+                const options = [
+                  ['0（ゼロ）', '0.0'],
+                  ['1（1.0）', '1.0'],
+                  ['最大の有限値', 'Double.MAX_VALUE'],
+                  ['最小の正の値', 'Double.MIN_VALUE']
+                ];
+                if (doubleValue !== null && doubleValue !== undefined && doubleValue !== '' &&
+                    !options.some(option => option[1] === doubleValue)) {
+                  // 既存の任意の数値や定数は失わず、直接入力として保持する。
+                  newField = new Blockly.FieldTextInput(String(doubleValue));
+                } else {
+                  newField = new Blockly.FieldDropdown(options);
+                  newField.setValue(options.some(option => option[1] === doubleValue) ? doubleValue : '0.0');
+                }
               } else {
                 let textValue = oldValue;
                 if (textValue === 'true' || textValue === 'false' || textValue === null || textValue === undefined) {
@@ -1178,6 +1201,90 @@
             });
           };
           variableDefinition._initialValueSwitchInstalled = true;
+        }
+
+        // 変数を使うブロックの名前欄を、宣言済み変数から選ぶドロップダウンにする。
+        // robot_variable_declare の NAME を一覧の元にするため、名前の入力ミスを減らせる。
+        const variableUseBlockTypes = ['robot_variable_assign', 'robot_variable_get'];
+        const variableUseBlockNamesInstalled = new Set();
+        function getDeclaredVariableBlocks(block) {
+          const workspace = block && block.workspace;
+          if (!workspace) return [];
+          return workspace.getAllBlocks(false)
+            .filter(candidate => candidate.type === 'robot_variable_declare')
+            .filter(candidate => /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(String(candidate.getFieldValue('NAME') || '').trim()));
+        }
+        function getDeclaredVariableOptions(block) {
+          const declarations = getDeclaredVariableBlocks(block);
+          const uniqueNames = [...new Set(declarations.map(candidate => String(candidate.getFieldValue('NAME')).trim()))];
+          if (uniqueNames.length === 0) return [['先に変数を宣言してください', 'item']];
+          return uniqueNames.map(name => [name, name]);
+        }
+        function syncVariableUseType(block) {
+          if (!block) return;
+          const name = String(block.getFieldValue('NAME') || '');
+          const declaration = getDeclaredVariableBlocks(block).find(candidate => candidate.getFieldValue('NAME') === name);
+          const javaType = declaration ? declaration.getFieldValue('TYPE') : 'double';
+          const check = javaType === 'String' ? 'String' :
+            javaType === 'boolean' ? 'Boolean' : 'Number';
+          if (block.type === 'robot_variable_get') {
+            block.setOutput(true, check);
+          } else if (block.type === 'robot_variable_assign') {
+            const input = block.getInput('VALUE');
+            if (input && input.connection) input.connection.setCheck(check);
+          }
+        }
+        for (const type of variableUseBlockTypes) {
+          const definition = Blockly.Blocks[type];
+          if (!definition || variableUseBlockNamesInstalled.has(type)) continue;
+          const originalInit = definition.init;
+          definition.init = function() {
+            originalInit.call(this);
+            const oldField = this.getField('NAME');
+            if (!oldField) return;
+            const input = this.inputList.find(item => item.fieldRow.includes(oldField));
+            if (!input) return;
+            const oldValue = oldField.getValue();
+            const field = new Blockly.FieldDropdown(() => getDeclaredVariableOptions(this));
+            input.removeField('NAME', true);
+            input.insertFieldAt(input.fieldRow.length, field, 'NAME');
+            const options = getDeclaredVariableOptions(this);
+            const valid = options.some(option => option[1] === oldValue);
+            field.setValue(valid ? oldValue : options[0][1]);
+            this.setTooltip(type === 'robot_variable_assign'
+              ? '宣言した変数を選び、その変数に値を代入します。先に「変数を宣言する」ブロックを置いてください。'
+              : '宣言した変数を選び、その変数の値を計算や比較に使います。');
+          };
+          variableUseBlockNamesInstalled.add(type);
+        }
+
+        // 宣言した変数の追加・名前変更・削除後に、変数選択欄を再描画する。
+        if (!workspace._robotVariableDropdownListenerInstalled) {
+          workspace.addChangeListener(event => {
+            if (!event || event.isUiEvent) return;
+            if (event.type !== Blockly.Events.BLOCK_CREATE &&
+                event.type !== Blockly.Events.BLOCK_DELETE &&
+                event.type !== Blockly.Events.BLOCK_CHANGE &&
+                event.type !== Blockly.Events.BLOCK_MOVE) return;
+            const declarations = workspace.getAllBlocks(false)
+              .filter(block => block.type === 'robot_variable_declare');
+            const names = new Set(declarations
+              .map(block => String(block.getFieldValue('NAME') || '').trim())
+              .filter(name => /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name)));
+            workspace.getAllBlocks(false).forEach(block => {
+              if (!variableUseBlockTypes.includes(block.type)) return;
+              const field = block.getField('NAME');
+              if (!field) return;
+              const current = field.getValue();
+              if (names.size === 0) {
+                if (current !== 'item') field.setValue('item');
+              } else if (!names.has(current)) {
+                field.setValue([...names][0]);
+              }
+              syncVariableUseType(block);
+            });
+          });
+          workspace._robotVariableDropdownListenerInstalled = true;
         }
 
         // ツールボックス（色カテゴリー）内でもRGB数値欄を表示しない。

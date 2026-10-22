@@ -13,7 +13,7 @@ ROBOCODE_BLOCKS(RobotVariable)
 
     Block("robot_variable_declare")
         .category("変数")
-        .text("公開範囲 %1 %2 型 %3 変数名 %4 初期値 %5")
+        .text("公開範囲 %1 %2 型 %3 変数名 %4 初期値 %5 %6")
         .dropdown("ACCESS", {
             {"指定なし", ""},
             {"どこからでも使える", "public"},
@@ -27,57 +27,68 @@ ROBOCODE_BLOCKS(RobotVariable)
             {"整数", "int"},
             {"小数", "float"},
             {"倍精度の小数", "double"},
+            {"長整数", "long"},
             {"文字列", "String"},
             {"真偽値", "boolean"}
             })
         .textField("NAME", "item")
-        .textField("INITIAL_VALUE", "0")
+        // 初期値は編集可能な数字ブロックを最初から表示し、別の値ブロックにも置き換えられる。
+        .optionalValueInput("INITIAL_VALUE_BLOCK", "Number")
+        .dropdown("INITIAL_BOOLEAN", {
+            {"false", "false"},
+            {"true", "true"}
+            })
         .javaFunction([](BlockData& data) -> std::string {
         const std::string accessText = data.text("ACCESS");
         const std::string staticText = data.text("STATIC");
         const std::string name = data.text("NAME");
         const std::string type = data.text("TYPE");
-        std::string initialValue = data.text("INITIAL_VALUE");
+        std::string initialValue = data.text("INITIAL_VALUE_BLOCK");
+        const bool hasRealValueBlock = data.hasConnectedValue("INITIAL_VALUE_BLOCK");
+        const std::string booleanInitialValue = data.text("INITIAL_BOOLEAN");
 
-        // 型に合わせて初期値を整える
-        if (type.compare("boolean") == 0) {
-            // true または false 以外なら false にする
-            if (initialValue.compare("true") != 0 &&
-                initialValue.compare("false") != 0) {
-                initialValue = "false";
+        // 実際の値ブロックが接続されている場合はそれを優先する。
+        // 接続されていない boolean 型では true/false の選択肢を使用する。
+        if (type == "boolean" && !hasRealValueBlock) {
+            initialValue = booleanInitialValue;
+        }
+        // 初期値の shadow がない場合は型に応じた既定値を使う。
+        if (initialValue.empty()) {
+            if (type == "String") initialValue = "null";
+            else if (type == "boolean") initialValue = "false";
+            else if (type == "float") initialValue = "0.0f";
+            else if (type == "double") initialValue = "0.0";
+            else if (type == "long") initialValue = "0L";
+            else initialValue = "0";
+        }
+        // 数字ブロックの値は型に合わせて Java の表記を整える。
+        // すでに式ブロック（例：Double.MAX_VALUE）が接続されている場合は式を維持する。
+        if (type == "boolean") {
+            if (initialValue != "true" && initialValue != "false") initialValue = "false";
+        }
+        else if (type == "String") {
+            if (initialValue != "null" &&
+                (initialValue.size() < 2 || initialValue.front() != '"' || initialValue.back() != '"')) {
+                // 接続式はそのまま使う。通常の数字 shadow などは文字列の初期値として扱わない。
+                if (initialValue == "0") initialValue = "\\";
             }
         }
-        else if (type.compare("String") == 0) {
-            // null は「文字列 null」ではなく、値がまだないことを表す Java の特別な値です。
-            // そのため、ダブルクォーテーションで囲まず、そのまま出力します。
-            if (initialValue.compare("null") != 0 &&
-                (initialValue.size() < 2 ||
-                 initialValue.front() != '"' ||
-                 initialValue.back() != '"')) {
-                initialValue = std::string("\"") + initialValue + "\"";
-            }
+        else if (type == "int") {
+            // 0 などの整数式はそのまま
         }
-        else if (type.compare("int") == 0) {
-            // 整数が空欄なら 0
-            if (initialValue.empty()) {
-                initialValue = "0";
-            }
+        else if (type == "float") {
+            if (initialValue == "0") initialValue = "0.0f";
+            else if (initialValue.find_first_of(".fF") == std::string::npos &&
+                     initialValue.find("MAX_VALUE") == std::string::npos &&
+                     initialValue.find("MIN_VALUE") == std::string::npos) initialValue += ".0f";
         }
-        else if (type.compare("float") == 0) {
-            // 小数が空欄なら 0.0f
-            if (initialValue.empty()) {
-                initialValue = "0.0f";
-            }
-            else if (initialValue.find_first_of(".fF") == std::string::npos) {
-                // 小数点も f もなければ .0f を追加
-                initialValue += ".0f";
-            }
+        else if (type == "double") {
+            if (initialValue == "0") initialValue = "0.0";
         }
-        else if (type.compare("double") == 0) {
-            // 倍精度の小数が空欄なら 0.0
-            if (initialValue.empty()) {
-                initialValue = "0.0";
-            }
+        else if (type == "long") {
+            if (initialValue == "0") initialValue = "0L";
+            else if (initialValue.find_first_of("lL") == std::string::npos &&
+                     initialValue.find_first_of(".eE") == std::string::npos) initialValue += "L";
         }
 
         // Java の変数宣言を作成
@@ -112,7 +123,7 @@ ROBOCODE_BLOCKS(RobotVariable)
         .textField("NAME", "item")
         .valueInput("VALUE", "Number")
         .java("{NAME} = {VALUE};")
-        .tooltip("変数に新しい値を代入します");
+        .tooltip("宣言した変数を選んで、新しい値を代入します。");
 
     // ③ 変数の値を取得する
     Block("robot_variable_get")
@@ -121,9 +132,17 @@ ROBOCODE_BLOCKS(RobotVariable)
         .textField("NAME", "item")
         .output("Number")
         .java("{NAME}")
-        .tooltip("変数に保存されている値を取得し、計算や比較に使います");
+        .tooltip("宣言した変数を選び、その変数の値を計算や比較に使います。");
 
 
+
+    // double 型の初期値などに接続して使える定数ブロック
+    Block("robot_double_max_value")
+        .category("計算")
+        .text("double 型の最大値（Double.MAX_VALUE）")
+        .output("Number")
+        .java("Double.MAX_VALUE")
+        .tooltip("double 型で表せる最大の有限値です。変数の初期値の穴にも接続できます。");
 
     // ④-② 特殊な初期値を持つ変数（Double.MAX_VALUE）
     // Java クラス直下のフィールドとして出力します。
@@ -170,6 +189,21 @@ ROBOCODE_BLOCKS(RobotVariable)
             "EnemyInfo を複数保存するリストです。\n"
             "使用する Java ファイルの先頭に java.util.List と java.util.ArrayList の import が必要です。"
         );
+
+    // 真偽値の値ブロック。boolean 型の変数や条件式に接続して使います。
+    Block("robot_boolean_true")
+        .category("変数")
+        .text("真（true）")
+        .output("Boolean")
+        .java("true")
+        .tooltip("条件が正しいことを表す true です。");
+
+    Block("robot_boolean_false")
+        .category("変数")
+        .text("偽（false）")
+        .output("Boolean")
+        .java("false")
+        .tooltip("条件が正しくないことを表す false です。");
 
     // null（何も参照していない状態）
     Block("java_null")

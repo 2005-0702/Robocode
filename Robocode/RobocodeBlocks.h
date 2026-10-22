@@ -152,6 +152,8 @@ public:
     //選択肢の中身
     BlockDef& dropdown(const std::string& name, const Options& options);
     BlockDef& valueInput(const std::string& name, const std::string& type = "Number");
+    // 接続しなくてもよい値ブロックの穴（変数初期値などに使用）
+    BlockDef& optionalValueInput(const std::string& name, const std::string& type = "Number");
     BlockDef& statements(const std::string& name);
     //初期値
     BlockDef& textField(const std::string& name, const std::string& initial = "");
@@ -178,7 +180,7 @@ public:
 
     // ===== ここから下は RobocodeBlocksCore.cpp が使うもの（読まなくてOK）=====
     struct Arg {
-        enum Kind { Number, Dropdown, Value, Statements, Text, Variable };
+        enum Kind { Number, Dropdown, Value, OptionalValue, Statements, Text, Variable };
         Kind kind = Number;
         std::string name;
         double initial = 0;
@@ -215,6 +217,10 @@ public:
 class BlockData {
 public:
     double number(const std::string& name);
+
+    // 値ブロックが接続されているか確認する
+    bool hasConnectedValue(const std::string& name);
+
     std::string text(const std::string& name);
     void error(const std::string& message);
     void warning(const std::string& message);
