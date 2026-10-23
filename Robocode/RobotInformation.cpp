@@ -29,11 +29,12 @@ ROBOCODE_BLOCKS(RobotInformation)
         .category("ゲーム情報")
         .text("自分の%1 の向き")
         .dropdown("PART", {
-            {"ロボット","getHeading())"},
-            {"砲塔","getGunHeading()"},
-            {"レーダー","getRadarHeading()"} })
-            .tooltip("自分のロボットの本体、砲塔、レーダーの向きの情報が分かります")
-        .java("{PART};");
+            {"ロボット", "getHeading"},
+            {"砲塔",     "getGunHeading"},
+            {"レーダー", "getRadarHeading"} })
+            .output("Number")
+        .tooltip("自分のロボットの本体、砲塔、レーダーの向きです（画面の上が 0 度、0〜360）")
+        .java("{PART}()");
     //自分のエネルギー残量を取得
     Block("robot_energy")
         .category("ゲーム情報")
