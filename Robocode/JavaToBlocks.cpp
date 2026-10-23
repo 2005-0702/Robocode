@@ -559,6 +559,25 @@ std::string removeSpaces(const std::string& s) {
     return out;
 }
 
+// 名前の形か（名前 . 名前 … と、[ ] がつながったもの）
+bool isNameLike(const Toks& toks, size_t from, size_t to) {
+    if (to <= from || toks[from].kind != TokKind::Ident) return false;
+    bool needName = false;   // . のあとは名前が要る
+    for (size_t k = from; k < to; ++k) {
+        const Tok& t = toks[k];
+        if (t.kind == TokKind::Ident) { needName = false; continue; }
+        if (t.s == "." && !needName) { needName = true; continue; }
+        if (t.s == "[" && !needName) {   // [ ] の中は何でもよい（かっこがそろっていれば）
+            size_t close = matchBracket(toks, k);
+            if (close >= to || toks[close].s != "]") return false;
+            k = close;
+            continue;
+        }
+        return false;
+    }
+    return !needName;
+}
+
 // 入力欄に入ったものが、その入力欄に合っているか
 bool captureFits(const Pattern& p, size_t pieceIndex, const Toks& toks, size_t from, size_t to) {
     const Piece& piece = p.pieces[pieceIndex];
@@ -593,8 +612,12 @@ bool captureFits(const Pattern& p, size_t pieceIndex, const Toks& toks, size_t f
         return true;
     }
     case Arg::Statements:
-    case Arg::Text:
         return true;
+    case Arg::Text:
+        // 文字の欄（名前や型を自分で書く欄）には、名前の形のものだけを入れる
+        //   OK：sin  /  int  /  double[]  /  Math.PI  /  scores[g]
+        //   NG：a + b  /  max(a, b)  （計算や呼び出しを、名前の欄に入れてしまわないように）
+        return isNameLike(toks, from, to);
     case Arg::Variable:   // 変数を選ぶ欄のある型紙は、Java からはもどさない
         return false;
     }

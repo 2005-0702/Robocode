@@ -193,7 +193,7 @@ static bool RunCommand(std::wstring commandLine, std::string& output, DWORD& exi
 
 // ---------------------------------------------------------------------
 //  名前のチェック
-//    Robocode では、パッケージ名は16文字まで、ロボットの名前は32文字まで
+//    Robocode では、パッケージ名は16文字まで、ロボットの名前は32文字まで（どちらも大文字を使える）
 // ---------------------------------------------------------------------
 static bool IsLower(char c) { return c >= 'a' && c <= 'z'; }
 static bool IsUpper(char c) { return c >= 'A' && c <= 'Z'; }
@@ -221,9 +221,10 @@ std::string CheckPackageName(const std::string& name) {
             startOfPart = true;
             continue;
         }
-        if (startOfPart && !IsLower(c)) return "パッケージ名は小文字の英字で始めてください（. のあとも同じ）";
-        if (!IsLower(c) && !IsDigit(c) && c != '_') {
-            return "パッケージ名には、小文字の英字・数字・_ と、区切りの . だけを使ってください";
+        // 大文字も使える（例：Team.Red）
+        if (startOfPart && !IsLower(c) && !IsUpper(c)) return "パッケージ名は英字で始めてください（. のあとも同じ）";
+        if (!IsLower(c) && !IsUpper(c) && !IsDigit(c) && c != '_') {
+            return "パッケージ名には、英字・数字・_ と、区切りの . だけを使ってください";
         }
         startOfPart = false;
     }

@@ -53,6 +53,17 @@
       gap: 6px 8px;
     }
     #toolbar .row .spacer { flex: 1; }
+    /* 右の結果の欄をかくしているときは、2段を1行にまとめる（入らないときだけ折り返す） */
+    body.panel-collapsed #toolbar {
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px 8px;
+    }
+    body.panel-collapsed #toolbar .row { display: contents; }   /* 2つの段の中身を、1つの行にならべる */
+    #toolbar .keep { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }   /* 折り返してもばらばらにしないまとまり */
+    #toolbar .rowSep { display: none; }                           /* 1段目と2段目の区切りの線（1行のときだけ出す） */
+    body.panel-collapsed #toolbar .rowSep { display: block; }
     #toolbar [data-tip] { position: relative; }
     #toolbar label,
     #toolbar button {
@@ -480,16 +491,24 @@
     </div>
     <div class="row">
     <!-- パッケージ名とロボットの名前 → Robocode では「パッケージ名.ロボットの名前」で表示される -->
+    <!-- span class="keep" の中は、折り返すときもばらばらにならない -->
+    <span class="keep">
+    <span class="sep rowSep"></span>
     <label for="packageName">フォルダ</label>
     <input id="packageName" value="student" maxlength="16"
            title="英字で始まり、英字・数字・_ だけ（. で区切れる）。16文字まで">
     <span class="dot">.</span>
+    </span>
+    <span class="keep">
     <label for="robotName">ロボットの名前</label>
     <input id="robotName" value="MyRobot" maxlength="32"
            title="英字で始まり、英字・数字・_ だけ。32文字まで">
+    </span>
+    <span class="keep">
     <button id="importJavaButton" class="sub icon" data-tip="Java（.java）を読みこんでブロックにする" aria-label="Java を読みこむ"><svg viewBox="0 0 24 24"><path d="M13 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9z"/><path d="M13 3v6h6"/><path d="M10 12l-2.5 2.5L10 17M14 12l2.5 2.5L14 17"/></svg></button>
     <button id="convertButton" data-tip="ブロックを Java にして、Robocode で使えるロボットを作ります">ロボットを作る</button>
     <button id="launchButton" title="Robocode を起動する（このアプリから開いた Robocode なら開き直す）">Robocode を開く</button>
+    </span>
     </div>
   </div>
 
@@ -1859,10 +1878,30 @@
 
       // 幅が TRASH_MAX_WIDTH より広くならないようにする
       const originalReflow = trashFlyout.reflowInternal_;
+      // 「ゴミ箱を空にする」ボタンの幅（見えていないと測れないので、かくしたまま一瞬だけ出して測る）
+      function emptyTrashButtonWidth() {
+        const shown = emptyTrashButton.style.display === 'block';
+        if (!shown) {
+          emptyTrashButton.style.visibility = 'hidden';
+          emptyTrashButton.style.display = 'block';
+        }
+        const w = emptyTrashButton.offsetWidth || 170;
+        if (!shown) {
+          emptyTrashButton.style.display = 'none';
+          emptyTrashButton.style.visibility = '';
+        }
+        return w;
+      }
+
       trashFlyout.reflowInternal_ = function () {
         originalReflow.call(this);
-        if (this.width_ > TRASH_MAX_WIDTH) {
-          this.width_ = TRASH_MAX_WIDTH;
+        // 小さいブロックだけのときも、「ゴミ箱を空にする」ボタンが入る幅にする
+        const minWidth = Math.min(TRASH_MAX_WIDTH, emptyTrashButtonWidth() + 20);
+        let newWidth = this.width_;
+        if (newWidth > TRASH_MAX_WIDTH) newWidth = TRASH_MAX_WIDTH;   // 広くなりすぎないように
+        if (newWidth < minWidth) newWidth = minWidth;                 // せまくなりすぎないように
+        if (newWidth !== this.width_) {
+          this.width_ = newWidth;
           this.position();
           this.targetWorkspace.resizeContents();
           this.targetWorkspace.recordDragTargets();
@@ -1897,7 +1936,12 @@
         // 「ゴミ箱を空にする」ボタンを、中身の一覧の上（左上）に出す
         const flyoutRect = trashWs.getParentSvg().getBoundingClientRect();
         emptyTrashButton.style.display = 'block';
-        emptyTrashButton.style.left = (flyoutRect.left + 10) + 'px';
+        // 中身の一覧の左上に置く。一覧の右はしや画面の右はしからはみ出すときは、内側に寄せる
+        const buttonWidth = emptyTrashButton.offsetWidth;
+        let buttonLeft = flyoutRect.left + 10;
+        buttonLeft = Math.min(buttonLeft, flyoutRect.right - buttonWidth - 10, window.innerWidth - buttonWidth - 8);
+        buttonLeft = Math.max(buttonLeft, 4);
+        emptyTrashButton.style.left = buttonLeft + 'px';
         emptyTrashButton.style.top = (flyoutRect.top - TRASH_BUTTON_SPACE + 8) + 'px';   // 中身の一覧のすぐ上
         const box = trashWs.getBlocksBoundingBox();
         const contentWidth = (box.right + 20) * trashWs.scale;                    // 中身の幅

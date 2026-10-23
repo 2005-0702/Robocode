@@ -68,9 +68,6 @@
     <ClCompile Include="RobotSample.cpp">
       <Filter>ソース ファイル\category</Filter>
     </ClCompile>
-    <ClCompile Include="RobotSensor.cpp">
-      <Filter>ソース ファイル\category</Filter>
-    </ClCompile>
     <ClCompile Include="RobotControl.cpp">
       <Filter>ソース ファイル\category</Filter>
     </ClCompile>
@@ -80,7 +77,7 @@
     <ClCompile Include="RobotAdvancedMove.cpp">
       <Filter>ソース ファイル\category</Filter>
     </ClCompile>
-    <ClCompile Include="RobotSensorPlus.cpp">
+    <ClCompile Include="RobotSensor.cpp">
       <Filter>ソース ファイル\category</Filter>
     </ClCompile>
     <ClCompile Include="RobotVariable.cpp">
@@ -92,13 +89,13 @@
     <ClCompile Include="RobotColor.cpp">
       <Filter>ソース ファイル\category</Filter>
     </ClCompile>
-    <ClCompile Include="RobotActionValue.cpp">
-      <Filter>ソース ファイル\category</Filter>
-    </ClCompile>
     <ClCompile Include="RobotControlPlus.cpp">
       <Filter>ソース ファイル\category</Filter>
     </ClCompile>
     <ClCompile Include="RobotMathBlocks.cpp">
+      <Filter>ソース ファイル\category</Filter>
+    </ClCompile>
+    <ClCompile Include="RobotJavaClass.cpp">
       <Filter>ソース ファイル\category</Filter>
     </ClCompile>
   </ItemGroup>
