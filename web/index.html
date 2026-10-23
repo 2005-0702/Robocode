@@ -439,6 +439,36 @@
     .message.link:hover { background: #eef3fb; }
 
     /* 囲んで選ぶときの四角 */
+    /* カテゴリの一覧で選んだブロックの、黄色いわく
+       （Blockly の「マウスを乗せたときのわく」とは別にしているので、マウスを動かしても消えない） */
+    .blocklyFlyout .rbPicked > .blocklyPath {
+      stroke: #fc3 !important;
+      stroke-width: 4px !important;
+    }
+    /* カテゴリの一覧のブロックの左上に出す「置いてある数」 */
+    .rbCount circle { fill: #e74c3c; stroke: #fff; stroke-width: 1.5px; }
+    .rbCount text { fill: #fff; font-size: 11px; font-weight: bold; font-family: Meiryo, sans-serif; }
+    /* Ctrl + F：置いてあるブロックをさがす欄 */
+    #findBar {
+      display: none;
+      position: fixed;
+      top: 12px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 2000;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: #2c3e50;
+      color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+      font-size: 14px;
+    }
+    #findBar.open { display: flex; }
+    #findInput { width: 220px; font-size: 14px; padding: 4px 8px; border: none; border-radius: 4px; }
+    #findBar button { border: none; border-radius: 4px; background: #5d6d7e; color: #fff; padding: 4px 9px; cursor: pointer; font-size: 14px; }
+    #findBar button:hover { background: #7f8c8d; }
+    #findCount { min-width: 64px; text-align: center; color: #c8d3de; font-size: 13px; }
     #selectBand {
       position: fixed;
       border: 2px dashed #2980b9;
@@ -514,6 +544,15 @@
 
   <div id="blocklyDiv"></div>
   <div id="trashScroll"><div></div></div>
+  <!-- Ctrl + F：置いてあるブロックをさがす -->
+  <div id="findBar">
+    <span>🔍</span>
+    <input id="findInput" type="text" placeholder="置いてあるブロックをさがす" title="Enter：次へ　Shift + Enter：前へ　Esc：閉じる">
+    <span id="findCount"></span>
+    <button id="findPrev" title="前へ（Shift + Enter）">↑</button>
+    <button id="findNext" title="次へ（Enter）">↓</button>
+    <button id="findClose" title="閉じる（Esc）">✕</button>
+  </div>
   <button id="emptyTrashButton" title="ゴミ箱の中のブロックを全部消します（元に戻せません）">🗑 ゴミ箱を空にする</button>
 
   <!-- 画面を広くしているあいだだけ出るボタン（右上） -->
@@ -1499,6 +1538,7 @@
     }
 
     function searchBlocks(query) {
+      if (typeof clearFlyoutPick === 'function') clearFlyoutPick();
       const flyout = workspace.getToolbox() && workspace.getToolbox().getFlyout();
       if (!flyout) return;
       const words = query.trim().toLowerCase().split(/\s+/).filter(w => w);
@@ -1533,7 +1573,8 @@
     // ------------------------------------------------------------
     // 囲んで消す
     //   Shift を押しながら、作業エリアの何もないところからドラッグすると四角が出る。
-    //   四角の中にすっぽり入ったブロックが選ばれるので、Delete キー（または Backspace）でまとめて消せる。
+    //   四角に少しでもかかったブロックが選ばれるので、Delete キー（または Backspace）でまとめて消せる。
+    //   Ctrl を押しながらブロックをクリックしても、1つずつ選んだり、選ぶのをやめたりできる。
     // ------------------------------------------------------------
     const boxSelected = new Set();   // 囲んで選んだブロック
     let band = null;                 // ドラッグ中の四角 { x, y, div }
@@ -1557,7 +1598,15 @@
     const blocklyArea = document.getElementById('blocklyDiv');
     blocklyArea.addEventListener('pointerdown', (e) => {
       if (!e.shiftKey || e.button !== 0) {
-        if (!e.shiftKey) clearBoxSelection();
+        if (!e.shiftKey && !(e.ctrlKey || e.metaKey)) {
+          // 選んだブロックの上で押したときは、まとめて動かすかもしれないので、まだやめない（離したときに決める）
+          const onSelected = Array.from(boxSelected).some(b => !b.isDeadOrDying() && b.getSvgRoot().contains(e.target));
+          if (onSelected) {
+            pressOnSelected = { x: e.clientX, y: e.clientY };
+          } else {
+            clearBoxSelection();   // Ctrl のときは、選んだものを残す
+          }
+        }
         return;
       }
       // ツールボックスやブロック一覧の上では使わない
@@ -1579,6 +1628,18 @@
       if (band) updateBand(e);
     });
 
+    // 選んだブロックの上で押して、動かさずに離した（ただのクリック）：選ぶのをやめて、そのブロックだけにする
+    let pressOnSelected = null;
+    document.addEventListener('pointerup', (e) => {
+      const press = pressOnSelected;
+      pressOnSelected = null;
+      if (!press) return;
+      if (Math.abs(e.clientX - press.x) <= 4 && Math.abs(e.clientY - press.y) <= 4) {
+        clearBoxSelection();
+        setTimeout(() => { const sel = Blockly.common.getSelected(); if (sel && sel.addSelect) sel.addSelect(); }, 0);
+      }
+    });
+
     document.addEventListener('pointerup', (e) => {
       if (!band) return;
       const x1 = Math.min(band.x, e.clientX), x2 = Math.max(band.x, e.clientX);
@@ -1593,8 +1654,9 @@
 
       workspace.getAllBlocks(false).forEach(block => {
         if (block.isShadow() || !block.isDeletable()) return;
-        const r = block.getBoundingRectangleWithoutChildren();
-        if (r.left >= topLeft.x && r.right <= bottomRight.x && r.top >= topLeft.y && r.bottom <= bottomRight.y) {
+        const r = ownArea(block);
+        // 四角に少しでもかかっていれば選ぶ
+        if (r.left <= bottomRight.x && r.right >= topLeft.x && r.top <= bottomRight.y && r.bottom >= topLeft.y) {
           boxSelected.add(block);
           block.addSelect();
         }
@@ -1602,6 +1664,315 @@
 
       if (boxSelected.size > 0) {
         showStatus('', boxSelected.size + ' 個のブロックを選びました。Delete キーでまとめて消せます');
+      }
+    });
+
+    // ブロック「そのもの」の場所（作業エリアの座標）
+    //   「もし」や「敵を発見したとき」のように中にブロックを入れる口があるブロックは、
+    //   口より上の部分（見出しの行）だけにする。中のブロックを囲んだだけで、外側のブロックまで選ばれないように
+    const STATEMENT_INPUT = (Blockly.inputs && Blockly.inputs.inputTypes) ? Blockly.inputs.inputTypes.STATEMENT : 3;   // 中にブロックを入れる口
+    function ownArea(block) {
+      const r = block.getBoundingRectangleWithoutChildren();
+      const area = { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+      const statement = block.inputList.find(input =>
+        input.type === STATEMENT_INPUT && input.connection && input.connection.targetBlock());
+      if (statement) {
+        const offset = statement.connection.getOffsetInBlock();
+        if (offset && offset.y > 0) area.bottom = Math.min(area.bottom, area.top + offset.y);
+      }
+      return area;
+    }
+
+    // ------------------------------------------------------------
+    // Ctrl + クリックで、ブロックを1つずつ選ぶ（もう一度 Ctrl + クリックで、選ぶのをやめる）
+    //   選んだブロックは、Shift で囲んだときと同じように Delete で消せる・Ctrl + D で複製できる
+    // ------------------------------------------------------------
+    let ctrlClick = null;   // Ctrl を押してクリックし始めたところ { x, y, before }
+    blocklyArea.addEventListener('pointerdown', (e) => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.button !== 0) { ctrlClick = null; return; }
+      if (e.target.closest && e.target.closest('.blocklyFlyout, .blocklyToolboxDiv, .blocklyToolbox')) { ctrlClick = null; return; }
+      ctrlClick = { x: e.clientX, y: e.clientY, before: Blockly.common.getSelected() };
+    }, true);
+    document.addEventListener('pointerup', (e) => {
+      if (!ctrlClick) return;
+      const start = ctrlClick;
+      ctrlClick = null;
+      if (Math.abs(e.clientX - start.x) > 4 || Math.abs(e.clientY - start.y) > 4) return;   // ドラッグしたときは何もしない
+      // Blockly がクリックしたブロックを選び終わってから
+      setTimeout(() => {
+        const block = Blockly.common.getSelected();
+        if (!block || block.workspace !== workspace || block.isShadow() || !block.isDeletable()) return;
+        // 最初の Ctrl + クリックのときは、その前にふつうに選んでいたブロックも入れる
+        const before = start.before;
+        if (boxSelected.size === 0 && before && before !== block && before.workspace === workspace &&
+            !before.isDeadOrDying() && !before.isShadow()) {
+          boxSelected.add(before);
+        }
+        if (boxSelected.has(block)) {
+          boxSelected.delete(block);
+          block.removeSelect();
+          Blockly.common.setSelected(null);
+        } else {
+          boxSelected.add(block);
+        }
+        boxSelected.forEach(b => { if (!b.isDeadOrDying()) b.addSelect(); });
+        showStatus('', boxSelected.size + ' 個のブロックを選んでいます（Delete で消す／Ctrl + D で複製）');
+      }, 0);
+    });
+
+    // ------------------------------------------------------------
+    // ツールボックス（カテゴリの一覧・検索の一覧）で、ブロックをまとめて選んで出す
+    //   ・Shift + クリック：1つ目を選ぶ。もう一度 Shift + クリックすると、そのあいだのブロックを全部選ぶ
+    //   ・Ctrl + クリック ：1つずつ選ぶ／選ぶのをやめる
+    //   選んだブロックのどれかをドラッグして置く（またはダブルクリックする）と、
+    //   選んだブロックが全部、上から順に下につながって出てくる（つなげられないブロックは、そのすぐ下にならべる）
+    //   ・クリック         ：そのブロックを1つ選ぶ（ブロックの画面には出さない）
+    //   ・ダブルクリック・ドラッグ：ブロックの画面に出す
+    // ------------------------------------------------------------
+    const flyoutPick = { list: [], anchor: null };   // 選んだブロック（一覧の上からの順）
+    let flyoutDrop = null;                           // 選んだブロックを持ち出し中 { source, list, newId }
+
+    function toolboxFlyout() {
+      const toolbox = workspace.getToolbox();
+      return toolbox ? toolbox.getFlyout() : null;
+    }
+    // 一覧の中のブロックを、上から順に
+    function flyoutTopBlocks() {
+      const flyout = toolboxFlyout();
+      if (!flyout || !flyout.isVisible()) return [];
+      return flyout.getWorkspace().getTopBlocks(false).filter(b => !b.isDeadOrDying())
+        .sort((a, b) => a.getRelativeToSurfaceXY().y - b.getRelativeToSurfaceXY().y);
+    }
+    // 選んだしるし（黄色いわく）を付ける・外す
+    //   Blockly の addSelect は、一覧ではマウスを乗せたときのわくにも使われていて、
+    //   マウスが離れると消されてしまう。なので、自分の CSS クラス（rbPicked）で付ける
+    function markPicked(block, on) {
+      if (!block || block.isDeadOrDying()) return;
+      const root = block.getSvgRoot();
+      if (root) root.classList.toggle('rbPicked', on);
+    }
+    function clearFlyoutPick() {
+      flyoutPick.list.forEach(b => markPicked(b, false));
+      flyoutPick.list = [];
+      flyoutPick.anchor = null;
+    }
+    function setFlyoutPick(blocks) {
+      flyoutPick.list.forEach(b => markPicked(b, false));
+      const order = flyoutTopBlocks();
+      flyoutPick.list = order.filter(b => blocks.includes(b));   // 一覧の上からの順にそろえる
+      flyoutPick.list.forEach(b => markPicked(b, true));
+      if (flyoutPick.list.length > 1) {
+        showStatus('', flyoutPick.list.length + ' 個のブロックを選びました。どれかをドラッグすると、まとめて出せます');
+      }
+    }
+    // クリックした場所にある、一覧の中のブロック（一番外側）
+    function flyoutBlockAt(e) {
+      const flyout = toolboxFlyout();
+      if (!flyout || !flyout.isVisible()) return null;
+      const flyoutWs = flyout.getWorkspace();
+      const svg = flyoutWs.getParentSvg();
+      if (!svg || !svg.contains(e.target)) return null;
+      const el = e.target.closest && e.target.closest('[data-id]');
+      let block = el ? flyoutWs.getBlockById(el.getAttribute('data-id')) : null;
+      if (!block) {
+        // data-id がないときは、場所でさがす
+        const p = Blockly.utils.svgMath.screenToWsCoordinates(flyoutWs, new Blockly.utils.Coordinate(e.clientX, e.clientY));
+        block = flyoutTopBlocks().find(b => {
+          const r = b.getBoundingRectangle();
+          return p.x >= r.left && p.x <= r.right && p.y >= r.top && p.y <= r.bottom;
+        }) || null;
+      }
+      return block ? block.getRootBlock() : null;
+    }
+
+    blocklyArea.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      const block = flyoutBlockAt(e);
+      if (!block) {
+        // 一覧の何もないところや、ブロックの画面をクリックしたら、選んだものをやめる
+        if (flyoutPick.list.length > 0 && !(e.shiftKey || e.ctrlKey || e.metaKey)) clearFlyoutPick();
+        return;
+      }
+      const shift = e.shiftKey, ctrl = e.ctrlKey || e.metaKey;
+      if (shift || ctrl) {
+        // Blockly にブロックを出させない（選ぶだけにする）
+        e.preventDefault();
+        e.stopPropagation();
+        if (shift && flyoutPick.anchor && !flyoutPick.anchor.isDeadOrDying() && flyoutPick.anchor !== block) {
+          // 1つ目とのあいだを全部選ぶ
+          const order = flyoutTopBlocks();
+          const a = order.indexOf(flyoutPick.anchor), b = order.indexOf(block);
+          if (a >= 0 && b >= 0) setFlyoutPick(order.slice(Math.min(a, b), Math.max(a, b) + 1));
+        } else if (ctrl) {
+          const next = flyoutPick.list.includes(block)
+            ? flyoutPick.list.filter(b => b !== block) : flyoutPick.list.concat([block]);
+          setFlyoutPick(next);
+          flyoutPick.anchor = block;
+        } else {
+          setFlyoutPick([block]);
+          flyoutPick.anchor = block;
+        }
+        return;
+      }
+      // ふつうのクリック：あとで（離したときに）そのブロックを選ぶ
+      flyoutPress = { block: block, x: e.clientX, y: e.clientY };
+      // 選んであるブロックを持ち出すとき：あとで残りのブロックも出す
+      if (flyoutPick.list.length > 1 && flyoutPick.list.includes(block)) {
+        flyoutDrop = { source: block, list: flyoutPick.list.slice(), newId: null };
+      } else {
+        flyoutDrop = null;
+      }
+    }, true);
+
+    // ふつうのクリック（動かさずに離した）：そのブロックを1つ選ぶ（Shift + クリックの1つ目にもなる）
+    //   いくつか選んであって、その中のブロックをクリックしたときは、選んだままにする（そのままダブルクリックで全部出せる）
+    let flyoutPress = null;
+    document.addEventListener('pointerup', (e) => {
+      const press = flyoutPress;
+      flyoutPress = null;
+      if (!press || Math.abs(e.clientX - press.x) > 4 || Math.abs(e.clientY - press.y) > 4) return;
+      if (press.block.isDeadOrDying()) return;
+      if (flyoutPick.list.length > 1 && flyoutPick.list.includes(press.block)) return;
+      setFlyoutPick([press.block]);
+      flyoutPick.anchor = press.block;
+    });
+
+    // 置いたブロックの前後に、選んだほかのブロックを出してつなげる
+    function dropPickedBlocks(newBlock, group) {
+      const plan = flyoutDrop;
+      flyoutDrop = null;
+      if (!plan || !newBlock || newBlock.isDeadOrDying()) return;
+      const index = plan.list.indexOf(plan.source);
+      const make = (flyoutBlock) => {
+        if (flyoutBlock.isDeadOrDying()) return null;
+        const state = Blockly.serialization.blocks.save(flyoutBlock, { addCoordinates: false, saveIds: false });
+        return Blockly.serialization.blocks.append(state, workspace);
+      };
+      const canChain = (upper, lower) => upper && lower && upper.nextConnection && lower.previousConnection &&
+        workspace.connectionChecker.canConnect(upper.nextConnection, lower.previousConnection, false);
+      const lastInStack = (b) => { while (b.getNextBlock()) b = b.getNextBlock(); return b; };
+
+      const oldGroup = Blockly.Events.getGroup();
+      Blockly.Events.setGroup(group || true);   // 「元に戻す」1回で、まとめて戻せるように
+      let made = 0;
+      try {
+        // 下の部分：置いたブロックのすぐ下に、順につなげる
+        let upper = newBlock;
+        let loose = [];   // つなげられなかったブロック
+        plan.list.slice(index + 1).forEach(fb => {
+          const b = make(fb);
+          if (!b) return;
+          made++;
+          if (canChain(upper, b)) {
+            upper.nextConnection.connect(b.previousConnection);
+            upper = b;
+          } else {
+            loose.push(b);
+          }
+        });
+        // 上の部分：置いたブロックの上に、順につなげる
+        const before = plan.list.slice(0, index).map(make).filter(b => b);
+        made += before.length;
+        const chain = [];
+        before.forEach(b => {
+          const last = chain.length ? chain[chain.length - 1] : null;
+          if (!last || canChain(last, b)) {
+            if (last) last.nextConnection.connect(b.previousConnection);
+            chain.push(b);
+          } else {
+            loose.push(b);
+          }
+        });
+        if (chain.length) {
+          const top = chain[0], bottom = chain[chain.length - 1];
+          const parentConnection = newBlock.previousConnection && newBlock.previousConnection.targetConnection;
+          if (parentConnection && top.previousConnection &&
+              workspace.connectionChecker.canConnect(parentConnection, top.previousConnection, false)) {
+            // 置いたブロックがどこかにつながっていたら、そのあいだに入れる（置いたブロックはその下に来る）
+            parentConnection.connect(top.previousConnection);
+          } else if (canChain(bottom, newBlock)) {
+            const xy = newBlock.getRelativeToSurfaceXY();
+            top.moveTo(xy);
+            bottom.nextConnection.connect(newBlock.previousConnection);
+          } else {
+            chain.forEach(b => loose.push(b));
+          }
+        }
+        // つなげられなかったブロックは、そのすぐ下にならべる
+        const base = lastInStack(newBlock.getRootBlock());
+        const xy = newBlock.getRootBlock().getRelativeToSurfaceXY();
+        let y = base.getRelativeToSurfaceXY().y + base.getHeightWidth().height + 20;
+        loose.forEach(b => {
+          if (b.getParent()) return;
+          b.moveTo(new Blockly.utils.Coordinate(xy.x, y));
+          y += b.getHeightWidth().height + 20;
+        });
+      } finally {
+        Blockly.Events.setGroup(oldGroup || false);
+      }
+      clearFlyoutPick();
+      if (made > 0) showStatus('', (made + 1) + ' 個のブロックをまとめて出しました（Ctrl+Z で元に戻せます）');
+    }
+
+    // ---- 1回のクリックでは出さない（Blockly は、一覧のブロックをクリックすると出してしまうため） ----
+    let clickPatchWorked = false;   // 下の置きかえが、ちゃんと使われたか（使われていなければ、ダブルクリックで出さない）
+    (() => {
+      const proto = Blockly.Gesture && Blockly.Gesture.prototype;
+      const name = proto && ['doBlockClick', 'doBlockClick_'].find(n => typeof proto[n] === 'function');
+      if (!name) return;
+      const original = proto[name];
+      proto[name] = function (e) {
+        const flyout = this.flyout || this.flyout_;
+        if (flyout && flyout === toolboxFlyout()) {
+          clickPatchWorked = true;
+          return;   // カテゴリの一覧のブロックは、クリックしただけでは出さない
+        }
+        return original.call(this, e);
+      };
+    })();
+
+    // ダブルクリックで出す
+    blocklyArea.addEventListener('dblclick', (e) => {
+      if (e.shiftKey || e.ctrlKey || e.metaKey) return;   // Shift・Ctrl のときは選ぶだけ
+      if (!clickPatchWorked) return;                      // Blockly がもうクリックで出している
+      const block = flyoutBlockAt(e);
+      const flyout = toolboxFlyout();
+      if (!block || !flyout || !block.isEnabled()) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const picked = flyoutPick.list.length > 1 && flyoutPick.list.includes(block) ? flyoutPick.list.slice() : null;
+      Blockly.Events.setGroup(true);
+      const group = Blockly.Events.getGroup();
+      try {
+        const newBlock = flyout.createBlock(block);
+        if (newBlock.snapToGrid) newBlock.snapToGrid();
+        if (newBlock.bumpNeighbours) newBlock.bumpNeighbours();
+        if (picked) {
+          flyoutDrop = { source: block, list: picked, newId: newBlock.id };
+          dropPickedBlocks(newBlock, group);
+        } else {
+          flyoutDrop = null;
+          clearFlyoutPick();
+        }
+      } finally {
+        Blockly.Events.setGroup(false);
+      }
+    }, true);
+
+    workspace.addChangeListener((e) => {
+      if (e.type === Blockly.Events.TOOLBOX_ITEM_SELECT) clearFlyoutPick();   // ほかのカテゴリを開いたら選び直し
+      if (!flyoutDrop) return;
+      if (e.type === Blockly.Events.BLOCK_CREATE && !flyoutDrop.newId) {
+        const created = workspace.getBlockById(e.blockId);
+        if (!created || created.type !== flyoutDrop.source.type) return;
+        flyoutDrop.newId = e.blockId;
+        // ドラッグしないでクリックだけで出したときは、ここで出す
+        if (!(Blockly.Gesture && Blockly.Gesture.inProgress && Blockly.Gesture.inProgress())) {
+          setTimeout(() => dropPickedBlocks(workspace.getBlockById(flyoutDrop && flyoutDrop.newId), e.group), 0);
+        }
+      }
+      if (e.type === Blockly.Events.BLOCK_DRAG && !e.isStart && flyoutDrop && e.blockId === flyoutDrop.newId) {
+        setTimeout(() => dropPickedBlocks(workspace.getBlockById(e.blockId), e.group), 0);
       }
     });
 
@@ -1715,6 +2086,260 @@
       e.stopPropagation();
       duplicateBlocks();
     }, true);
+
+    // ------------------------------------------------------------
+    // 選んだブロック（Shift で囲んだ・Ctrl + クリックした）を、まとめて動かす
+    //   選んだブロックのどれかをドラッグすると、ほかの選んだブロックもいっしょに動く
+    //   （つながっている途中のブロックは、そこからはずして動かす。下のブロックは上につめる）
+    // ------------------------------------------------------------
+    let groupDrag = null;   // { dragged, start, others: [{ block, start }], pointer: {x, y} }
+    function selectedRoots(except) {
+      // 選んだブロックのうち、親（外側や上）も選ばれているものは、親といっしょに動くので入れない
+      const isInside = (b, set) => { for (let p = b.getParent(); p; p = p.getParent()) if (set.has(p)) return true; return false; };
+      const set = new Set(boxSelected);
+      if (except) set.add(except);
+      return Array.from(boxSelected).filter(b => b !== except && !b.isDeadOrDying() && !isInside(b, set));
+    }
+    let lastPointer = { x: 0, y: 0 };
+    document.addEventListener('pointerdown', (e) => { lastPointer = { x: e.clientX, y: e.clientY }; }, true);
+    document.addEventListener('pointermove', (e) => {
+      if (!groupDrag) return;
+      // ドラッグ中は、見た目だけいっしょに動かす（終わったときに本当に動かす）
+      const scale = workspace.scale || 1;
+      const dx = (e.clientX - groupDrag.pointer.x) / scale, dy = (e.clientY - groupDrag.pointer.y) / scale;
+      groupDrag.others.forEach(o => { if (!o.block.isDeadOrDying()) o.block.translate(o.start.x + dx, o.start.y + dy); });
+    });
+    workspace.addChangeListener((e) => {
+      if (e.type !== Blockly.Events.BLOCK_DRAG) return;
+      const block = workspace.getBlockById(e.blockId);
+      if (e.isStart) {
+        if (!block || boxSelected.size < 2 || !boxSelected.has(block)) { groupDrag = null; return; }
+        const others = selectedRoots(block).filter(b => !b.isDeadOrDying());
+        // つながっている途中のブロックは、先にはずす（はずすと位置が変わらないように、今の位置をおぼえてから）
+        const startOf = (b) => b.getRelativeToSurfaceXY();
+        const list = others.map(b => ({ block: b, start: startOf(b) }));
+        const oldGroup = Blockly.Events.getGroup();
+        Blockly.Events.setGroup(e.group || true);
+        try {
+          list.forEach(o => { if (o.block.getParent()) { o.block.unplug(true); o.block.moveTo(o.start); } });
+        } finally {
+          Blockly.Events.setGroup(oldGroup || false);
+        }
+        groupDrag = { dragged: block, start: startOf(block), others: list, pointer: { ...lastPointer } };
+        // 消すブロック（ゴミ箱に入れたとき）に、ほかのブロックが巻きこまれないように、ドラッグ中だけ選ぶのをやめない
+      } else if (groupDrag && block === groupDrag.dragged) {
+        const plan = groupDrag;
+        groupDrag = null;
+        setTimeout(() => {
+          const end = plan.dragged.isDeadOrDying() ? null : plan.dragged.getRelativeToSurfaceXY();
+          const oldGroup = Blockly.Events.getGroup();
+          Blockly.Events.setGroup(e.group || true);
+          try {
+            plan.others.forEach(o => {
+              if (o.block.isDeadOrDying()) return;
+              o.block.translate(o.start.x, o.start.y);   // 見た目を元の位置にもどしてから
+              if (end) o.block.moveBy(end.x - plan.start.x, end.y - plan.start.y);   // 本当に動かす（元に戻せる）
+            });
+          } finally {
+            Blockly.Events.setGroup(oldGroup || false);
+          }
+          boxSelected.forEach(b => { if (!b.isDeadOrDying()) b.addSelect(); });
+        }, 0);
+      }
+    });
+
+    // ------------------------------------------------------------
+    // コピー（Ctrl + C）・はりつけ（Ctrl + V）
+    //   選んだブロックがいくつかあるときは、まとめてコピーする（1つだけのときは Blockly のコピーを使う）
+    // ------------------------------------------------------------
+    let groupClipboard = null;   // { states: [ブロックの JSON], pasteCount }
+    function copyGroup() {
+      const roots = selectedRoots(null);
+      groupClipboard = {
+        pasteCount: 0,
+        states: roots.map(block => {
+          const state = Blockly.serialization.blocks.save(block, { addCoordinates: true, addNextBlocks: true, saveIds: false });
+          // 下につながっているブロックは、選んだものが続いているところまでにする
+          let st = state, b = block;
+          while (st.next && st.next.block) {
+            const next = b.getNextBlock();
+            if (!next || !boxSelected.has(next)) { delete st.next; break; }
+            st = st.next.block;
+            b = next;
+          }
+          return state;
+        }),
+      };
+      showStatus('', groupClipboard.states.length + ' 個のまとまりをコピーしました（Ctrl + V ではりつけ）');
+    }
+    function pasteGroup() {
+      groupClipboard.pasteCount++;
+      const offset = 30 * groupClipboard.pasteCount;   // はりつけるたびに、少しずつ右下にずらす
+      const created = [];
+      Blockly.Events.setGroup(true);
+      try {
+        groupClipboard.states.forEach(state => {
+          const s2 = JSON.parse(JSON.stringify(state));
+          s2.x = (s2.x || 0) + offset;
+          s2.y = (s2.y || 0) + offset;
+          created.push(Blockly.serialization.blocks.append(s2, workspace));
+        });
+      } finally {
+        Blockly.Events.setGroup(false);
+      }
+      clearBoxSelection();
+      created.forEach(b => { boxSelected.add(b); b.addSelect(); });
+      showStatus('', created.length + ' 個のまとまりをはりつけました（Ctrl+Z で元に戻せます）');
+    }
+    document.addEventListener('keydown', (e) => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+      const key = e.key.toLowerCase();
+      if (key !== 'c' && key !== 'v') return;
+      const tag = (document.activeElement && document.activeElement.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;   // 入力欄の文字のコピー・はりつけはそのまま
+      if (key === 'c') {
+        if (boxSelected.size > 1) {
+          e.preventDefault(); e.stopPropagation();
+          copyGroup();
+        } else {
+          groupClipboard = null;   // 1つだけのときは Blockly のコピーにまかせる（はりつけも Blockly）
+        }
+      } else if (groupClipboard) {
+        e.preventDefault(); e.stopPropagation();
+        pasteGroup();
+      }
+    }, true);
+
+    // ------------------------------------------------------------
+    // カテゴリの一覧のブロックの左上に、そのブロックを今いくつ置いているかを出す
+    // ------------------------------------------------------------
+    function countKey(block) {
+      const t = block.type;
+      if (t === 'procedures_callnoreturn' || t === 'procedures_callreturn') {
+        return t + ':' + (block.getFieldValue('NAME') || '');
+      }
+      if (t === 'variables_get' || t === 'variables_set') return t + ':' + (block.getFieldValue('VAR') || '');
+      if (t === 'robot_variable_get' || t === 'robot_variable_assign') return t + ':' + (block.getFieldValue('NAME') || '');
+      return t;
+    }
+    function updateFlyoutCounts() {
+      const flyout = toolboxFlyout();
+      if (!flyout || !flyout.isVisible()) return;
+      const counts = new Map();
+      workspace.getAllBlocks(false).forEach(b => {
+        if (b.isShadow() || b.isInsertionMarker()) return;
+        const k = countKey(b);
+        counts.set(k, (counts.get(k) || 0) + 1);
+      });
+      const SVG = 'http://www.w3.org/2000/svg';
+      flyout.getWorkspace().getTopBlocks(false).forEach(b => {
+        const root = b.getSvgRoot();
+        if (!root) return;
+        const old = root.querySelector(':scope > .rbCount');
+        if (old) old.remove();
+        const n = counts.get(countKey(b)) || 0;
+        if (n === 0) return;   // 1つも置いていないときは出さない
+        const g = document.createElementNS(SVG, 'g');
+        g.setAttribute('class', 'rbCount');
+        g.setAttribute('transform', 'translate(-2, -2)');
+        const label = n > 99 ? '99+' : String(n);
+        const r = label.length > 1 ? 10 : 8;
+        const c = document.createElementNS(SVG, 'circle');
+        c.setAttribute('r', String(r));
+        const tx = document.createElementNS(SVG, 'text');
+        tx.setAttribute('text-anchor', 'middle');
+        tx.setAttribute('dominant-baseline', 'central');
+        tx.textContent = label;
+        g.append(c, tx);
+        const title = document.createElementNS(SVG, 'title');
+        title.textContent = 'ブロックの画面に ' + n + ' 個置いています';
+        g.appendChild(title);
+        root.appendChild(g);
+      });
+    }
+    // 一覧を開いたとき・ブロックが増えたり減ったりしたときに、数を書き直す
+    (() => {
+      const flyout = toolboxFlyout();
+      if (flyout && !flyout._rbCountInstalled) {
+        const originalShow = flyout.show;
+        flyout.show = function (...args) {
+          const result = originalShow.apply(this, args);
+          setTimeout(updateFlyoutCounts, 0);
+          return result;
+        };
+        flyout._rbCountInstalled = true;
+      }
+      let countTimer = null;
+      workspace.addChangeListener((e) => {
+        if (e.isUiEvent) return;
+        clearTimeout(countTimer);
+        countTimer = setTimeout(updateFlyoutCounts, 50);
+      });
+    })();
+
+    // ------------------------------------------------------------
+    // Ctrl + F：置いてあるブロックを、書いてある文字でさがして、そこへ移動する
+    //   Enter で次、Shift + Enter で前、Esc で閉じる
+    // ------------------------------------------------------------
+    const findBar = document.getElementById('findBar');
+    const findInput = document.getElementById('findInput');
+    const findCount = document.getElementById('findCount');
+    let findHits = [], findIndex = -1;
+    function blockText(block) {
+      // そのブロックに書いてある文字（中や下のブロックの文字は入れない）
+      const parts = [];
+      block.inputList.forEach(input => input.fieldRow.forEach(f => { const t = f.getText && f.getText(); if (t) parts.push(t); }));
+      return parts.join(' ').toLowerCase();
+    }
+    function runFind(keepIndex) {
+      const words = findInput.value.trim().toLowerCase().split(/\s+/).filter(w => w);
+      if (words.length === 0) { findHits = []; findIndex = -1; findCount.textContent = ''; return; }
+      findHits = workspace.getAllBlocks(true)   // true：画面の上から順
+        .filter(b => !b.isShadow() && words.every(w => blockText(b).includes(w)));
+      if (!keepIndex) findIndex = -1;
+      if (findHits.length === 0) { findCount.textContent = 'ありません'; return; }
+      showFind(keepIndex ? Math.min(findIndex, findHits.length - 1) : 0);
+    }
+    function showFind(index) {
+      if (findHits.length === 0) return;
+      findIndex = (index + findHits.length) % findHits.length;
+      const block = findHits[findIndex];
+      findCount.textContent = (findIndex + 1) + ' / ' + findHits.length;
+      if (block.isDeadOrDying()) return;
+      workspace.centerOnBlock(block.id);
+      Blockly.common.setSelected(block);   // わくを付けて、どれか分かるようにする
+    }
+    function openFind() {
+      findBar.classList.add('open');
+      findInput.focus();
+      findInput.select();
+      if (findInput.value.trim()) runFind(false);
+    }
+    function closeFind() {
+      findBar.classList.remove('open');
+      findInput.blur();
+    }
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault(); e.stopPropagation();   // ブラウザの「ページ内検索」ではなく、ブロックをさがす
+        openFind();
+      }
+    }, true);
+    findInput.addEventListener('input', () => runFind(false));
+    findInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); showFind(findIndex + (e.shiftKey ? -1 : 1)); }
+      else if (e.key === 'Escape') { e.preventDefault(); closeFind(); }
+    });
+    document.getElementById('findNext').addEventListener('click', () => showFind(findIndex + 1));
+    document.getElementById('findPrev').addEventListener('click', () => showFind(findIndex - 1));
+    document.getElementById('findClose').addEventListener('click', closeFind);
+    // ブロックが増えたり消えたりしたら、さがし直す（開いているときだけ）
+    workspace.addChangeListener((e) => {
+      if (e.isUiEvent || !findBar.classList.contains('open')) return;
+      if (e.type === Blockly.Events.BLOCK_CREATE || e.type === Blockly.Events.BLOCK_DELETE || e.type === Blockly.Events.BLOCK_CHANGE) {
+        runFind(true);
+      }
+    });
 
     // ------------------------------------------------------------
     // 元に戻す（Ctrl + Z）・やり直す（Ctrl + Y）
