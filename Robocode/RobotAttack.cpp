@@ -21,8 +21,6 @@ ROBOCODE_BLOCKS(RobotAttack)
             double v = std::strtod(t.c_str(), &end);
             if (end != t.c_str() && *end == '\0' && (v < 0.1 || v > 3))
                 b.error("パワーは0.1～3にしてください");
-        
         })
         .java("fire({POWER});");                           // 作られるJava（{POWER} に入力した数字が入る）
- 
 }
