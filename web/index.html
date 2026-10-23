@@ -1227,7 +1227,9 @@
         const variableUseBlockTypes = ['robot_variable_assign', 'robot_variable_get'];
         const variableUseBlockNamesInstalled = new Set();
         function getDeclaredVariableBlocks(block) {
-          const workspace = block && block.workspace;
+          let workspace = block && block.workspace;
+          // ツールボックスや検索の一覧（フライアウト）の中のブロックは、ブロックの画面の宣言から選ぶ
+          if (workspace && workspace.isFlyout && workspace.targetWorkspace) workspace = workspace.targetWorkspace;
           if (!workspace) return [];
           return workspace.getAllBlocks(false)
             .filter(candidate => candidate.type === 'robot_variable_declare')
@@ -1455,6 +1457,47 @@
       walk(setup.toolbox && setup.toolbox.contents, '');
     }
 
+    // 自分で作った関数・変数も、検索で出てくるようにする（検索するたびに、今のブロックの画面から集める）
+    function userSearchEntries() {
+      const entries = [];
+      const add = (item, words) => entries.push({ item: item, words: words.toLowerCase() });
+
+      // 関数：「関数を作る」ブロックと、作った関数を呼ぶブロック
+      add({ kind: 'block', type: 'procedures_defnoreturn' }, '関数を作る 関数 function procedure');
+      add({ kind: 'block', type: 'procedures_defreturn' }, '値を返す関数を作る 関数 function procedure return');
+      if (Blockly.Procedures && Blockly.Procedures.allProcedures) {
+        const [noReturn, withReturn] = Blockly.Procedures.allProcedures(workspace);
+        noReturn.concat(withReturn).forEach(([name, params, hasReturn]) => {
+          add({ kind: 'block', type: hasReturn ? 'procedures_callreturn' : 'procedures_callnoreturn',
+                extraState: { name: name, params: params } },
+              name + ' ' + params.join(' ') + ' 関数 呼ぶ 自分で作った');
+        });
+      }
+
+      // 変数（「変数を宣言する」で作ったもの）：値を使うブロックと、代入するブロック
+      const declared = new Set(workspace.getAllBlocks(false)
+        .filter(b => b.type === 'robot_variable_declare')
+        .map(b => String(b.getFieldValue('NAME') || '').trim())
+        .filter(name => /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name)));
+      declared.forEach(name => {
+        if (Blockly.Blocks['robot_variable_get']) {
+          add({ kind: 'block', type: 'robot_variable_get', fields: { NAME: name } }, name + ' 変数 自分で作った');
+        }
+        if (Blockly.Blocks['robot_variable_assign']) {
+          add({ kind: 'block', type: 'robot_variable_assign', fields: { NAME: name } }, name + ' 変数 代入 自分で作った');
+        }
+      });
+
+      // 変数（Java の読みこみや、関数の引数でできた Blockly の変数）
+      //   id・名前・種類を全部わたしておくと、一覧からドラッグしたときに、ブロックの画面の同じ変数になる
+      workspace.getAllVariables().forEach(v => {
+        const variable = { id: v.getId(), name: v.name, type: v.type || '' };
+        add({ kind: 'block', type: 'variables_get', fields: { VAR: variable } }, v.name + ' 変数 自分で作った');
+        add({ kind: 'block', type: 'variables_set', fields: { VAR: variable } }, v.name + ' 変数 代入 にする 自分で作った');
+      });
+      return entries;
+    }
+
     function searchBlocks(query) {
       const flyout = workspace.getToolbox() && workspace.getToolbox().getFlyout();
       if (!flyout) return;
@@ -1464,7 +1507,8 @@
         return;
       }
       // スペースで区切ったら、全部の言葉に当てはまるものだけ出す
-      const hits = searchIndex.filter(entry => words.every(w => entry.words.includes(w)));
+      // 自分で作った関数・変数を先に、そのあとにふつうのブロックを出す
+      const hits = userSearchEntries().concat(searchIndex).filter(entry => words.every(w => entry.words.includes(w)));
       workspace.getToolbox().clearSelection();
       if (hits.length === 0) {
         flyout.show([{ kind: 'label', text: '「' + query.trim() + '」のブロックは見つかりませんでした' }]);
