@@ -95,9 +95,6 @@
     <ClCompile Include="RobotMathBlocks.cpp">
       <Filter>ソース ファイル\category</Filter>
     </ClCompile>
-    <ClCompile Include="RobotJavaClass.cpp">
-      <Filter>ソース ファイル\category</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Robocode.rc">
