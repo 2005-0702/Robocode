@@ -42,7 +42,7 @@
 //%1 ・・
 ROBOCODE_BLOCKS(RobotEvent)
 {
-    //通常時の処理
+    //①通常時の処理
     Block("robot_event_run")
         .category("イベント")
         .text("スタートしたら、ずっと %1")
@@ -55,8 +55,8 @@ ROBOCODE_BLOCKS(RobotEvent)
             "    }\n"
             "}");
 
-
-    //敵を発見したとき
+    
+    //②敵を発見したとき(敵の名前、距離、向き、エネルギーなどの情報を使える)
     Block("robot_event_enemyDetected")
         .category("イベント")
         .text("敵を発見したとき %1")
@@ -67,7 +67,62 @@ ROBOCODE_BLOCKS(RobotEvent)
             " {D0}\n"
             "}");
 
-    // 壁にぶつかったとき
+    //③敵に弾が命中時の処理
+    Block("robot_event_bulletHit")
+        .category("イベント")
+        .text("弾が敵に命中したとき %1")
+        .tooltip("自分の弾が敵ロボットに命中したときに実行します")
+        .statements("D0")
+        .event()
+        .java("public void onBulletHit(BulletHitEvent e) {\n"
+            " {D0}\n"
+            "}");
+
+    //④弾がはずれ時 
+    Block("robot_event_bulletMissed")
+        .category("イベント")
+        .text("弾がはずれたとき %1")
+        .tooltip("自分の弾が何にも命中しなかったときに実行します")
+        .statements("D0")
+        .event()
+        .java("public void onBulletMissed(BulletMissedEvent e) {\n"
+            " {D0}\n"
+            "}");
+
+    //⑤敵の弾に当たったとき 
+    Block("robot_event_hitByBullet")
+        .category("イベント")
+        .text("敵の弾に当たったとき %1")
+        .tooltip("敵ロボットの弾が自分のロボットに命中したときに実行します")
+        .statements("D0")
+        .event()
+        .java("public void onHitByBullet(HitByBulletEvent e) {\n"
+            " {D0}\n"
+            "}");
+
+    // ⑥弾同士が当たったとき
+    Block("robot_event_bulletHitBullet")
+        .category("イベント")
+        .text("弾同士がぶつかったとき %1")
+        .tooltip("自分のロボットの弾と敵ロボットの弾がぶつかったときに実行します")
+        .statements("D0")
+        .event()
+        .java("public void onBulletHitBullet(BulletHitBulletEvent e) {\n"
+            "    {D0}\n"
+            "}");
+
+    //⑦敵と衝突時 
+    Block("robot_event_hitEnemy")
+        .category("イベント")
+        .text("ロボットにぶつかったとき %1")
+        .tooltip("自分のロボットが敵ロボットと衝突したときに実行します")
+        .statements("D0")
+        .event()
+        .java("public void onHitRobot(HitRobotEvent e) {\n"
+            " {D0}\n"
+            "}");
+
+    //⑧壁にぶつかったとき
     Block("robot_event_hitWall")
         .category("イベント")
         .text("壁にぶつかったとき %1")
@@ -78,41 +133,18 @@ ROBOCODE_BLOCKS(RobotEvent)
             "{D0}\n"
             "}");
 
-    // 命中時の処理
-    Block("robot_event_bulletHit")
+    //⑨敵破壊時 
+    Block("robot_event_enemyDestroyed")
         .category("イベント")
-        .text("弾が命中したとき %1")
-        .tooltip("自分の弾が敵ロボットに命中したときに実行します")
+        .text("敵ロボットが破壊されたとき %1")
+        .tooltip("敵ロボットが破壊されたときに実行します")
         .statements("D0")
         .event()
-        .java("public void onBulletHit(BulletHitEvent e) {\n"
+        .java("public void onRobotDeath(RobotDeathEvent e) {\n"
             " {D0}\n"
             "}");
 
-   // はずれ時 
-   Block("robot_event_bulletMissed")
-       .category("イベント")
-       .text("弾がはずれたとき %1")
-       .tooltip("自分の弾が敵に命中しなかったときに実行します")
-       .statements("D0")
-       .event()
-       .java("public void onBulletMissed(BulletMissedEvent e) {\n"
-           " {D0}\n"
-           "}");
-
-
-   // 弾同士が衝突したとき 
-    /*  Block("robot_event_bulletCollision")
-        .category("イベント")
-        .text("弾同士が衝突したとき %1")
-        .tooltip("自分の弾が敵の弾と衝突したときに実行します")
-        .statements("D0")
-        .event()
-        .java("public void onBulletHitBullet(BulletHitBulletEvent event) {\n"
-            " {D0}\n"
-            "}");*/
-
-    // 自機破壊時 
+    //⑩自機破壊時 
     Block("robot_event_destroyed")
         .category("イベント")
         .text("自分のロボットが破壊されたとき %1")
@@ -123,40 +155,7 @@ ROBOCODE_BLOCKS(RobotEvent)
             " {D0}\n"
             "}");
 
-    // 被弾時 
-    Block("robot_event_hitByBullet")
-        .category("イベント")
-        .text("弾に当たったとき %1")
-        .tooltip("敵の弾が自分のロボットに命中したときに実行します")
-        .statements("D0")
-        .event()
-        .java("public void onHitByBullet(HitByBulletEvent e) {\n"
-            " {D0}\n"
-            "}");
-
-    // 敵と衝突時 
-    Block("robot_event_hitEnemy")
-        .category("イベント")
-        .text("ロボットにぶつかったとき %1")
-        .tooltip("ほかのロボットと衝突したときに実行します")
-        .statements("D0")
-        .event()
-        .java("public void onHitRobot(HitRobotEvent e) {\n"
-            " {D0}\n"
-            "}");
-
-    // 敵破壊時 
-    Block("robot_event_enemyDestroyed")
-        .category("イベント")
-        .text("敵ロボットが破壊されたとき %1")
-        .tooltip("ほかのロボットが破壊されたときに実行します")
-        .statements("D0")
-        .event()
-        .java("public void onRobotDeath(RobotDeathEvent e) {\n"
-            " {D0}\n"
-            "}");
-
-    // 勝利時
+    //⑪勝利時
     Block("robot_event_win")
         .category("イベント")
         .text("勝利したとき %1")
@@ -166,6 +165,21 @@ ROBOCODE_BLOCKS(RobotEvent)
         .java("public void onWin(WinEvent e) {\n"
             " {D0}\n"
             "}");
-   
+
+  
+    ///その他の応用イベント
+    /*
+       onStatus	現在のロボットの状態が通知された	エネルギーや位置を確認する
+       onRoundEnded	1ラウンドが終了した	ラウンドごとの結果を記録する
+       onBattleEnde バトル全体が終了した	試合全体の結果を確認する
+       onSkippedTurn 処理が間に合わず、自分の行動ターンが飛ばされた	処理が重い原因を調べる
+     */
+
+    /*
+    イベント名	中学生向けの説明
+        onCustomEvent	自分で決めた条件が成立したとき
+        onMessageReceived	チームの仲間などからメッセージを受け取ったとき
+        onPaint	ロボットの画面を描画するとき
+        onRoundStarted	新しいラウンドが始まったとき*/
    
 }

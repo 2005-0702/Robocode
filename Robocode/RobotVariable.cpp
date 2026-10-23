@@ -134,16 +134,6 @@ ROBOCODE_BLOCKS(RobotVariable)
         .java("{NAME}")
         .tooltip("宣言した変数を選び、その変数の値を計算や比較に使います。");
 
-
-
-    // double 型の初期値などに接続して使える定数ブロック
-    Block("robot_double_max_value")
-        .category("計算")
-        .text("double 型の最大値（Double.MAX_VALUE）")
-        .output("Number")
-        .java("Double.MAX_VALUE")
-        .tooltip("double 型で表せる最大の有限値です。変数の初期値の穴にも接続できます。");
-
     // ④-② 特殊な初期値を持つ変数（Double.MAX_VALUE）
     // Java クラス直下のフィールドとして出力します。
     Block("robot_variable_target_distance")

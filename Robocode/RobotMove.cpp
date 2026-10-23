@@ -3,6 +3,8 @@
 // 
 // 
 //  2026/10/16 片山 サンプルコード追加
+//  2026/10/22 片山 setAdjustをちゃんと使えるようにする
+// 
 // =====================================================================
 #include "RobocodeBlocks.h"
 
@@ -27,14 +29,34 @@ ROBOCODE_BLOCKS(RobotMove)
     // 車体・砲塔・レーダーを独立して動かす
     Block("robot_keep_direction")
         .category("動き")
-        .text("%1 をする ")
+        .text("%1 をする %2")
         .dropdown("PART", {
-            {"レーダーを車体から独立","setAdjustRadarForRobotTurn"},
-            {"砲塔を車体から独立","setAdjustGunForRobotTurn"},
-            {"レーダーを砲塔から独立","setAdjustRadarForGunTurn"} })
-            .tooltip("車体や砲塔が回っても、えらんだ部分はつられて回らなくなります。"
+            {"レーダーを車体から独立","RADAR_ROBOT"},
+            {"砲塔を車体から独立","GUN_ROBOT"},
+            {"レーダーを砲塔から独立","RADAR_GUN"} })
+        .dropdown("ENABLED", {
+            {"有効", "true"},
+            {"無効", "false"}
+                })
+        .tooltip("車体や砲塔が回っても、選んだ部分はつられて回らなくなります。"
                 "「スタートしたら」の最初に置くと、ずっとその設定になります")
-        .java("{PART};");
+       
+        .javaFunction([](BlockData& data) -> std::string {
+        const std::string part = data.text("PART");
+        const std::string enabled = data.text("ENABLED");
+
+        if (part == "RADAR_ROBOT") {
+            return "setAdjustRadarForRobotTurn(" + enabled + ");";
+        }
+        else if (part == "GUN_ROBOT") {
+            return "setAdjustGunForRobotTurn(" + enabled + ");";
+        }
+        else if (part == "RADAR_GUN") {
+            return "setAdjustRadarForGunTurn(" + enabled + ");";
+        }
+
+        return "";
+        });
 
 
     //===============
