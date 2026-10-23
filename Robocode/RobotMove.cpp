@@ -24,6 +24,16 @@ ROBOCODE_BLOCKS(RobotMove)
         .tooltip("後ろに下がります。マイナスだと前に進みます")
         .java("back({DIST})");
 
+
+    // 車体・砲塔・レーダーを 〇 度 右に回す
+    Block("act_turn_right")
+        .category("動き")
+        .text("%1 を右に %2 度回す")
+        .dropdown("PART", { {"車体", "turnRight"}, {"砲塔", "turnGunRight"}, {"レーダー", "turnRadarRight"} })
+        .valueInput("ANGLE", "Number")
+        .tooltip("右に回します。マイナスを入れると左に回ります")
+        .java("{PART}({ANGLE});");
+
     // 車体・砲塔・レーダーを独立して動かす
     Block("robot_keep_direction")
         .category("動き")
