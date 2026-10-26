@@ -237,6 +237,25 @@ static std::string HandleMessageFromBlockly(const std::string& text) {
             }
         }
     }
+    // 「サンプルのロボット」：画面から届いた Java の文字を、ブロックにもどす（ファイルは開かない）
+    //   届く形：{ "kind": "importJavaText", "java": "public class … { … }" }
+    //   返す形：「Java を読みこむ」と同じ { "kind": "imported", … }
+    else if (kind == "importJavaText") {
+        reply["kind"] = "imported";
+        reply["canceled"] = false;
+        reply["path"] = "";
+        rb::ImportResult imported = rb::ConvertFromJava(msg.value("java", ""));
+        reply["ok"] = imported.ok;
+        reply["error"] = imported.ok ? "" : "ブロックにできませんでした：" + imported.error;
+        if (imported.ok) {
+            reply["workspace"] = json::parse(imported.workspaceJson);
+            reply["robotName"] = imported.robotName;
+            reply["package"] = imported.packageName;
+            reply["converted"] = imported.convertedBlocks;
+            reply["raw"] = imported.rawBlocks;
+            reply["notes"] = imported.notes;
+        }
+    }
     // 「保存した場所」をクリック：エクスプローラーで、そのファイルを選んだ状態でフォルダを開く
    //   届く形：{ "kind": "showInFolder", "path": "C:\\robocode\\robots\\student\\MyRobot.java" }
    //   返事はしない

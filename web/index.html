@@ -469,6 +469,83 @@
     #findBar button { border: none; border-radius: 4px; background: #5d6d7e; color: #fff; padding: 4px 9px; cursor: pointer; font-size: 14px; }
     #findBar button:hover { background: #7f8c8d; }
     #findCount { min-width: 64px; text-align: center; color: #c8d3de; font-size: 13px; }
+    #toolbar button.icon.emoji { font-size: 22px; line-height: 1; }
+    /* ---------- チュートリアル ---------- */
+    #tutSpot {
+      display: none;
+      position: fixed;
+      z-index: 2500;
+      border-radius: 8px;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+      outline: 3px solid #f1c40f;
+      pointer-events: none;          /* 下の画面はそのまま操作できる */
+      transition: all 0.25s;
+    }
+    #tutSpot.none { box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45); outline: none; width: 0; height: 0; }
+    /* ブロックを置くステップ：画面を暗くしない（置く場所が見えるように）。光らせる枠だけ出す */
+    #tutSpot.soft { box-shadow: 0 0 0 4px rgba(241, 196, 15, 0.35); }
+    /* ブロックを置くステップのカード：小さめにして、ブロックの画面のじゃまにならない場所に置く */
+    #tutCard.docked { width: 300px; padding: 12px 14px 10px; font-size: 13px; transition: opacity 0.15s; }
+    #tutCard.docked h3 { font-size: 15px; }
+    /* ブロックを置くステップ：開くカテゴリのわくを点滅させる */
+    #tutSpot.soft { animation: rbSpotBlink 0.9s ease-in-out infinite; }
+    @keyframes rbSpotBlink {
+      0%, 100% { outline-color: #f1c40f; box-shadow: 0 0 0 4px rgba(241, 196, 15, 0.45); }
+      50%      { outline-color: rgba(241, 196, 15, 0.15); box-shadow: 0 0 0 4px rgba(241, 196, 15, 0); }
+    }
+    /* ブロックを置くステップ：一覧の中の「置くブロック」を点滅させる */
+    .blocklyFlyout .rbTutBlink > .blocklyPath {
+      stroke: #ffcc00 !important;
+      stroke-width: 5px !important;
+      animation: rbBlockBlink 0.9s ease-in-out infinite;
+    }
+    .blocklyFlyout .rbTutBlink { animation: rbBlockGlow 0.9s ease-in-out infinite; }
+    @keyframes rbBlockBlink { 0%, 100% { stroke-opacity: 1; } 50% { stroke-opacity: 0.15; } }
+    @keyframes rbBlockGlow {
+      0%, 100% { filter: drop-shadow(0 0 6px rgba(255, 204, 0, 0.95)); }
+      50%      { filter: drop-shadow(0 0 0 rgba(255, 204, 0, 0)); }
+    }
+    /* ドラッグしているあいだは、カードをうすくして、マウスが通りぬけるようにする */
+    #tutCard.passthrough { opacity: 0.25; pointer-events: none; }
+    #tutCard {
+      display: none;
+      position: fixed;
+      z-index: 2600;
+      width: 360px;
+      max-width: calc(100vw - 32px);
+      box-sizing: border-box;
+      padding: 16px 18px 12px;
+      background: #fff;
+      color: #222;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    #tutCard h3 { margin: 0 0 6px; font-size: 16px; color: #2c3e50; }
+    #tutCard .tutText { margin: 0 0 8px; }
+    #tutCard .tutWait { margin: 0 0 8px; padding: 6px 10px; border-radius: 6px; background: #fff7d6; color: #7a5b00; font-size: 13px; }
+    #tutCard .tutWait.done { background: #e8f8ee; color: #1e7e34; }
+    #tutCard .tutFoot { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+    #tutCard .tutFoot .tutStep { flex: 1; color: #888; font-size: 12px; }
+    #tutCard button { border: none; border-radius: 6px; padding: 6px 12px; font-size: 14px; cursor: pointer; background: #5d6d7e; color: #fff; }
+    #tutCard button.primary { background: #27ae60; }
+    #tutCard button:disabled { opacity: 0.4; cursor: default; }
+    /* ---------- サンプルのロボット ---------- */
+    #sampleOverlay { position: fixed; inset: 0; z-index: 2400; display: none; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.45); }
+    #sampleOverlay.open { display: flex; }
+    #sampleDialog { width: 640px; max-width: calc(100vw - 32px); max-height: calc(100vh - 48px); overflow: auto; box-sizing: border-box;
+      background: #fff; border-radius: 14px; padding: 18px 20px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4); }
+    #sampleDialog h3 { margin: 0 0 4px; font-size: 18px; color: #2c3e50; }
+    #sampleDialog .sampleLead { margin: 0 0 12px; color: #555; font-size: 13px; }
+    .sampleCard { border: 1px solid #dfe4ea; border-radius: 10px; padding: 10px 14px; margin-bottom: 10px; }
+    .sampleCard .sampleHead { display: flex; align-items: center; gap: 8px; }
+    .sampleCard .sampleName { font-weight: bold; font-size: 15px; flex: 1; }
+    .sampleCard .sampleLevel { color: #e67e22; font-size: 13px; white-space: nowrap; }
+    .sampleCard p { margin: 6px 0; font-size: 13px; line-height: 1.6; }
+    .sampleCard ul { margin: 4px 0 0; padding-left: 20px; font-size: 13px; color: #1f5f8b; }
+    .sampleCard button { border: none; border-radius: 6px; padding: 6px 14px; background: #27ae60; color: #fff; cursor: pointer; font-size: 14px; }
+    #sampleClose { float: right; border: none; background: #5d6d7e; color: #fff; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
     #selectBand {
       position: fixed;
       border: 2px dashed #2980b9;
@@ -515,6 +592,12 @@
 
     <span class="sep"></span>
 
+    <!-- チュートリアルとサンプル -->
+    <button id="tutorialButton" class="sub icon emoji" data-tip="チュートリアル：ロボットの作り方の案内を始めます" aria-label="チュートリアル">❓</button>
+    <button id="sampleButton" class="sub icon emoji" data-tip="サンプル：見本のロボットを開いて参考にできます" aria-label="サンプルのロボット">🤖</button>
+
+    <span class="sep"></span>
+
     <!-- ブロックを名前で探す -->
     <input id="searchBox" type="search" placeholder="🔍ブロックを検索 "
            title="ブロックの名前の一部を入れると、当てはまるブロックが出てきます（Esc で閉じる）">
@@ -544,6 +627,31 @@
 
   <div id="blocklyDiv"></div>
   <div id="trashScroll"><div></div></div>
+  <!-- チュートリアル：光らせる枠と説明のカード -->
+  <div id="tutSpot"></div>
+  <div id="tutCard" role="dialog" aria-live="polite">
+    <h3 id="tutTitle"></h3>
+    <p class="tutText" id="tutText"></p>
+    <p class="tutWait" id="tutWait"></p>
+    <div class="tutFoot">
+      <span class="tutStep" id="tutStep"></span>
+      <button id="tutQuit">やめる</button>
+      <button id="tutBack">もどる</button>
+      <button id="tutNext" class="primary">次へ</button>
+    </div>
+  </div>
+
+  <!-- サンプルのロボットを選ぶ画面 -->
+  <div id="sampleOverlay">
+    <div id="sampleDialog" role="dialog" aria-modal="true" aria-labelledby="sampleTitle">
+      <button id="sampleClose">✕ 閉じる</button>
+      <h3 id="sampleTitle">🤖 サンプルのロボット</h3>
+      <p class="sampleLead">行き詰まったら、見本のロボットを開いてみよう。どのブロックをどう組んでいるかを見て、数字を変えたり、ブロックを足したりして、自分のロボットに生かそう。<br>
+        （開くと、今のブロックの画面は入れかわります。今の作品は先に保存しておこう）</p>
+      <div id="sampleList"></div>
+    </div>
+  </div>
+
   <!-- Ctrl + F：置いてあるブロックをさがす -->
   <div id="findBar">
     <span>🔍</span>
@@ -1120,7 +1228,7 @@
       document.getElementById('javaCode').textContent = '';
       document.getElementById('messages').innerHTML = '';
       showStatus('ok', 'Java を読みこみました（ブロック ' + msg.converted + ' 個、そのまま書くブロック ' + msg.raw + ' 個）');
-      addMessage('info', '📄', msg.path);
+      if (msg.path) addMessage('info', '📄', msg.path);
       if (msg.raw > 0) {
         addMessage('warning', '💡', '当てはまるブロックがなかったところは、「Java」カテゴリの「そのまま書く」ブロックになっています。' +
                    '足りないブロックを追加すると、次からはふつうのブロックにもどせます');
@@ -1395,6 +1503,7 @@
         }
 
         const build = msg.build;
+        if (build && build.ok) lastBuildOk = true;   // チュートリアルの「ロボットを作る」で使う
         if (build && build.ok) {
           showStatus('ok', build.message + (msg.warnings.length > 0
             ? '（注意が ' + msg.warnings.length + ' 件あります）' : ''));
@@ -1451,6 +1560,15 @@
       if (msg.kind === 'imported') {
         if (msg.ok) {
           loadImportedJava(msg);
+          if (pendingSample) {   // サンプルを開いたとき
+            const sample = pendingSample;
+            pendingSample = null;
+            document.getElementById('messages').innerHTML = '';
+            showStatus('ok', 'サンプル「' + sample.name + '」を開きました');
+            addMessage('info', '🤖', sample.what);
+            sample.tips.forEach(t => addMessage('info', '💡', t));
+            addMessage('info', '📌', '「ロボットを作る」を押すと、このまま Robocode で動かせます（名前は ' + msg.robotName + '）');
+          }
         } else if (!msg.canceled) {
           showStatus('error', msg.error);
         }
@@ -2127,26 +2245,44 @@
         }
         groupDrag = { dragged: block, start: startOf(block), others: list, pointer: { ...lastPointer } };
         // 消すブロック（ゴミ箱に入れたとき）に、ほかのブロックが巻きこまれないように、ドラッグ中だけ選ぶのをやめない
-      } else if (groupDrag && block === groupDrag.dragged) {
-        const plan = groupDrag;
-        groupDrag = null;
-        setTimeout(() => {
-          const end = plan.dragged.isDeadOrDying() ? null : plan.dragged.getRelativeToSurfaceXY();
-          const oldGroup = Blockly.Events.getGroup();
-          Blockly.Events.setGroup(e.group || true);
-          try {
-            plan.others.forEach(o => {
-              if (o.block.isDeadOrDying()) return;
-              o.block.translate(o.start.x, o.start.y);   // 見た目を元の位置にもどしてから
-              if (end) o.block.moveBy(end.x - plan.start.x, end.y - plan.start.y);   // 本当に動かす（元に戻せる）
-            });
-          } finally {
-            Blockly.Events.setGroup(oldGroup || false);
-          }
-          boxSelected.forEach(b => { if (!b.isDeadOrDying()) b.addSelect(); });
-        }, 0);
+      } else if (groupDrag && e.blockId === groupDrag.dragged.id) {
+        // ゴミ箱に入れたときは、ドラッグしたブロックはもう消えているので、id で比べる
+        finishGroupDrag(e.group);
       }
     });
+    // ドラッグを終えたとき（ゴミ箱に入れたときなど、ドラッグの終わりのお知らせが来ないこともあるので、離したときにも）
+    document.addEventListener('pointerup', () => {
+      if (groupDrag) setTimeout(() => finishGroupDrag(null), 0);   // Blockly がドラッグを終えてから
+    });
+    function finishGroupDrag(group) {
+      const plan = groupDrag;
+      if (!plan) return;
+      groupDrag = null;   // これ以上カーソルについていかないように、すぐにやめる
+      const trashed = plan.dragged.isDeadOrDying();   // ドラッグしたブロックがゴミ箱に入った（消えた）
+      const end = trashed ? null : plan.dragged.getRelativeToSurfaceXY();
+      const oldGroup = Blockly.Events.getGroup();
+      Blockly.Events.setGroup(group || true);   // 「元に戻す」1回で、まとめてもどせるように
+      try {
+        plan.others.forEach(o => {
+          if (o.block.isDeadOrDying()) return;
+          o.block.translate(o.start.x, o.start.y);   // 見た目を元の位置にもどしてから
+          if (trashed) {
+            o.block.dispose(false, true);            // いっしょにゴミ箱へ
+          } else if (end) {
+            o.block.moveBy(end.x - plan.start.x, end.y - plan.start.y);   // 本当に動かす（元に戻せる）
+          }
+        });
+      } finally {
+        Blockly.Events.setGroup(oldGroup || false);
+      }
+      if (trashed) {
+        const n = plan.others.length + 1;
+        boxSelected.clear();
+        showStatus('', n + ' 個のまとまりをゴミ箱に入れました（Ctrl+Z で元に戻せます）');
+      } else {
+        boxSelected.forEach(b => { if (!b.isDeadOrDying()) b.addSelect(); });
+      }
+    }
 
     // ------------------------------------------------------------
     // コピー（Ctrl + C）・はりつけ（Ctrl + V）
@@ -2257,6 +2393,16 @@
         root.appendChild(g);
       });
     }
+    // カテゴリの一覧の大きさは、ブロックの画面を拡大・縮小しても変えない（小さくなると見づらいため）
+    //   一覧の上と左に少し空白を入れて、左上の「置いてある数」が見切れないようにする
+    (() => {
+      const flyout = toolboxFlyout();
+      if (!flyout) return;
+      const fixedScale = (workspace.options && workspace.options.zoomOptions && workspace.options.zoomOptions.startScale) || 1;
+      flyout.getFlyoutScale = () => fixedScale;
+      flyout.MARGIN = 18;   // Blockly のもとは 8
+    })();
+
     // 一覧を開いたとき・ブロックが増えたり減ったりしたときに、数を書き直す
     (() => {
       const flyout = toolboxFlyout();
@@ -2783,6 +2929,351 @@
       document.getElementById('messages').appendChild(div);
       return div;
     }
+
+    // ------------------------------------------------------------
+    // サンプルのロボット
+    //   見本の Java を C++ に送ってブロックにもどし（「Java を読みこむ」と同じしくみ）、ブロックの画面に開く。
+    //   Java で書いてあるので、ブロックの名前が変わっても、当てはまるブロックがあればそのブロックになる。
+    // ------------------------------------------------------------
+    const SAMPLE_ROBOTS = [
+      {
+        "id": "hajimete",
+        "cls": "SampleHajimete",
+        "level": 1,
+        "name": "はじめてのロボット",
+        "what": "前に進んだり下がったりしながら、砲塔をぐるっと回して敵をさがします。敵を見つけたら撃ち、弾に当たったり壁にぶつかったりしたら向きを変えます。",
+        "tips": [
+          "進む・下がる距離を変えてみよう",
+          "見つけたときのパワーを 1 から 3 にすると？",
+          "弾に当たったときに回る角度を変えてみよう"
+        ],
+        "java": "package sample;\nimport robocode.*;\npublic class SampleHajimete extends AdvancedRobot {\n    public void run() {\n        while (true) {\n            ahead(100);\n            turnGunRight(360);\n            back(100);\n            turnGunRight(360);\n        }\n    }\n    public void onScannedRobot(ScannedRobotEvent e) {\n        fire(1);\n    }\n    public void onHitByBullet(HitByBulletEvent e) {\n        turnRight(90);\n        ahead(50);\n    }\n    public void onHitWall(HitWallEvent e) {\n        back(50);\n        turnRight(90);\n    }\n}\n"
+      },
+      {
+        "id": "oikake",
+        "cls": "SampleOikake",
+        "level": 2,
+        "name": "追いかけて撃つ",
+        "what": "レーダーで敵をさがし、見つけたら敵のほうを向いて近づきます。近いときは強く（パワー 3）、遠いときは弱く（パワー 1）撃ちます。",
+        "tips": [
+          "「150」「140」を変えると、敵との距離の取り方が変わるよ",
+          "「200」を変えて、強く撃つ距離を決めよう",
+          "ぶつかったときの動きを変えてみよう"
+        ],
+        "java": "package sample;\nimport robocode.*;\npublic class SampleOikake extends AdvancedRobot {\n    public void run() {\n        while (true) {\n            turnRadarRight(360);\n        }\n    }\n    public void onScannedRobot(ScannedRobotEvent e) {\n        turnRight(e.getBearing());\n        if (e.getDistance() > 150) {\n            ahead(e.getDistance() - 140);\n        }\n        if (e.getDistance() < 200) {\n            fire(3);\n        } else {\n            fire(1);\n        }\n        scan();\n    }\n    public void onHitRobot(HitRobotEvent e) {\n        fire(3);\n        back(40);\n    }\n}\n"
+      },
+      {
+        "id": "yokeru",
+        "cls": "SampleYokeru",
+        "level": 2,
+        "name": "弾をよける",
+        "what": "弾に当たったら、弾が飛んできた方向に対して横向きになって、ランダムな距離だけ動きます。動きが読まれにくくなります。",
+        "tips": [
+          "ランダムな距離の範囲（50〜150）を変えてみよう",
+          "「90」を変えると、よける向きが変わるよ",
+          "見つけたら追いかける動きも足してみよう"
+        ],
+        "java": "package sample;\nimport robocode.*;\npublic class SampleYokeru extends AdvancedRobot {\n    public void run() {\n        while (true) {\n            turnGunRight(360);\n        }\n    }\n    public void onScannedRobot(ScannedRobotEvent e) {\n        fire(2);\n    }\n    public void onHitByBullet(HitByBulletEvent e) {\n        turnRight(robocode.util.Utils.normalRelativeAngleDegrees(90 - e.getBearing()));\n        ahead((50 + Math.random() * (150 - 50)));\n    }\n    public void onHitWall(HitWallEvent e) {\n        back(100);\n    }\n}\n"
+      },
+      {
+        "id": "yoyaku",
+        "cls": "SampleYoyaku",
+        "level": 3,
+        "name": "同時に動く（予約）",
+        "what": "「予約」のブロックで、進む・車体を回す・レーダーを回すを同時に行います。敵を見つけたら砲塔を敵に向けて、距離に合わせたパワーで撃ちます。",
+        "tips": [
+          "予約で回す角度（30）を変えると、円の大きさが変わるよ",
+          "「400」を変えて、パワーの決め方を工夫しよう",
+          "壁にぶつかったときの予約を変えてみよう"
+        ],
+        "java": "package sample;\nimport robocode.*;\npublic class SampleYoyaku extends AdvancedRobot {\n    public void run() {\n        while (true) {\n            setAhead(100);\n            setTurnRight(30);\n            setTurnRadarRight(360);\n            execute();\n        }\n    }\n    public void onScannedRobot(ScannedRobotEvent e) {\n        turnGunRight(robocode.util.Utils.normalRelativeAngleDegrees(e.getBearing() + getHeading() - getGunHeading()));\n        fire(Math.min(3, 400 / e.getDistance()));\n    }\n    public void onHitWall(HitWallEvent e) {\n        setBack(100);\n        setTurnRight(90);\n        execute();\n    }\n}\n"
+      },
+      {
+        "id": "kansu",
+        "cls": "SampleKansu",
+        "level": 3,
+        "name": "関数と変数を使う",
+        "what": "ジグザグに動く動きを「関数」にまとめて使い回します。弾に当たった回数を「変数」で数えて、4 回当たったら大きく逃げます。",
+        "tips": [
+          "関数「zigzag」の中の角度を変えてみよう",
+          "逃げるまでの回数（3）を変えてみよう",
+          "自分で新しい関数を作って、イベントから呼んでみよう"
+        ],
+        "java": "package sample;\nimport robocode.*;\npublic class SampleKansu extends AdvancedRobot {\n    double hits = 0;\n    public void run() {\n        while (true) {\n            zigzag(100);\n            turnGunRight(360);\n        }\n    }\n    public void onScannedRobot(ScannedRobotEvent e) {\n        fire(2);\n    }\n    public void onHitByBullet(HitByBulletEvent e) {\n        hits += 1;\n        if (hits > 3) {\n            turnRight(180);\n            ahead(150);\n            hits = 0;\n        }\n    }\n    private void zigzag(double kyori) {\n        turnRight(45);\n        ahead(kyori);\n        turnLeft(90);\n        ahead(kyori);\n        turnRight(45);\n    }\n}\n"
+      }
+    ];
+    let pendingSample = null;
+    let lastBuildOk = false;
+    const sampleOverlay = document.getElementById('sampleOverlay');
+    function openSampleList() {
+      const list = document.getElementById('sampleList');
+      list.innerHTML = '';
+      SAMPLE_ROBOTS.forEach(sample => {
+        const card = document.createElement('div');
+        card.className = 'sampleCard';
+        const head = document.createElement('div');
+        head.className = 'sampleHead';
+        const name = document.createElement('span');
+        name.className = 'sampleName';
+        name.textContent = sample.name;
+        const level = document.createElement('span');
+        level.className = 'sampleLevel';
+        level.textContent = '★'.repeat(sample.level) + '☆'.repeat(3 - sample.level) + ['', ' やさしい', ' ふつう', ' 少しむずかしい'][sample.level];
+        const open = document.createElement('button');
+        open.textContent = '開く';
+        open.addEventListener('click', () => loadSample(sample));
+        head.append(name, level, open);
+        const what = document.createElement('p');
+        what.textContent = sample.what;
+        const tips = document.createElement('ul');
+        sample.tips.forEach(t => { const li = document.createElement('li'); li.textContent = 'ためしてみよう：' + t; tips.appendChild(li); });
+        card.append(head, what, tips);
+        list.appendChild(card);
+      });
+      sampleOverlay.classList.add('open');
+    }
+    function closeSampleList() { sampleOverlay.classList.remove('open'); }
+    function loadSample(sample) {
+      if (!confirmDiscard()) return;
+      closeSampleList();
+      if (document.body.classList.contains('focus-mode')) setFocusMode(false);
+      pendingSample = sample;
+      showStatus('', 'サンプル「' + sample.name + '」を開いています…');
+      window.chrome.webview.postMessage({ kind: 'importJavaText', java: sample.java });
+    }
+    document.getElementById('sampleButton').addEventListener('click', openSampleList);
+    document.getElementById('sampleClose').addEventListener('click', closeSampleList);
+    sampleOverlay.addEventListener('click', (e) => { if (e.target === sampleOverlay) closeSampleList(); });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && sampleOverlay.classList.contains('open')) { e.preventDefault(); e.stopPropagation(); closeSampleList(); }
+    }, true);
+
+    // ------------------------------------------------------------
+    // チュートリアル
+    //   「❓」（チュートリアル）を押すと始まる。光った場所の説明を読んで、言われたとおりに操作する。
+    //   「できたら自動で進む」ステップは、ブロックを置くと次に進む（「次へ」で飛ばすこともできる）。
+    // ------------------------------------------------------------
+    const tutSpot = document.getElementById('tutSpot');
+    const tutCard = document.getElementById('tutCard');
+    let tutIndex = -1;
+    let tutTimer = null;
+
+    // ブロックの画面に、その種類のブロックがあるか
+    const tutHas = (type) => workspace.getAllBlocks(false).some(b => b.type === type && !b.isInsertionMarker());
+    // あるイベントの中に、その種類のブロックが入っているか
+    const tutInside = (eventType, types) => workspace.getAllBlocks(false).some(b =>
+      b.type === eventType && b.getDescendants(false).some(d => d !== b && types.includes(d.type) && !d.isInsertionMarker()));
+    // カテゴリの名前から、ツールボックスのその行をさがす
+    function tutCategory(name) {
+      const rows = document.querySelectorAll('.blocklyToolboxCategory, .blocklyTreeRow');
+      for (const row of rows) {
+        const label = row.querySelector('.blocklyTreeLabel, .blocklyToolboxCategoryLabel') || row;
+        if ((label.textContent || '').trim() === name) return row;
+      }
+      return document.querySelector('.blocklyToolboxDiv');
+    }
+
+    const TUTORIAL = [
+      { title: 'ようこそ！', target: null,
+        text: 'このアプリでは、ブロックを組み合わせて、Robocode の戦車ロボットを作ります。いっしょに、敵を見つけて撃つロボットを作ってみよう。（いつでも「やめる」で終われます）' },
+      { title: 'ツールボックス', target: () => document.querySelector('.blocklyToolboxDiv'),
+        text: '左にあるのがツールボックスです。カテゴリ（イベント・動き・攻撃 …）をクリックすると、そのカテゴリのブロックが出てきます。' },
+      { title: '① 「スタートしたら、ずっと」を置く', target: () => tutCategory('イベント'),
+        text: '「イベント」を開いて、「スタートしたら、ずっと」をブロックの画面にドラッグしよう（ダブルクリックでも置けます）。ロボットがずっとくり返す動きを、この中に入れます。',
+        wait: '「スタートしたら、ずっと」を置こう', blink: ['robot_event_run'], check: () => tutHas('robot_event_run') },
+      { title: '② 進むブロックを入れる', target: () => tutCategory('動き'),
+        text: '「動き」を開いて、「進む」のブロックを「スタートしたら、ずっと」の口の中にカチッとはめよう。',
+        wait: '「進む」を「スタートしたら、ずっと」の中に入れよう', blink: ['act_move', 'act_ahead'],
+        check: () => tutInside('robot_event_run', ['act_move', 'act_ahead', 'adv_set_ahead']) },
+      { title: '③ 回るブロックをつなげる', target: () => tutCategory('動き'),
+        text: '同じ「動き」から「〇 を 〇 に 〇 度回す」を、「進む」の下につなげよう。進んで、回って、をずっとくり返すロボットになります。',
+        wait: '「回す」を「進む」の下につなげよう', blink: ['act_turn', 'act_turn_right'],
+        check: () => tutInside('robot_event_run', ['act_turn', 'act_turn_right', 'adv_set_turn']) },
+      { title: '④ 敵を見つけたときを置く', target: () => tutCategory('イベント'),
+        text: 'もう一度「イベント」を開いて、「敵を発見したとき」を置こう。レーダーで敵を見つけたときに、中のブロックが動きます。',
+        wait: '「敵を発見したとき」を置こう', blink: ['robot_event_enemyDetected'], check: () => tutHas('robot_event_enemyDetected') },
+      { title: '⑤ 撃つブロックを入れる', target: () => tutCategory('攻撃'),
+        text: '「攻撃」を開いて、「パワー 〇 で撃つ」を「敵を発見したとき」の中に入れよう。',
+        wait: '「撃つ」を「敵を発見したとき」の中に入れよう', blink: ['robot_fire', 'act_fire'],
+        check: () => tutInside('robot_event_enemyDetected', ['robot_fire', 'act_fire', 'adv_set_fire']) },
+      { title: '⑥ 数字を変えてみる', target: () => document.getElementById('blocklyDiv'),
+        text: 'ブロックの中の数字（進む距離・回る角度・パワー）は、クリックすると書きかえられます。いろいろ変えてみよう。パワーは 0.1〜3 で、大きいほど強いけど、自分のエネルギーも多く使います。' },
+      { title: '⑦ ロボットに名前を付ける', target: () => document.getElementById('robotName'),
+        text: 'ここにロボットの名前を書きます。英字で始めて、英字・数字・_ だけで書こう（例：MyTank）。' },
+      { title: '⑧ ロボットを作る', target: () => document.getElementById('convertButton'),
+        text: '「ロボットを作る」を押すと、ブロックが Java のプログラムになって、Robocode で使えるようになります。まちがいがあると、右の欄にエラーが出ます（クリックするとそのブロックに飛べます）。',
+        wait: '「ロボットを作る」を押そう', check: () => lastBuildOk },
+      { title: '⑨ Robocode で戦わせる', target: () => document.getElementById('launchButton'),
+        text: '「Robocode を開く」を押して、Robocode の「Battle」→「New」で、自分のロボット（student.名前）と相手（sample.SittingDuck など）を選び、「Start Battle」を押そう。' },
+      { title: '⑩ 保存しておこう', target: () => document.getElementById('saveButton'),
+        text: '作ったブロックは「保存」（Ctrl + S）で残しておけます。次は「開く」から続きができます。' },
+      { title: '困ったときは', target: () => document.getElementById('sampleButton'),
+        text: '行き詰まったら「🤖」（サンプル）で見本のロボットを開いてみよう。上の「🔍 ブロックを検索」や、Ctrl + F（置いてあるブロックをさがす）も使えます。これでチュートリアルはおしまい！' },
+    ];
+
+    // ブロックを置くステップで、カードを置く場所（ブロックの画面とツールボックスの一覧にかからないところ）
+    //   右の結果の欄が出ていれば、その上。かくしていれば、ブロックの画面の右上
+    function tutDockPosition(cardW, cardH) {
+      const panel = document.getElementById('resultPanel');
+      const pr = panel && !document.body.classList.contains('panel-collapsed') ? panel.getBoundingClientRect() : null;
+      if (pr && pr.width >= cardW + 16) {
+        return { left: pr.left + (pr.width - cardW) / 2, top: Math.min(pr.top + 56, window.innerHeight - cardH - 16) };
+      }
+      const area = document.getElementById('blocklyDiv').getBoundingClientRect();
+      return { left: area.right - cardW - 28, top: area.top + 12 };   // 右のスクロールバーにかからないように
+    }
+
+    // 一覧（カテゴリ・検索）の中の、置いてほしいブロックを点滅させる
+    function tutBlink() {
+      const step = tutIndex >= 0 ? TUTORIAL[tutIndex] : null;
+      const want = step && step.blink && step.check && !step.check() ? step.blink : [];
+      const flyout = toolboxFlyout();
+      const blocks = flyout && flyout.isVisible() ? flyout.getWorkspace().getTopBlocks(false) : [];
+      let found = false;
+      blocks.forEach(b => {
+        const root = b.getSvgRoot && b.getSvgRoot();
+        if (!root) return;
+        const on = want.includes(b.type);
+        if (on) found = true;
+        if (root.classList.contains('rbTutBlink') !== on) root.classList.toggle('rbTutBlink', on);
+      });
+      // 一覧に置くブロックが出ているときは、カテゴリのわくの点滅は止める（ブロックのほうを見てほしいので）
+      tutSpot.style.animation = found ? 'none' : '';
+    }
+    function clearTutBlink() {
+      document.querySelectorAll('.rbTutBlink').forEach(el => el.classList.remove('rbTutBlink'));
+    }
+
+    function tutPlace() {
+      if (tutIndex < 0) return;
+      tutBlink();
+      const step = TUTORIAL[tutIndex];
+      const el = step.target ? step.target() : null;
+      const visible = el && el.getBoundingClientRect().width > 0;
+      const cardW = tutCard.offsetWidth || 360, cardH = tutCard.offsetHeight || 200;
+      if (step.check) {
+        // ブロックを置くステップ：画面は暗くせず、カードはじゃまにならない場所へ
+        tutCard.classList.add('docked');
+        if (visible) {
+          const r = el.getBoundingClientRect(), pad = 6;
+          tutSpot.className = 'soft';
+          tutSpot.style.display = 'block';
+          tutSpot.style.left = (r.left - pad) + 'px';
+          tutSpot.style.top = (r.top - pad) + 'px';
+          tutSpot.style.width = (r.width + pad * 2) + 'px';
+          tutSpot.style.height = (r.height + pad * 2) + 'px';
+        } else {
+          tutSpot.style.display = 'none';
+        }
+        const d = tutDockPosition(cardW, cardH);
+        tutCard.style.left = Math.max(16, Math.min(d.left, window.innerWidth - cardW - 16)) + 'px';
+        tutCard.style.top = Math.max(16, Math.min(d.top, window.innerHeight - cardH - 16)) + 'px';
+        return;
+      }
+      tutCard.classList.remove('docked');
+      if (!visible) {
+        tutSpot.className = 'none';
+        tutSpot.style.display = 'block';
+        tutSpot.style.left = (window.innerWidth / 2) + 'px';
+        tutSpot.style.top = (window.innerHeight / 2) + 'px';
+        tutCard.style.left = Math.max(16, (window.innerWidth - cardW) / 2) + 'px';
+        tutCard.style.top = Math.max(16, (window.innerHeight - cardH) / 2) + 'px';
+        return;
+      }
+      const r = el.getBoundingClientRect();
+      const pad = 6;
+      tutSpot.className = '';
+      tutSpot.style.display = 'block';
+      tutSpot.style.left = (r.left - pad) + 'px';
+      tutSpot.style.top = (r.top - pad) + 'px';
+      tutSpot.style.width = (r.width + pad * 2) + 'px';
+      tutSpot.style.height = (r.height + pad * 2) + 'px';
+      // カードは、光らせた場所の右・下・左・上のうち、入るところに置く
+      let left, top;
+      if (r.right + 16 + cardW < window.innerWidth) { left = r.right + 16; top = r.top; }
+      else if (r.bottom + 16 + cardH < window.innerHeight) { left = r.left; top = r.bottom + 16; }
+      else if (r.left - 16 - cardW > 0) { left = r.left - 16 - cardW; top = r.top; }
+      else { left = r.left; top = r.top - 16 - cardH; }
+      left = Math.max(16, Math.min(left, window.innerWidth - cardW - 16));
+      top = Math.max(16, Math.min(top, window.innerHeight - cardH - 16));
+      tutCard.style.left = left + 'px';
+      tutCard.style.top = top + 'px';
+    }
+    function tutShow(index) {
+      tutIndex = index;
+      const step = TUTORIAL[index];
+      document.getElementById('tutTitle').textContent = step.title;
+      document.getElementById('tutText').textContent = step.text;
+      const wait = document.getElementById('tutWait');
+      if (step.check) {
+        const done = !!step.check();
+        wait.style.display = 'block';
+        wait.className = 'tutWait' + (done ? ' done' : '');
+        wait.textContent = done ? '✔ できました！次へ進みます' : '👉 ' + step.wait + '（置けたら自動で次へ進みます）';
+      } else {
+        wait.style.display = 'none';
+      }
+      document.getElementById('tutStep').textContent = (index + 1) + ' / ' + TUTORIAL.length;
+      document.getElementById('tutBack').disabled = index === 0;
+      const notDone = step.check && !step.check();
+      document.getElementById('tutNext').textContent = index === TUTORIAL.length - 1 ? 'おわる' : (notDone ? 'とばす' : '次へ');
+      document.getElementById('tutNext').title = notDone ? '置かずに次のステップへ進みます' : '';
+      tutCard.style.display = 'block';
+      tutPlace();
+    }
+    function tutStart() {
+      if (document.body.classList.contains('focus-mode')) setFocusMode(false);
+      if (document.body.classList.contains('panel-collapsed')) document.getElementById('panelTab').click();
+      lastBuildOk = false;
+      tutShow(0);
+      clearInterval(tutTimer);
+      tutTimer = setInterval(() => {   // 画面が変わっても光らせる場所についていく・できたかを見る
+        if (tutIndex < 0) return;
+        const step = TUTORIAL[tutIndex];
+        // ドラッグ中（置き終わっていないとき）は見ない（ドラッグを始めた瞬間に「置いた」ことにならないように）
+        const dragging = Blockly.Gesture && Blockly.Gesture.inProgress && Blockly.Gesture.inProgress();
+        if (step.check && !dragging && step.check() && !step._advanced) {
+          step._advanced = true;
+          setTimeout(() => { if (TUTORIAL[tutIndex] === step) tutNextStep(); }, 900);   // 「できました」を少し見せてから
+          tutShow(tutIndex);
+        }
+        tutPlace();
+      }, 300);
+    }
+    function tutEnd() {
+      tutIndex = -1;
+      clearTutBlink();
+      clearInterval(tutTimer);
+      tutSpot.style.display = 'none';
+      tutCard.style.display = 'none';
+      TUTORIAL.forEach(s => { s._advanced = false; });
+    }
+    function tutNextStep() {
+      if (tutIndex >= TUTORIAL.length - 1) { tutEnd(); showStatus('ok', 'チュートリアルおつかれさま！自由にロボットを作ってみよう'); return; }
+      const next = TUTORIAL[tutIndex + 1];
+      next._advanced = next.check ? !!next.check() : false;   // 先にできているステップは、自動では進まない（読んでから次へ）
+      tutShow(tutIndex + 1);
+    }
+    // ドラッグしているあいだは、カードをうすくして通りぬけられるようにする（カードの上にも置けるように）
+    document.addEventListener('pointerdown', (e) => {
+      if (tutIndex < 0 || tutCard.contains(e.target)) return;
+      tutCard.classList.add('passthrough');
+    }, true);
+    document.addEventListener('pointerup', () => { tutCard.classList.remove('passthrough'); }, true);
+    document.addEventListener('pointercancel', () => { tutCard.classList.remove('passthrough'); }, true);
+
+    document.getElementById('tutorialButton').addEventListener('click', tutStart);
+    document.getElementById('tutNext').addEventListener('click', tutNextStep);
+    document.getElementById('tutBack').addEventListener('click', () => { if (tutIndex > 0) { TUTORIAL[tutIndex - 1]._advanced = true; tutShow(tutIndex - 1); } });
+    document.getElementById('tutQuit').addEventListener('click', tutEnd);
+    window.addEventListener('resize', tutPlace);
+    // はじめて開いた人には、チュートリアルがあることを知らせる（1回だけ）
+    try {
+      if (!localStorage.getItem('robocodeBlocks.tutorialHint')) {
+        localStorage.setItem('robocodeBlocks.tutorialHint', '1');
+        setTimeout(() => showStatus('', 'はじめての人は、上の「❓」（チュートリアル）を押してみよう'), 1500);
+      }
+    } catch (err) { /* 覚えられなくても動く */ }
   </script>
 </body>
 </html>
