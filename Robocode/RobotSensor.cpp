@@ -1,6 +1,8 @@
 // =====================================================================
-//  SensorPlus.cpp  ―  組み合わせて使う「センサー」のブロック
+//  RobotSensor.cpp  ―  組み合わせて使う「センサー」のブロック
 //
+//  2026/10/23 片山 プログラムの整理
+// 
 //  ここのブロックは、数字や「はい／いいえ」を出すだけ。
 //  「計算」「制御」「数字で動く」ブロックと組み合わせて、作戦を自分で考えられるようにする。
 // =====================================================================
@@ -8,14 +10,15 @@
 
 ROBOCODE_BLOCKS(RobotSensor)
 {
-    // ---------------- 敵を発見したとき に使えるもの ----------------
+    // ------ 敵を発見したとき に使えるもの -------
 
     // 敵の方向（自分の向きから見て何度か）
     Block("enemy_bearing")
         .category("センサー")
         .text("敵の方向（自分から見た角度）")
         .output("Number")
-        .tooltip("自分の向きから見て、敵が何度の方向にいるかです。正面 0、右がプラス、左がマイナス（-180〜180）")
+        .tooltip("自分の正面を 0 度として、敵がどの方向にいるかを表します\n"
+                 "右はプラス、左はマイナス（-180〜180）")
         .java("e.getBearing()")
         .onlyIn("robot_event_enemyDetected");
 
@@ -24,28 +27,29 @@ ROBOCODE_BLOCKS(RobotSensor)
         .category("センサー")
         .text("敵の方位（画面の上が 0 度）")
         .output("Number")
-        .tooltip("画面の上を 0 度として、敵がどの方位にいるかです（0〜360）。砲塔やレーダーを向けるときに使います")
+        .tooltip("フィールドの上方向を 0 度として、敵がどの方位にいるかを表します\n"
+            "時計回りに角度が増えます（0～360 度）。")
         .java("robocode.util.Utils.normalAbsoluteAngleDegrees(getHeading() + e.getBearing())")
         .onlyIn("robot_event_enemyDetected");
 
-
+    //敵にロック
     Block("robot_lock")
         .category("センサー")
         .text("%1 を敵にロックする")
         .dropdown("PART", {
-            {"レーダー", R"({
-            double radar = getHeading() + e.getBearing() - getRadarHeading();
-            while (radar > 180) radar -= 360;
-            while (radar < -180) radar += 360;
-            turnRadarRight(radar);
-        })"},
+            {"レーダー", R"(
+    double radar = getHeading() + e.getBearing() - getRadarHeading();
+    while (radar > 180) radar -= 360;
+    while (radar < -180) radar += 360;
+    turnRadarRight(radar);
+        )"},
 
-            {"砲塔", R"({
-            double gun = getHeading() + e.getBearing() - getGunHeading();
-            while (gun > 180) gun -= 360;
-            while (gun < -180) gun += 360;
-            turnGunRight(gun);
-        })"}
+            {"砲塔", R"(
+    double gun = getHeading() + e.getBearing() - getGunHeading();
+    while (gun > 180) gun -= 360;
+    while (gun < -180) gun += 360;
+    turnGunRight(gun);
+        )"}
             })
         .tooltip("レーダーまたは砲塔を敵の方向に向けます")
         .java("{PART}")
@@ -55,7 +59,9 @@ ROBOCODE_BLOCKS(RobotSensor)
     Block("act_scan")
         .category("センサー")
         .text("もう一度レーダーで探す")
-        .tooltip("今のレーダーの向きで、もう一度敵を探します。見つかると「敵を発見したとき」がまた動きます")
+        .tooltip("今のレーダーの向きで、もう一度敵を探します\n"
+            "※レーダーの向きに敵がいる場合「敵を発見したとき」の\n"
+            "イベントが発生します")
         .java("scan();");
 
     // 敵が止まっている？
@@ -74,7 +80,8 @@ ROBOCODE_BLOCKS(RobotSensor)
         .category("センサー")
         .text("弾が飛んできた方向")
         .output("Number")
-        .tooltip("自分の向きから見て、当たった弾が飛んできた方向です（-180〜180）")
+        .tooltip("自分の正面を 0 度として、弾が飛んできた方向を表します\n"
+                 "右はプラス、左はマイナスです（-180～180 度）")
         .java("e.getBearing()")
         .onlyIn("robot_event_hitByBullet");
 
@@ -83,7 +90,9 @@ ROBOCODE_BLOCKS(RobotSensor)
         .category("センサー")
         .text("当たった弾の向き")
         .output("Number")
-        .tooltip("当たった弾が進んでいた向きです（画面の上が 0 度）。+180 すると、弾が飛んできたほうの向きになります")
+        .tooltip("自分に当たった弾が進んでいた向きを表します\n"
+                "フィールドの上方向が 0 度で、時計回りに増えます（0～360 度）\n"
+                "※ 弾が飛んできた方角は、この角度に 180 度足して求められます")
         .java("e.getHeading()")
         .onlyIn("robot_event_hitByBullet");
 
@@ -92,7 +101,8 @@ ROBOCODE_BLOCKS(RobotSensor)
         .category("センサー")
         .text("ぶつかった壁の方向")
         .output("Number")
-        .tooltip("自分の向きから見て、ぶつかった壁がある方向です（-180〜180）")
+        .tooltip("自分の正面を 0 度として、ぶつかった壁の方向を表します\n"
+                 "右はプラス、左はマイナスです（-180～180 度）")
         .java("e.getBearing()")
         .onlyIn("robot_event_hitWall");
 
@@ -101,7 +111,8 @@ ROBOCODE_BLOCKS(RobotSensor)
         .category("センサー")
         .text("ぶつかったロボットの方向")
         .output("Number")
-        .tooltip("自分の向きから見て、ぶつかったロボットがいる方向です（-180〜180）")
+        .tooltip("自分の正面を 0 度として、ぶつかった敵ロボットの方向を表します\n"
+                 "右はプラス、左はマイナスです（-180～180 度）")
         .java("e.getBearing()")
         .onlyIn("robot_event_hitEnemy");
 
@@ -112,7 +123,8 @@ ROBOCODE_BLOCKS(RobotSensor)
         .category("センサー")
         .text("いちばん近い壁までの距離")
         .output("Number")
-        .tooltip("上下左右の壁のうち、いちばん近い壁までの距離です")
+        .tooltip("ロボットの中心から、上下左右の壁までの距離を計算し、\n"
+                    "最も近い壁までの距離を返します")
         .java("Math.min(Math.min(getX(), getBattleFieldWidth() - getX()), "
               "Math.min(getY(), getBattleFieldHeight() - getY()))");
 
@@ -121,7 +133,8 @@ ROBOCODE_BLOCKS(RobotSensor)
         .category("センサー")
         .text("バトル場の真ん中の方向")
         .output("Number")
-        .tooltip("自分の向きから見て、バトル場の真ん中が何度の方向にあるかです（-180〜180）")
+        .tooltip("自分の正面を 0 度として、バトル場の中心がどの方向にあるかを表します\n"
+                 "右はプラス、左はマイナスです（-180～180 度）")
         .java("robocode.util.Utils.normalRelativeAngleDegrees(Math.toDegrees(Math.atan2("
               "getBattleFieldWidth() / 2 - getX(), getBattleFieldHeight() / 2 - getY())) - getHeading())");
 

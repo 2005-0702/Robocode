@@ -4,37 +4,42 @@
 // 
 //  2026/10/16 片山 サンプルコード追加
 //  2026/10/22 片山 setAdjustをちゃんと使えるようにする
-// 
+//  2026/10/23 片山 プログラムの整理
 // =====================================================================
 #include "RobocodeBlocks.h"
 
 ROBOCODE_BLOCKS(RobotMove)
 {
-    //進む
-    Block("act_ahead")
+    // 進む・下がる
+    Block("act_move")
         .category("動き")
-        .text("%1 進む")
-        .valueInput("DIST","Number")
-        .tooltip("前に進みます。マイナスを入れると後ろに下がります")
-        .java("ahead({DIST});");
-
-    //下がる
-    Block("act_back")
-        .category("動き")
-        .text("%1 下がる")
+        .text("%1 %2")
+        .dropdown("DIRECTION", {
+            {"進む", "ahead"},
+            {"下がる", "back"}
+            })
         .valueInput("DIST", "Number")
-        .tooltip("後ろに下がります。マイナスだと前に進みます")
-        .java("back({DIST})");
+        .tooltip("進むか下がるかを選び、移動する距離を指定します")
+        .java("{DIRECTION}({DIST});");
 
-
-    // 車体・砲塔・レーダーを 〇 度 右に回す
-    Block("act_turn_right")
+    // 車体・砲塔・レーダーを右または左に回す
+    Block("act_turn")
         .category("動き")
-        .text("%1 を右に %2 度回す")
-        .dropdown("PART", { {"車体", "turnRight"}, {"砲塔", "turnGunRight"}, {"レーダー", "turnRadarRight"} })
+        .text("%1 を %2 に %3 度回す")
+        .dropdown("PART", {
+            {"車体", "turn"},
+            {"砲塔", "turnGun"},
+            {"レーダー", "turnRadar"}
+            })
+        .dropdown("DIRECTION", {
+            {"右", "Right"},
+            {"左", "Left"}
+            })
         .valueInput("ANGLE", "Number")
-        .tooltip("右に回します。マイナスを入れると左に回ります")
-        .java("{PART}({ANGLE});");
+        .tooltip("車体・砲塔・レーダーを選んだ方向と角度で回します")
+        .java("{PART}{DIRECTION}({ANGLE});");
+
+       
 
     // 車体・砲塔・レーダーを独立して動かす
     Block("robot_keep_direction")
@@ -48,9 +53,9 @@ ROBOCODE_BLOCKS(RobotMove)
             {"有効", "true"},
             {"無効", "false"}
                 })
-        .tooltip("車体や砲塔が回っても、選んだ部分はつられて回らなくなります。"
-                "「スタートしたら」の最初に置くと、ずっとその設定になります")
-       
+        .tooltip("車体や砲塔が回っても、選んだ部分は\n"
+            "つられて回らなくなります。")
+              
         .javaFunction([](BlockData& data) -> std::string {
         const std::string part = data.text("PART");
         const std::string enabled = data.text("ENABLED");
@@ -68,6 +73,7 @@ ROBOCODE_BLOCKS(RobotMove)
         return "";
         });
 
+  
 
     //===============
     //サンプルコード
@@ -86,26 +92,26 @@ ROBOCODE_BLOCKS(RobotMove)
             "turnGunRight(360);"
         );
 
-    //ぐにゃぐにゃ動く
+    //曲がりながら動く
     Block("robot_sample_limpRunnning")
         .category("動き")
-        .text("ぐにゃぐにゃ動く")
+        .text("曲がりながら動く")
         .tooltip("前進、車体の回転、待機を組み合わせたサンプルです")
         .color(210)
-        .java(R"({
-        for (int step = 0; step < 6; step++) {    // 右に曲がりながら進む（15度 × 6回 = 90度）
-            turnRight(15);
-            ahead(25);
-        }
-        for (int step = 0; step < 12; step++) {   // 左に曲がりながら進む（15度 × 12回 = 180度）
-            turnLeft(15);
-            ahead(25);
-        }
-        for (int step = 0; step < 6; step++) {    // 右に曲がりながら進む（90度。向きが元にもどる）
-            turnRight(15);
-            ahead(25);
-        }
-        })");
+        .java(R"(
+for (int step = 0; step < 6; step++) {    // 右に曲がりながら進む（15度 × 6回 = 90度）
+    turnRight(15);
+    ahead(25);
+}
+for (int step = 0; step < 12; step++) {   // 左に曲がりながら進む（15度 × 12回 = 180度）
+    turnLeft(15);
+    ahead(25);
+}
+for (int step = 0; step < 6; step++) {    // 右に曲がりながら進む（90度。向きが元にもどる）
+    turnRight(15);
+    ahead(25);
+}
+    )");
 
 
     // ぐるぐる走行
@@ -114,29 +120,19 @@ ROBOCODE_BLOCKS(RobotMove)
         .text("ぐるぐる走行")
         .tooltip("車体を旋回させながら前進するサンプルです")
         .color(210)
-        // ぐるぐる走行（Robot でも動く形）
         .java("turnRight(30);\n"
             "ahead(60);");
 
-    // 勝利のダンス
-    Block("robot_sample_victoryDance")
-        .category("動き")
-        .text("勝利のダンス")
-        .tooltip("右回転と左回転を繰り返して、勝利を表現します")
-        .java(R"(
-     for (int i = 0; i < 50; i++) {
-         turnRight(30);
-         turnLeft(30);
-     }
-     )");
 
     // 勝利の回転
     Block("robot_sample_victorySpin")
         .category("動き")
         .text("勝利の回転")
-        .tooltip("車体を大きく回転させて、勝利を表現します")
+        .tooltip("車体を大きく回転させて、勝利を表現するサンプルです")
         .java(R"(
-         turnRight(36000);
+         turnRight(360);
      )");
 
+
+  
 }
