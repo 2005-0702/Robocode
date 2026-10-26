@@ -5,6 +5,12 @@
 // =====================================================================
 #include "RobocodeBlocks.h"
 
+namespace
+{
+    constexpr double MIN_FIRE_POWER = 0.1;
+    constexpr double MAX_FIRE_POWER = 3.0;
+}
+
 ROBOCODE_BLOCKS(RobotAttack)
 {
     // パワー〇〇で撃つ  
@@ -19,8 +25,11 @@ ROBOCODE_BLOCKS(RobotAttack)
             std::string t = b.text("POWER");
             char* end = nullptr;
             double v = std::strtod(t.c_str(), &end);
-            if (end != t.c_str() && *end == '\0' && (v < 0.1 || v > 3))
+            if (end != t.c_str() &&
+                *end == '\0' &&
+                (v < MIN_FIRE_POWER || v > MAX_FIRE_POWER)) {
                 b.error("パワーは0.1～3にしてください");
+            }
         })
         .java("fire({POWER});");                           // 作られるJava（{POWER} に入力した数字が入る）
 }
