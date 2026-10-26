@@ -141,7 +141,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="RobotAdvancedMove.cpp" />
-    <ClCompile Include="RobotControlPlus.cpp" />
     <ClCompile Include="RobotInformation.cpp" />
     <ClCompile Include="JavaToBlocks.cpp" />
     <ClCompile Include="main.cpp" />

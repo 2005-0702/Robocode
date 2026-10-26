@@ -42,54 +42,64 @@
 
 ROBOCODE_BLOCKS(RobotControl)
 {
-    
-    //もし〇〇なら
+    // 条件が合うときだけ、中の命令を実行する
     Block("robot_if")
         .category("制御")
         .text("もし %1 なら %2")
-        .valueInput("COND", "Boolean")          // 「はい」のブロックをはめる穴
-        .statements("DO")                       // 中にブロックを入れる口
-        .tooltip("条件に合うときだけ、中の処理を実行します")
+        .valueInput("COND", "Boolean")  // 条件を入れる穴
+        .statements("DO")              // 実行する命令を入れる穴
+        .tooltip("条件に合うときだけ、中の命令を実行します")
         .java("if ({COND}) {\n"
             "    {DO}\n"
             "}");
 
-    // もし〇〇なら○○でなければ
+    // 条件によって、実行する命令を切り替える
     Block("robot_if_else")
         .category("制御")
-        .text("もし %1 なら %2 でなければ %3" )
-        .valueInput("COND", "Boolean")          // 「はい／いいえ」のブロックをはめる穴
-        .statements("DO")                       // 中にブロックを入れる口
-        .statements("ELSE")                       
+        .text("もし %1 なら %2 でなければ %3")
+        .valueInput("COND", "Boolean")  // 条件を入れる穴
+        .statements("DO")              // 条件が「はい」のときの命令
+        .statements("ELSE")            // 条件が「いいえ」のときの命令
         .tooltip("条件に応じて、実行する処理を切り替えます")
         .java("if ({COND}) {\n"
             "    {DO}\n"
-            "}else {\n"
-          "    {ELSE}\n"
+            "} else {\n"
+            "    {ELSE}\n"
             "}");
 
-    // 指定した回数だけ繰り返す（for文）
+    // 指定した回数だけ、中の命令を繰り返す
     Block("robot_for")
         .category("制御")
         .text("%1 回繰り返す %2")
-        .number("COUNT", 5, 0)
-        .statements("DO")
-        .tooltip("指定した回数だけ、中の処理を繰り返します")
+        .number("COUNT", 5, 0)          // 繰り返す回数
+        .statements("DO")               // 繰り返す命令
+        .tooltip("指定した回数だけ、中の命令を繰り返します")
         .javaFunction([](BlockData& b) {
         static int counter = 0;
-        std::string i = "i" + std::to_string(counter++);   // i0, i1, i2 … と毎回ちがう名前にする
+
+        // 繰り返しごとに違う変数名を使う
+        std::string i = "i" + std::to_string(counter++);
+
         std::string inner = b.text("DO");
-        std::string indented;                               // 中身を4文字ずつ字下げする
+        std::string indented;
+
+        // 繰り返す命令を読みやすいように字下げする
         size_t start = 0;
         while (start <= inner.size()) {
             size_t end = inner.find('\n', start);
             if (end == std::string::npos) end = inner.size();
+
             indented += "    " + inner.substr(start, end - start) + "\n";
             start = end + 1;
         }
-        return "for (int " + i + " = 0; " + i + " < " + b.text("COUNT") + "; " + i + "++) {\n" +
-            indented + "}";
+
+        // Javaのfor文を作る
+        return "for (int " + i + " = 0; " + i + " < "
+            + b.text("COUNT") + "; " + i + "++) {\n"
+            + indented + "}";
             });
+
+      
 
     //条件が成立している間、中の処理を繰り返す(while文)
     Block("robot_while")
@@ -97,16 +107,17 @@ ROBOCODE_BLOCKS(RobotControl)
         .text("条件 %1 の間繰り返す %2")
         .valueInput("COND", "Boolean")
         .statements("DO")
-        .tooltip("条件が成立している間、中の処理を繰り返します")
+        .tooltip("条件が成立している間、中の処理を繰り返します\n"
+                 "※条件が変わらないと、止まらなくなることがあります")
         .java("while ({COND}) {\n"
             "    {DO}\n"
             "}");
 
-    // 〇〇 < 〇〇（数字を比べる）
+    // 2つの値を比べる
     Block("robot_compare")
         .category("制御")
         .text("%1 %2 %3")
-        .valueInput("A", "")              // 数字のブロックをはめる穴（左）
+        .valueInput("A", "")              // 左側の値
         .dropdown("OP", {
             {"<", "<"},
             {">", ">"},
@@ -115,9 +126,9 @@ ROBOCODE_BLOCKS(RobotControl)
             {"≧",">="},
             {"≠","!="},
             })
-        .valueInput("B", "")              // 数字のブロックをはめる穴（右）
-        .output("Boolean")                      // 比べた結果は「はい／いいえ」
-        .tooltip("2つの数字を比べます")
+        .valueInput("B", "")         // 右側
+        .output("Boolean")           // 比べた結果は「はい／いいえ」
+        .tooltip("2つの値を比べます")
         .java("({A} {OP} {B})");
 
 
@@ -132,16 +143,84 @@ ROBOCODE_BLOCKS(RobotControl)
             })
         .valueInput("B", "")
         .output("Boolean")
-        .tooltip("2つの条件をANDまたはORでつなぎます")
+        .tooltip("andは両方の条件が成立とき、\n"
+                 "orはどちらかが成立したのときに\n"
+                 "「はい」になります")
         .java("({A} {OP} {B})");
 
-    // はい / いいえ（true / false）
+    // はい / いいえ
     Block("logic_boolean_value")
         .category("制御")
         .text("%1")
-        .dropdown("BOOL", { {"はい（true）", "true"}, {"いいえ（false）", "false"} })
+        .dropdown("BOOL", { {"はい", "true"}, {"いいえ", "false"} })
         .output("Boolean")
-        .tooltip("「はい」か「いいえ」です。もしの条件や、くり返しの条件にはめられます")
+        .tooltip("「はい」か「いいえ」を選びます\n"
+            "条件を指定するときに使います")
         .java("{BOOL}");
+
+    //条件の結果を反対にする
+    Block("control_not")
+        .category("制御")
+        .text("%1 ではない")
+        .valueInput("COND", "Boolean")
+        .output("Boolean")
+        .tooltip("「はい」と「いいえ」を逆にします")
+        .java("(!{COND})");
+
+    //確率で成立する
+    Block("control_chance")
+        .category("制御")
+        .text("%1 ％の確率で")
+        .number("PERCENT", 50, 0, 100)
+        .output("Boolean")
+        .tooltip("決めた確率で「はい」になります\n"
+            "動きをランダムに変えたいときに使います")
+        .java("(Math.random() * 100 < {PERCENT})");
+
+    // ---------------- 記憶（変数） ----------------
+    //   memA, memB, memC はロボットのクラスに用意しておく（ラウンドが変わると 0 にもどる）
+
+    //選んだ記憶に数字を保存
+    Block("memory_set")
+        .category("制御")
+        .text("記憶 %1 を %2 にする")
+        .dropdown("MEM", { 
+            {"A", "memA"},
+            {"B", "memB"},
+            {"C", "memC"} 
+            })
+        .valueInput("VALUE", "Number")
+        .tooltip("選んだ記憶に数字を入れます\n"
+                 "※ラウンドが変わると0に戻ります")
+        .java("{MEM} = {VALUE};");
+
+    //記憶している数字に、新しい数字を足す
+    Block("memory_add")
+        .category("制御")
+        .text("記憶 %1 に %2 を足す")
+        .dropdown("MEM", {
+            {"A", "memA"},
+            {"B", "memB"},
+            {"C", "memC"} 
+            })
+        .valueInput("VALUE", "Number")
+        .tooltip("記憶している数字に数字を足します\n"
+                 "マイナスの数字を足すと、引き算になります")
+        .java("{MEM} += {VALUE};");
+
+    //記憶している数字を取り出す
+    Block("memory_get")
+        .category("制御")
+        .text("記憶 %1")
+        .dropdown("MEM", {
+            {"A", "memA"},
+            {"B", "memB"},
+            {"C", "memC"}
+            })
+        .output("Number")
+        .tooltip("選んだ記憶に入っている数字を使います\n"
+                 "計算や条件の判断に使います\n"
+                 "まだ数字を保存していない場合は、0です")
+        .java("{MEM}");
     
 }
