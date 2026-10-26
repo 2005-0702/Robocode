@@ -8,6 +8,7 @@
 // =====================================================================
 #include "RobocodeBlocks.h"
 
+
 ROBOCODE_BLOCKS(RobotAdvancedMove)
 {
     // 〇 進む／下がる（予約）

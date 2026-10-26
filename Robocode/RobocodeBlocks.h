@@ -136,46 +136,115 @@ using Options       = std::vector<std::pair<std::string, std::string>>;
 // ---------------------------------------------------------------------
 class BlockDef {
 public:
-    //カテゴリー
+    //==================
+    //ブロックの基本設定
+    //==================
+    
+    //カテゴリーを決める
     BlockDef& category(const std::string& name);
-    //ブロックの中身
+    //ブロックの表示文を決める
     BlockDef& text(const std::string& message);
     //ブロックの説明
     BlockDef& tooltip(const std::string& message);
-    //色
+    //ブロックの色
     BlockDef& color(int hue);
-
+    
+    //==================
     // 入力欄
+    //==================
+    
+    // 数値を入力する欄を追加する
+    // name：入力欄の名前
+    // initial：初期値
     BlockDef& number(const std::string& name, double initial);
+    
+    // 最小値を指定した数値入力欄を追加する
+    // name：入力欄の名前
+    // initial：初期値
+    // min：入力できる最小値
     BlockDef& number(const std::string& name, double initial, double min);
+    
+    // 最小値と最大値を指定した数値入力欄を追加する
+    // name：入力欄の名前
+    // initial：初期値
+    // min：入力できる最小値
+    // max：入力できる最大値
     BlockDef& number(const std::string& name, double initial, double min, double max);
-    //選択肢の中身
+   
+    // 選択肢
+    // name：選択欄の名前
+    // options：選択肢の一覧
     BlockDef& dropdown(const std::string& name, const Options& options);
+   
+    // 他のブロックの値を接続する入力欄を追加する
+    // name：入力欄の名前
+    // type：接続できる値の種類（省略時は Number）
     BlockDef& valueInput(const std::string& name, const std::string& type = "Number");
-    // 接続しなくてもよい値ブロックの穴（変数初期値などに使用）
+    
+    // 接続しなくてもよい値入力欄を追加する
+    // 変数の初期値など、入力が省略可能な場合に使用する
+    // name：入力欄の名前
+    // type：接続できる値の種類（省略時は Number）   
     BlockDef& optionalValueInput(const std::string& name, const std::string& type = "Number");
+    
+    // 他の処理ブロックを接続するための入力欄を追加する
+    // name：入力欄の名前
     BlockDef& statements(const std::string& name);
-    //初期値
+   
+    // 文字列を直接入力する欄を追加する
+    // name：入力欄の名前
+    // initial：初期表示する文字列
     BlockDef& textField(const std::string& name, const std::string& initial = "");
+    
+    // 変数を選択する欄を追加する
+    // name：入力欄の名前
+    // initial：初期選択する変数名
     BlockDef& variableField(const std::string& name,
         const std::string& initial = "score");
 
-    // ブロックの種類
+    //=====================
+    //ブロックの種類
+    //=====================
+
+    // 他のブロックに値を渡すブロックとして設定する
+    // type：出力する値の種類（省略時は Number）
     BlockDef& output(const std::string& type = "Number");
+    
+    // イベントを開始するブロックとして設定する
     BlockDef& event();
 
-    // クラス内のフィールドとして出力する
+    //==============================
+    //Javaコードの生成設定
+    //==============================
+       
+    // Javaクラス内のフィールドとして出力するブロックに設定する
     BlockDef& classMember();
 
-    // Java
+    // ブロックに対応するJavaコードのテンプレートを設定する
+    // javaTemplate：生成するJavaコードのひな形
     BlockDef& java(const std::string& javaTemplate);
+
+    // 関数を使ってJavaコードを生成する処理を設定する
+    // function：ブロックの内容に応じてコードを生成する関数
     BlockDef& javaFunction(JavaFunction function);
 
-    // チェック
-    BlockDef& warnIfZero(const std::string& name, const std::string& message);
-    BlockDef& onlyIn(const std::string& eventType);
-    BlockDef& check(CheckFunction function);
 
+    // ==============================
+    // 入力値や使用場所のチェック
+    // ==============================
+
+    // 指定した入力値が0の場合に警告を表示する設定を追加する
+    // name：チェックする入力欄の名前
+    // message：表示する警告文
+    BlockDef& warnIfZero(const std::string& name, const std::string& message);
+
+    // 特定のイベント内でのみ使用できるように設定する
+    // eventType：使用を許可するイベントの種類
+    BlockDef& onlyIn(const std::string& eventType);
+
+    // 独自の条件でブロックの内容をチェックする処理を設定する
+    // function：チェックを実行する関数
+    BlockDef& check(CheckFunction function);
    
 
     // ===== ここから下は RobocodeBlocksCore.cpp が使うもの（読まなくてOK）=====
