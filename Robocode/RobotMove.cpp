@@ -121,7 +121,7 @@ for (int step = 0; step < 6; step++) {    // 右に曲がりながら進む（90
         .tooltip("車体を旋回させながら前進するサンプルです")
         .color(210)
         .java("turnRight(30);\n"
-            "ahead(60);");
+            "ahead(60);\n");
 
 
     // 勝利の回転
@@ -129,10 +129,6 @@ for (int step = 0; step < 6; step++) {    // 右に曲がりながら進む（90
         .category("動き")
         .text("勝利の回転")
         .tooltip("車体を大きく回転させて、勝利を表現するサンプルです")
-        .java(R"(
-         turnRight(360);
-     )");
+        .java("turnRight(360);\n");
 
-
-  
 }

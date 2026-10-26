@@ -1,5 +1,7 @@
 ﻿// =====================================================================
 //  RobotBuilder.cpp  ―  できた Java を Robocode で使えるようにする
+// 
+//  2026/10/26 片山 変数も攻撃の上限のエラーが出るようにする。
 // =====================================================================
 #include "RobotBuilder.h"
 
@@ -7,6 +9,13 @@
 #include <shobjidl.h>   // IFileOpenDialog（フォルダを選ぶ画面）
 #include <fstream>
 #include <sstream>
+#include <regex>
+#include <map>
+#include <cctype>
+#include <cstdlib>
+#include <stdexcept>
+#include <string>
+#include <iomanip>
 
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "ole32.lib")
@@ -233,6 +242,356 @@ std::string CheckPackageName(const std::string& name) {
 }
 
 // ---------------------------------------------------------------------
+// fire のパワーを検査する
+// ---------------------------------------------------------------------
+namespace
+{
+    constexpr double MIN_FIRE_POWER = 0.1;
+    constexpr double MAX_FIRE_POWER = 3.0;
+
+    class ExpressionParser
+    {
+    public:
+        ExpressionParser(
+            const std::string& expression,
+            const std::map<std::string, double>& variables)
+            : m_expression(expression),
+            m_variables(variables),
+            m_position(0)
+        {
+        }
+
+        double Calculate()
+        {
+            double result = ParseExpression();
+            SkipSpaces();
+
+            // 式の最後まで読み取れなければ計算できない
+            if (m_position != m_expression.size())
+                throw std::runtime_error("計算できない式です");
+
+            return result;
+        }
+
+    private:
+        const std::string& m_expression;
+        const std::map<std::string, double>& m_variables;
+        size_t m_position;
+
+        void SkipSpaces()
+        {
+            while (m_position < m_expression.size() &&
+                std::isspace(
+                    static_cast<unsigned char>(
+                        m_expression[m_position])))
+            {
+                ++m_position;
+            }
+        }
+
+        // 足し算・引き算
+        double ParseExpression()
+        {
+            double value = ParseTerm();
+
+            while (true)
+            {
+                SkipSpaces();
+
+                if (m_position >= m_expression.size())
+                    break;
+
+                char op = m_expression[m_position];
+
+                if (op != '+' && op != '-')
+                    break;
+
+                ++m_position;
+
+                double right = ParseTerm();
+
+                if (op == '+')
+                    value += right;
+                else
+                    value -= right;
+            }
+
+            return value;
+        }
+
+        // 掛け算・割り算
+        double ParseTerm()
+        {
+            double value = ParseFactor();
+
+            while (true)
+            {
+                SkipSpaces();
+
+                if (m_position >= m_expression.size())
+                    break;
+
+                char op = m_expression[m_position];
+
+                if (op != '*' && op != '/')
+                    break;
+
+                ++m_position;
+
+                double right = ParseFactor();
+
+                if (op == '*')
+                {
+                    value *= right;
+                }
+                else
+                {
+                    if (right == 0.0)
+                        throw std::runtime_error("0で割る式です");
+
+                    value /= right;
+                }
+            }
+
+            return value;
+        }
+
+        // 数字・変数・括弧
+        double ParseFactor()
+        {
+            SkipSpaces();
+
+            if (m_position >= m_expression.size())
+                throw std::runtime_error("値がありません");
+
+            char c = m_expression[m_position];
+
+            // マイナスの値
+            if (c == '-')
+            {
+                ++m_position;
+                return -ParseFactor();
+            }
+
+            // プラスの値
+            if (c == '+')
+            {
+                ++m_position;
+                return ParseFactor();
+            }
+
+            // 括弧内の計算
+            if (c == '(')
+            {
+                ++m_position;
+
+                double value = ParseExpression();
+
+                SkipSpaces();
+
+                if (m_position >= m_expression.size() ||
+                    m_expression[m_position] != ')')
+                {
+                    throw std::runtime_error("括弧が正しくありません");
+                }
+
+                ++m_position;
+                return value;
+            }
+
+            // 数字
+            if (std::isdigit(static_cast<unsigned char>(c)) ||
+                c == '.')
+            {
+                const char* start = m_expression.c_str()
+                    + m_position;
+
+                char* end = nullptr;
+                double value = std::strtod(start, &end);
+
+                if (end == start)
+                    throw std::runtime_error("数字を読み取れません");
+
+                m_position += static_cast<size_t>(end - start);
+                return value;
+            }
+
+            // 変数名
+            if (std::isalpha(static_cast<unsigned char>(c)) ||
+                c == '_' || c == '$')
+            {
+                size_t start = m_position++;
+
+                while (m_position < m_expression.size())
+                {
+                    char ch = m_expression[m_position];
+
+                    if (!std::isalnum(
+                        static_cast<unsigned char>(ch)) &&
+                        ch != '_' && ch != '$')
+                    {
+                        break;
+                    }
+
+                    ++m_position;
+                }
+
+                std::string name =
+                    m_expression.substr(start, m_position - start);
+
+                auto found = m_variables.find(name);
+
+                if (found == m_variables.end())
+                    throw std::runtime_error("変数の値が不明です");
+
+                return found->second;
+            }
+
+            throw std::runtime_error("対応していない計算式です");
+        }
+    };
+
+
+    std::string CheckFirePower(const std::string& javaCode)
+    {
+        std::map<std::string, double> variables;
+
+        // 数値型変数の初期値を取得する
+        const std::regex declaration(
+            R"(\b(?:byte|short|int|long|float|double)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*([^;]+);)"
+        );
+
+        for (std::sregex_iterator it(
+            javaCode.begin(), javaCode.end(), declaration), end;
+            it != end; ++it)
+        {
+            const std::string name = (*it)[1].str();
+            const std::string expression = (*it)[2].str();
+
+            try
+            {
+                ExpressionParser parser(expression, variables);
+                variables[name] = parser.Calculate();
+            }
+            catch (...)
+            {
+                // 初期値を計算できない変数は登録しない
+            }
+        }
+
+        // fire(...) の引数を探す
+        size_t searchPosition = 0;
+
+        while (true)
+        {
+            size_t firePosition = javaCode.find("fire", searchPosition);
+
+            if (firePosition == std::string::npos)
+                break;
+
+            searchPosition = firePosition + 4;
+
+            // fire が別の単語の一部ではないか確認する
+            if (firePosition > 0)
+            {
+                char before = javaCode[firePosition - 1];
+
+                if (std::isalnum(static_cast<unsigned char>(before)) ||
+                    before == '_' || before == '$')
+                {
+                    continue;
+                }
+            }
+
+            size_t openPosition = searchPosition;
+
+            while (openPosition < javaCode.size() &&
+                std::isspace(static_cast<unsigned char>(
+                    javaCode[openPosition])))
+            {
+                ++openPosition;
+            }
+
+            if (openPosition >= javaCode.size() ||
+                javaCode[openPosition] != '(')
+            {
+                continue;
+            }
+
+            // fire の引数が終わる位置を探す
+            size_t argumentStart = openPosition + 1;
+            size_t position = argumentStart;
+            int depth = 1;
+
+            while (position < javaCode.size() && depth > 0)
+            {
+                if (javaCode[position] == '(')
+                    ++depth;
+                else if (javaCode[position] == ')')
+                    --depth;
+
+                ++position;
+            }
+
+            if (depth != 0)
+                continue;
+
+            size_t argumentEnd = position - 1;
+
+            std::string argument = javaCode.substr(
+                argumentStart,
+                argumentEnd - argumentStart);
+
+            searchPosition = position;
+
+
+            try
+            {
+                ExpressionParser parser(argument, variables);
+                double power = parser.Calculate();
+
+                if (power < MIN_FIRE_POWER || power > MAX_FIRE_POWER)
+                {
+                    // 計算結果を文字列に変換する
+                    std::ostringstream powerText;
+                    powerText << std::setprecision(10) << power;
+
+                    std::string powerString = powerText.str();
+
+                    // 小数点以下の不要な0を削除する
+                    if (powerString.find('.') != std::string::npos)
+                    {
+                        powerString.erase(
+                            powerString.find_last_not_of('0') + 1);
+
+                        if (!powerString.empty() && powerString.back() == '.')
+                        {
+                            powerString.pop_back();
+                        }
+                    }
+
+                    return
+                        "攻撃エラー：fire に指定したパワーが範囲外です。\n"
+                        "パワーは0.1～3.0にしてください。\n"
+                        "計算結果：" + powerString;
+                }
+            }
+            catch (...)
+            {
+                // 計算できない式は、この簡易検査では判定しない
+            }
+
+            
+        }
+
+        return "";
+    }
+
+    
+}
+
+
+// ---------------------------------------------------------------------
 //  保存してコンパイルする
 // ---------------------------------------------------------------------
 BuildResult BuildRobot(const std::wstring& robocodeFolder,
@@ -243,6 +602,10 @@ BuildResult BuildRobot(const std::wstring& robocodeFolder,
 
     r.message = CheckPackageName(packageName);
     if (r.message.empty()) r.message = CheckRobotName(robotName);
+    if (!r.message.empty()) return r;
+
+    // 攻撃パワーの検査
+    r.message = CheckFirePower(javaCode);
     if (!r.message.empty()) return r;
 
     // 1. robots\パッケージ名\ロボット名.java に保存する
