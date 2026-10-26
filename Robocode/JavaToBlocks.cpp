@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <locale>
+#include <cmath>
 #include <map>
 #include <set>
 #include <sstream>
@@ -354,14 +355,41 @@ std::vector<Toks> splitMembers(const Toks& toks, size_t from, size_t to) {
 // ---------------------------------------------------------------------
 //  4. 型紙（ブロックの .java("…")）
 // ---------------------------------------------------------------------
-enum class PieceKind { Literal, Hole, IdentHole };
+enum class PieceKind { Literal, Hole, IdentHole, Compound };
 
 struct Piece {
     PieceKind kind;
     std::string text;           // Literal のとき
     int arg = -1;               // Hole / IdentHole のとき：何番目の入力欄か
     std::string prefix, suffix; // IdentHole のとき：get{AXIS}() の get と空
+    // Compound のとき：1つの単語の中に選ぶ欄が2つ以上あるもの（{PART}{DIRECTION} → turnGunRight など）
+    //   partArgs[i] が -1 なら partTexts[i] の文字、そうでなければその番号の選ぶ欄
+    std::vector<int> partArgs;
+    std::vector<std::string> partTexts;
 };
+
+// Compound の単語 s を、決まった文字と選ぶ欄の値に分ける（できたら values[入力欄の番号] に値が入る）
+//   例：{PART}{DIRECTION} と turnGunRight → PART = turnGun, DIRECTION = Right
+bool splitCompound(const Piece& piece, const Info& info, const std::string& s, size_t pos, size_t part,
+                   std::map<int, std::string>& values) {
+    if (part == piece.partArgs.size()) return pos == s.size();
+    int a = piece.partArgs[part];
+    if (a < 0) {
+        const std::string& lit = piece.partTexts[part];
+        if (s.compare(pos, lit.size(), lit) != 0) return false;
+        return splitCompound(piece, info, s, pos + lit.size(), part + 1, values);
+    }
+    const Arg& arg = info.args[a];
+    if (arg.kind != Arg::Dropdown) return false;   // 選ぶ欄だけ（どこで切るかが決まるため）
+    for (const auto& o : arg.options) {
+        const std::string& v = o.second;
+        if (v.empty() || s.compare(pos, v.size(), v) != 0) continue;
+        values[a] = v;
+        if (splitCompound(piece, info, s, pos + v.size(), part + 1, values)) return true;
+    }
+    values.erase(a);
+    return false;
+}
 
 struct Pattern {
     const Info* info = nullptr;
@@ -426,18 +454,37 @@ bool buildPattern(const Info& info, Pattern& p) {
             std::string prefix, suffix;
             int holeArg = -1;
             size_t j = i;
+            // 単語の中を、決まった文字と {名前} に分けていく（{名前} が2つ以上あってもよい）
+            std::vector<int> partArgs;
+            std::vector<std::string> partTexts;
+            std::string current;
+            int holeCount = 0;
             while (j < src.size()) {
                 size_t e = 0;
                 int a = -1;
-                if (holeArg < 0 && readHole(info, src, j, e, a)) {
-                    holeArg = a;
+                if (readHole(info, src, j, e, a)) {
+                    if (!current.empty()) { partArgs.push_back(-1); partTexts.push_back(current); current.clear(); }
+                    partArgs.push_back(a);
+                    partTexts.push_back("");
+                    if (holeArg < 0) holeArg = a;
+                    ++holeCount;
                     j = e;
                 } else if (isIdentChar(src[j])) {
-                    (holeArg < 0 ? prefix : suffix) += src[j];
+                    (holeCount == 0 ? prefix : suffix) += src[j];
+                    current += src[j];
                     ++j;
                 } else {
                     break;
                 }
+            }
+            if (!current.empty()) { partArgs.push_back(-1); partTexts.push_back(current); }
+            if (holeCount >= 2) {
+                Piece piece{PieceKind::Compound, "", holeArg};
+                piece.partArgs = partArgs;
+                piece.partTexts = partTexts;
+                p.pieces.push_back(piece);
+                i = j;
+                continue;
             }
             if (holeArg < 0) {
                 // ふつうの単語（数字で始まるときは数字）
@@ -696,6 +743,14 @@ bool matchFrom(const Pattern& p, size_t pi, const Toks& toks, size_t pos, size_t
 
     if (piece.kind == PieceKind::Literal) {
         if (pos >= end || toks[pos].s != piece.text) return false;
+        return matchFrom(p, pi + 1, toks, pos + 1, end, caps, budget);
+    }
+
+    if (piece.kind == PieceKind::Compound) {
+        if (pos >= end || toks[pos].kind != TokKind::Ident) return false;
+        std::map<int, std::string> values;
+        if (!splitCompound(piece, *p.info, toks[pos].s, 0, 0, values)) return false;
+        for (const auto& v : values) caps[v.first] = {pos, pos + 1};   // 単語まるごと。あとで中の部分だけ取り出す
         return matchFrom(p, pi + 1, toks, pos + 1, end, caps, budget);
     }
 
@@ -1160,6 +1215,12 @@ public:
 
     Importer() {
         for (const Info* info : detail::RegisteredBlocks()) {
+            // 「〇 回繰り返す」があるか（数字の欄 COUNT と、口 DO があるもの）
+            if (info->type == "robot_for") {
+                const Arg* c = info->findArg("COUNT");
+                const Arg* d = info->findArg("DO");
+                hasForBlock = c && c->kind == Arg::Number && d && d->kind == Arg::Statements;
+            }
             if (info->javaTemplate.empty()) continue;  // javaFunction のブロックは型紙がない
             if (info->type == kRawStatement || info->type == kRawExpression || info->type == kRawMember ||
                 info->type == kNumberBlock) continue;
@@ -1239,6 +1300,14 @@ public:
                     if (piece.kind == PieceKind::IdentHole && piece.arg == static_cast<int>(k)) {
                         const std::string& s = toks[from].s;
                         text = s.substr(piece.prefix.size(), s.size() - piece.prefix.size() - piece.suffix.size());
+                    }
+                    // {PART}{DIRECTION} のように、1つの単語に選ぶ欄が2つ以上あるとき
+                    if (piece.kind == PieceKind::Compound &&
+                        std::find(piece.partArgs.begin(), piece.partArgs.end(), static_cast<int>(k)) != piece.partArgs.end()) {
+                        std::map<int, std::string> values;
+                        if (splitCompound(piece, info, toks[from].s, 0, 0, values) && values.count(static_cast<int>(k))) {
+                            text = values[static_cast<int>(k)];
+                        }
                     }
                 }
                 for (const auto& o : arg.options) {
@@ -1366,8 +1435,35 @@ public:
     }
 
     // 命令ブロックにする
+    // 「〇 回繰り返す」（robot_for）は .javaFunction で Java を作っていて型紙がないので、ここで読む
+    //   for (int i = 0; i < 50; i++) { … } → 「50 回繰り返す」（中で i を使っていないときだけ）
+    bool hasForBlock = false;
+    bool convertCountLoop(const Toks& t, const std::string& eventType, int& rawCount, json& out) {
+        if (!hasForBlock || t.size() < 16 || t[0].s != "for" || t[1].s != "(" || t[2].s != "int" ||
+            t[3].kind != TokKind::Ident || t[4].s != "=" || t[5].s != "0" || t[6].s != ";") return false;
+        const std::string& name = t[3].s;
+        if (t[7].s != name || t[8].s != "<" || t[9].kind != TokKind::Number || t[10].s != ";") return false;
+        bool post = t[11].s == name && t[12].s == "++";   // i++
+        bool pre = t[11].s == "++" && t[12].s == name;    // ++i
+        if ((!post && !pre) || t[13].s != ")" || t[14].s != "{" || t.back().s != "}" ||
+            matchBracket(t, 14) != t.size() - 1) return false;
+        double count = 0;
+        if (!parseNumberLiteral(t, 9, 10, count) || count < 0 || count != std::floor(count)) return false;
+        // 中で数えている変数（i）を使っていたら、ブロックにはできない（ブロックの Java では名前が変わるため）
+        for (size_t k = 15; k + 1 < t.size(); ++k) {
+            if (t[k].kind == TokKind::Ident && t[k].s == name && !(k > 0 && t[k - 1].s == ".")) return false;
+        }
+        json block = {{"type", "robot_for"}, {"fields", {{"COUNT", count}}}};
+        json chain = convertStatementList(t, 15, t.size() - 1, eventType, rawCount);
+        if (!chain.is_null()) block["inputs"]["DO"]["block"] = chain;
+        ++converted;
+        out = block;
+        return true;
+    }
+
     json convertStatement(const Toks& toks, const std::string& eventType, int& rawCount) {
         json variableBlock;
+        if (convertCountLoop(toks, eventType, rawCount, variableBlock)) return variableBlock;
         if (convertVariableStatement(toks, eventType, rawCount, variableBlock)) return variableBlock;
         // 関数を呼ぶ（f_名前(…);）・もし〇なら値を返す
         if (!toks.empty() && toks.back().s == ";" &&

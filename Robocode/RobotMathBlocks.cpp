@@ -61,6 +61,8 @@ ROBOCODE_BLOCKS(RobotMathBlocks)
             {"〇の△乗",               "pow"},
             {"斜めの長さ（√(A²+B²)）", "hypot"},
             {"角度（atan2、ラジアン）", "atan2"},
+            { "小さいほう",              "min" },
+            { "大きいほう",              "max" },
             })
             .output("Number")
         .tooltip("Java の Math を使った計算です")
