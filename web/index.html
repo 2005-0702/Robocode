@@ -314,7 +314,7 @@
       background: #1e1e1e;
       color: #d4d4d4;
       font-family: Consolas, monospace;
-      font-size: 13px;
+      font-size: var(--java-font, 13px);   /* 画面の設定で変えられる */
       white-space: pre;
     }
 
@@ -325,7 +325,7 @@
     }
     .blocklyToolboxDiv > .blocklyToolboxContents > .blocklyToolboxCategory {
       flex: 1 1 0;            /* 高さを等分する */
-      min-height: 34px;       /* これより小さくはしない（入りきらなければスクロール） */
+      min-height: var(--cat-row, 34px);   /* これより小さくはしない（入りきらなければスクロール）。画面の設定で変えられる */
       display: flex;
       flex-direction: column;
     }
@@ -339,8 +339,9 @@
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
     .blocklyToolboxDiv .blocklyTreeLabel {
-      font-size: 15px;
+      font-size: var(--cat-font, 15px);   /* 画面の設定で変えられる */
     }
+    .blocklyToolboxDiv { min-width: var(--cat-width, 0px); }
 
     /* アイコンのボタン（新規・開く・保存・別名で保存・元に戻す・やり直す） */
     #toolbar button.icon {
@@ -470,6 +471,62 @@
     #findBar button:hover { background: #7f8c8d; }
     #findCount { min-width: 64px; text-align: center; color: #c8d3de; font-size: 13px; }
     #toolbar button.icon.emoji { font-size: 22px; line-height: 1; }
+    /* ---------- ❓ のメニュー ---------- */
+    #helpMenu {
+      display: none; position: fixed; z-index: 2300; min-width: 240px;
+      background: #fff; border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); padding: 6px;
+    }
+    #helpMenu.open { display: block; }
+    #helpMenu button {
+      display: block; width: 100%; text-align: left; border: none; background: none; color: #222;
+      padding: 9px 12px; border-radius: 6px; font-size: 14px; cursor: pointer;
+    }
+    #helpMenu button:hover { background: #eef3fb; }
+    /* ---------- ショートカット一覧・画面の設定（同じ形のダイアログ） ---------- */
+    .rbDialogOverlay { position: fixed; inset: 0; z-index: 2400; display: none; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.45); }
+    .rbDialogOverlay.open { display: flex; }
+    .rbDialog { width: 680px; max-width: calc(100vw - 32px); max-height: calc(100vh - 48px); overflow: auto; box-sizing: border-box;
+      background: #fff; color: #222; border-radius: 14px; padding: 18px 20px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4); font-size: 14px; }
+    .rbDialog h3 { margin: 0 0 10px; font-size: 18px; color: #2c3e50; }
+    .rbDialog h4 { margin: 14px 0 6px; font-size: 15px; color: #1f5f8b; }
+    .rbDialog .rbClose { float: right; border: none; background: #5d6d7e; color: #fff; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+    .rbDialog table { border-collapse: collapse; width: 100%; }
+    .rbDialog td { padding: 5px 8px; border-bottom: 1px solid #eef0f3; vertical-align: top; }
+    .rbDialog td.key { white-space: nowrap; width: 38%; }
+    .rbDialog kbd { display: inline-block; padding: 1px 6px; border: 1px solid #c8cfd8; border-bottom-width: 2px; border-radius: 4px; background: #f6f8fa; font-family: inherit; font-size: 12px; }
+    .rbTabs { display: flex; gap: 6px; margin-bottom: 10px; }
+    .rbTabs button { border: 1px solid #c8cfd8; background: #f4f6f8; border-radius: 6px; padding: 5px 12px; cursor: pointer; font-size: 14px; }
+    .rbTabs button.active { background: #2c3e50; color: #fff; border-color: #2c3e50; }
+    .rbTabPage { display: none; }
+    .rbTabPage.active { display: block; }
+    .rbCat { border: 1px solid #e3e7ec; border-radius: 8px; margin-bottom: 6px; }
+    .rbCat summary { padding: 6px 10px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+    .rbCat summary .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+    .rbCat .rbBlocks { padding: 4px 12px 8px 34px; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+    .rbCat .rbBlocks .rbBlockRow { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 4px; }
+    .rbCat .rbBlocks .rbBlockRow:hover { background: #f4f7fb; }
+    .rbCat .rbBlocks .rbBlockRow label { flex: 1; }
+    .rbCat summary .rbCatName { flex: 1; }
+    /* 開いているか分かるように、カテゴリの名前の前に ▸ ▾ を出す */
+    .rbCat summary { list-style: none; }
+    .rbCat summary::-webkit-details-marker { display: none; }
+    .rbCat summary .rbCatName::before { content: '▸ '; color: #888; }
+    .rbCat[open] summary .rbCatName::before { content: '▾ '; }
+    /* ドラッグでならべかえる */
+    .rbGrip { cursor: grab; color: #9aa4af; padding: 0 2px; user-select: none; font-size: 14px; letter-spacing: -2px; }
+    .rbGrip:active { cursor: grabbing; }
+    .rbDragging { opacity: 0.4; }
+    .rbDropBefore { box-shadow: inset 0 3px 0 #2980b9; }
+    .rbDropAfter { box-shadow: inset 0 -3px 0 #2980b9; }
+    .rbOrder { border: 1px solid #c8cfd8; background: #fff; border-radius: 4px; width: 26px; height: 22px; padding: 0; cursor: pointer; font-size: 12px; line-height: 1; }
+    .rbOrder:hover { background: #eef3fb; }
+    .rbOrder:disabled { opacity: 0.3; cursor: default; }
+    .rbRange { display: grid; grid-template-columns: 220px 1fr 56px; align-items: center; gap: 10px; margin: 8px 0; }
+    .rbRange output { text-align: right; color: #555; }
+    .rbChecks { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+    .rbDialogFoot { margin-top: 14px; display: flex; gap: 8px; justify-content: flex-end; }
+    .rbDialogFoot button { border: none; border-radius: 6px; padding: 6px 14px; cursor: pointer; font-size: 14px; background: #5d6d7e; color: #fff; }
+    .rbDialogFoot button.primary { background: #27ae60; }
     /* ---------- チュートリアル ---------- */
     #tutSpot {
       display: none;
@@ -593,7 +650,7 @@
     <span class="sep"></span>
 
     <!-- チュートリアルとサンプル -->
-    <button id="tutorialButton" class="sub icon emoji" data-tip="チュートリアル：ロボットの作り方の案内を始めます" aria-label="チュートリアル">❓</button>
+    <button id="tutorialButton" class="sub icon emoji" data-tip="ヘルプ：チュートリアル・ショートカットキー一覧・画面の設定" aria-label="ヘルプ">❓</button>
     <button id="sampleButton" class="sub icon emoji" data-tip="サンプル：見本のロボットを開いて参考にできます" aria-label="サンプルのロボット">🤖</button>
 
     <span class="sep"></span>
@@ -627,6 +684,50 @@
 
   <div id="blocklyDiv"></div>
   <div id="trashScroll"><div></div></div>
+  <!-- ❓ を押すと出るメニュー -->
+  <div id="helpMenu" role="menu">
+    <button id="helpTutorial" role="menuitem">▶ チュートリアルを始める</button>
+    <button id="helpShortcuts" role="menuitem">⌨ ショートカットキーの一覧</button>
+    <button id="helpLayout" role="menuitem">⚙ 画面の設定（カテゴリ・ブロック・文字の大きさ）</button>
+  </div>
+
+  <!-- ショートカットキーの一覧 -->
+  <div id="shortcutOverlay" class="rbDialogOverlay">
+    <div class="rbDialog" role="dialog" aria-modal="true">
+      <button class="rbClose" data-close="shortcutOverlay">✕ 閉じる</button>
+      <h3>⌨ ショートカットキーの一覧</h3>
+      <div id="shortcutList"></div>
+    </div>
+  </div>
+
+  <!-- 画面の設定 -->
+  <div id="layoutOverlay" class="rbDialogOverlay">
+    <div class="rbDialog" role="dialog" aria-modal="true">
+      <button class="rbClose" data-close="layoutOverlay">✕ 閉じる</button>
+      <h3>⚙ 画面の設定</h3>
+      <div class="rbTabs">
+        <button data-tab="layoutTabCats" class="active">カテゴリとブロック</button>
+        <button data-tab="layoutTabLook">大きさ</button>
+        <button data-tab="layoutTabButtons">上の欄のボタン</button>
+      </div>
+      <div id="layoutTabCats" class="rbTabPage active">
+        <p style="margin:0 0 8px;color:#555;font-size:13px">チェックを外したカテゴリ・ブロックは、ツールボックスと検索に出なくなります（置いてあるブロックは消えません）。⋮⋮ をドラッグするか ▲▼ で、ならぶ順番を変えられます。カテゴリの名前をクリックすると、中のブロックが出ます。</p>
+        <div id="layoutCatList"></div>
+      </div>
+      <div id="layoutTabLook" class="rbTabPage">
+        <div id="layoutRanges"></div>
+      </div>
+      <div id="layoutTabButtons" class="rbTabPage">
+        <p style="margin:0 0 8px;color:#555;font-size:13px">チェックを外したボタンは、上の欄に出なくなります。</p>
+        <div id="layoutButtonList" class="rbChecks"></div>
+      </div>
+      <div class="rbDialogFoot">
+        <button id="layoutReset">はじめの設定にもどす</button>
+        <button class="primary" data-close="layoutOverlay">閉じる</button>
+      </div>
+    </div>
+  </div>
+
   <!-- チュートリアル：光らせる枠と説明のカード -->
   <div id="tutSpot"></div>
   <div id="tutCard" role="dialog" aria-live="polite">
@@ -1470,10 +1571,11 @@
           };
           definition._rgbHiddenOnInit = true;
         }
-        workspace.updateToolbox(msg.setup.toolbox);
+        originalSetup = msg.setup;   // 画面の設定で、カテゴリやブロックをかくすときに使う
+        workspace.updateToolbox(layoutToolbox(msg.setup.toolbox));
 
         // 検索できるように、ブロックの一覧を覚えておく
-        buildSearchIndex(msg.setup);
+        buildSearchIndex({ blocks: msg.setup.blocks, toolbox: layoutToolbox(msg.setup.toolbox) });
 
         // 前回の続きを読み込む（ブロックの定義がそろってからでないと読み込めない）
         restoreAutosave();
@@ -2398,8 +2500,8 @@
     (() => {
       const flyout = toolboxFlyout();
       if (!flyout) return;
-      const fixedScale = (workspace.options && workspace.options.zoomOptions && workspace.options.zoomOptions.startScale) || 1;
-      flyout.getFlyoutScale = () => fixedScale;
+      const startScale = (workspace.options && workspace.options.zoomOptions && workspace.options.zoomOptions.startScale) || 1;
+      flyout.getFlyoutScale = () => startScale * (layoutPrefs.flyoutScale || 1);   // 画面の設定で変えられる
       flyout.MARGIN = 18;   // Blockly のもとは 8
     })();
 
@@ -3262,7 +3364,23 @@
     document.addEventListener('pointerup', () => { tutCard.classList.remove('passthrough'); }, true);
     document.addEventListener('pointercancel', () => { tutCard.classList.remove('passthrough'); }, true);
 
-    document.getElementById('tutorialButton').addEventListener('click', tutStart);
+    // ❓：メニューを出す（チュートリアル・ショートカット一覧・画面の設定）
+    const helpMenu = document.getElementById('helpMenu');
+    document.getElementById('tutorialButton').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (helpMenu.classList.contains('open')) { helpMenu.classList.remove('open'); return; }
+      const r = e.currentTarget.getBoundingClientRect();
+      helpMenu.style.left = Math.min(r.left, window.innerWidth - 260) + 'px';
+      helpMenu.style.top = (r.bottom + 6) + 'px';
+      helpMenu.classList.add('open');
+    });
+    document.addEventListener('pointerdown', (e) => {
+      if (helpMenu.classList.contains('open') && !helpMenu.contains(e.target) &&
+          !document.getElementById('tutorialButton').contains(e.target)) helpMenu.classList.remove('open');
+    }, true);
+    document.getElementById('helpTutorial').addEventListener('click', () => { helpMenu.classList.remove('open'); tutStart(); });
+    document.getElementById('helpShortcuts').addEventListener('click', () => { helpMenu.classList.remove('open'); openShortcuts(); });
+    document.getElementById('helpLayout').addEventListener('click', () => { helpMenu.classList.remove('open'); openLayout(); });
     document.getElementById('tutNext').addEventListener('click', tutNextStep);
     document.getElementById('tutBack').addEventListener('click', () => { if (tutIndex > 0) { TUTORIAL[tutIndex - 1]._advanced = true; tutShow(tutIndex - 1); } });
     document.getElementById('tutQuit').addEventListener('click', tutEnd);
@@ -3271,9 +3389,384 @@
     try {
       if (!localStorage.getItem('robocodeBlocks.tutorialHint')) {
         localStorage.setItem('robocodeBlocks.tutorialHint', '1');
-        setTimeout(() => showStatus('', 'はじめての人は、上の「❓」（チュートリアル）を押してみよう'), 1500);
+        setTimeout(() => showStatus('', 'はじめての人は、上の「❓」を押して「チュートリアルを始める」を選んでみよう'), 1500);
       }
     } catch (err) { /* 覚えられなくても動く */ }
+
+    // ------------------------------------------------------------
+    // ショートカットキーの一覧
+    // ------------------------------------------------------------
+    const SHORTCUTS = [
+      ['作品', [
+        ['<kbd>Ctrl</kbd> + <kbd>S</kbd>', '保存する'],
+      ]],
+      ['ブロックの画面', [
+        ['<kbd>Ctrl</kbd> + <kbd>Z</kbd>', '元に戻す'],
+        ['<kbd>Ctrl</kbd> + <kbd>Y</kbd>', 'やり直す'],
+        ['<kbd>Ctrl</kbd> + <kbd>C</kbd> / <kbd>Ctrl</kbd> + <kbd>V</kbd>', 'コピー / はりつけ（いくつか選んでいるときは、まとめて）'],
+        ['<kbd>Ctrl</kbd> + <kbd>D</kbd>', '選んだブロックを複製する'],
+        ['<kbd>Delete</kbd> / <kbd>Backspace</kbd>', '選んだブロックを消す'],
+        ['<kbd>Shift</kbd> + ドラッグ（何もないところから）', '四角で囲んで、まとめて選ぶ（少しでもかかったブロック）'],
+        ['<kbd>Ctrl</kbd> + クリック', 'ブロックを1つずつ選ぶ・選ぶのをやめる'],
+        ['選んだブロックをドラッグ', '選んだブロックをまとめて動かす（ゴミ箱に入れると、まとめて消す）'],
+        ['<kbd>Ctrl</kbd> + <kbd>F</kbd>', '置いてあるブロックを、書いてある文字でさがして移動する（Enter で次、Shift + Enter で前）'],
+        ['マウスのホイール', '拡大・縮小'],
+        ['何もないところをドラッグ', '画面を動かす'],
+      ]],
+      ['カテゴリの一覧（ツールボックス）', [
+        ['クリック', 'ブロックを1つ選ぶ'],
+        ['ダブルクリック / ドラッグ', 'ブロックの画面に出す'],
+        ['<kbd>Shift</kbd> + クリック', '選んだブロックから、そこまでを全部選ぶ'],
+        ['<kbd>Ctrl</kbd> + クリック', '1つずつ選ぶ・選ぶのをやめる'],
+      ]],
+      ['そのほか', [
+        ['<kbd>Esc</kbd>', '広い画面からもどる・検索を閉じる・ダイアログを閉じる'],
+        ['<kbd>Shift</kbd> + ホイール（ゴミ箱の一覧）', 'ゴミ箱の中を横にスクロール'],
+      ]],
+    ];
+    function openShortcuts() {
+      const box = document.getElementById('shortcutList');
+      box.innerHTML = '';
+      SHORTCUTS.forEach(([title, rows]) => {
+        const h = document.createElement('h4');
+        h.textContent = title;
+        const table = document.createElement('table');
+        rows.forEach(([key, what]) => {
+          const tr = document.createElement('tr');
+          const k = document.createElement('td'); k.className = 'key'; k.innerHTML = key;   // 決まった文字だけ（入力した文字は入らない）
+          const w = document.createElement('td'); w.textContent = what;
+          tr.append(k, w);
+          table.appendChild(tr);
+        });
+        box.append(h, table);
+      });
+      document.getElementById('shortcutOverlay').classList.add('open');
+    }
+
+    // ダイアログを閉じる（✕・閉じる・外側のクリック・Esc）
+    document.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', () =>
+      document.getElementById(btn.dataset.close).classList.remove('open')));
+    document.querySelectorAll('.rbDialogOverlay').forEach(ov => ov.addEventListener('click', (e) => { if (e.target === ov) ov.classList.remove('open'); }));
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const open = document.querySelector('.rbDialogOverlay.open');
+      if (open) { e.preventDefault(); e.stopPropagation(); open.classList.remove('open'); }
+      if (helpMenu.classList.contains('open')) helpMenu.classList.remove('open');
+    }, true);
+
+    // ------------------------------------------------------------
+    // 画面の設定
+    //   ・カテゴリやブロックをかくす（ツールボックスと検索に出さない）
+    //   ・ブロックの文字・一覧のブロック・カテゴリの文字・Java の文字の大きさ、カテゴリの幅・高さ
+    //   ・上の欄のボタンをかくす
+    //   設定はこのパソコンに覚えておく（「はじめの設定にもどす」で元にもどる）
+    // ------------------------------------------------------------
+    const LAYOUT_KEY = 'robocodeBlocks.layout';
+    const LAYOUT_DEFAULT = {
+      hiddenCats: [], hiddenBlocks: [], hiddenButtons: [],
+      catOrder: [], blockOrder: {},   // ならべる順番（カテゴリの名前の順・カテゴリごとのブロックの名前の順）
+      blockFont: 12, flyoutScale: 1, catFont: 15, catRow: 34, catWidth: 0, javaFont: 13,
+    };
+    let layoutPrefs = Object.assign({}, LAYOUT_DEFAULT);
+    try { layoutPrefs = Object.assign({}, LAYOUT_DEFAULT, JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}')); } catch (err) { /* 読めなくても動く */ }
+    let originalSetup = null;
+
+    const LAYOUT_RANGES = [
+      ['blockFont',   'ブロックの文字の大きさ',        8, 20, 1,   v => v + 'px'],
+      ['flyoutScale', 'カテゴリの一覧のブロックの大きさ', 0.6, 1.6, 0.05, v => Math.round(v * 100) + '%'],
+      ['catFont',     'カテゴリの文字の大きさ',        10, 22, 1,   v => v + 'px'],
+      ['catRow',      'カテゴリ1つ分の高さ（いちばん小さいとき）', 20, 70, 1, v => v + 'px'],
+      ['catWidth',    'カテゴリの幅（いちばん小さいとき）', 0, 240, 5, v => v ? v + 'px' : '自動'],
+      ['javaFont',    'できた Java の文字の大きさ',    9, 22, 1,   v => v + 'px'],
+    ];
+    const LAYOUT_BUTTONS = [
+      ['newButton', '新しく作る'], ['openButton', '開く'], ['saveButton', '保存'], ['saveAsButton', '別名で保存'],
+      ['fileName', 'ファイル名'], ['undoButton', '元に戻す'], ['redoButton', 'やり直す'], ['focusButton', '画面を広くする'],
+      ['sampleButton', 'サンプル'], ['searchBox', 'ブロックの検索'], ['importJavaButton', 'Java を読みこむ'], ['launchButton', 'Robocode を開く'],
+    ];
+
+    function saveLayout() {
+      try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(layoutPrefs)); } catch (err) { /* 保存できなくても動く */ }
+    }
+
+    // 決めた順番にならべる（順番を決めていないものは、もとの順番のまま後ろに）
+    function orderBy(list, keyOf, order) {
+      const rank = new Map((order || []).map((k, i) => [k, i]));
+      return list.map((item, i) => ({ item, i, r: rank.has(keyOf(item)) ? rank.get(keyOf(item)) : order.length + i }))
+        .sort((a, b) => a.r - b.r || a.i - b.i).map(x => x.item);
+    }
+    function orderedCats(toolbox) {
+      return orderBy((toolbox && toolbox.contents) || [], c => c.name, layoutPrefs.catOrder || []);
+    }
+    function orderedBlocks(cat) {
+      const order = (layoutPrefs.blockOrder || {})[cat.name] || [];
+      return orderBy(cat.contents || [], b => b.type, order);
+    }
+
+    // ツールボックスから、かくすカテゴリ・ブロックを取りのぞき、決めた順番にならべる
+    function layoutToolbox(toolbox) {
+      if (!toolbox) return toolbox;
+      const hiddenCats = new Set(layoutPrefs.hiddenCats), hiddenBlocks = new Set(layoutPrefs.hiddenBlocks);
+      const contents = [];
+      orderedCats(toolbox).forEach(cat => {
+        if (cat.kind === 'category' && hiddenCats.has(cat.name)) return;
+        if (cat.kind === 'category' && Array.isArray(cat.contents)) {
+          const items = orderedBlocks(cat).filter(item => !(item.kind === 'block' && hiddenBlocks.has(item.type)));
+          if (items.length === 0) return;   // 中が空のカテゴリは出さない
+          contents.push(Object.assign({}, cat, { contents: items }));
+        } else {
+          contents.push(cat);
+        }
+      });
+      return Object.assign({}, toolbox, { contents: contents });
+    }
+
+    // 設定を画面に反映する
+    let appliedBlockFont = 12;
+    function applyLayout(rebuildToolbox) {
+      const root = document.documentElement.style;
+      root.setProperty('--cat-font', layoutPrefs.catFont + 'px');
+      root.setProperty('--cat-row', layoutPrefs.catRow + 'px');
+      root.setProperty('--cat-width', layoutPrefs.catWidth + 'px');
+      root.setProperty('--java-font', layoutPrefs.javaFont + 'px');
+      LAYOUT_BUTTONS.forEach(([id]) => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = layoutPrefs.hiddenButtons.includes(id) ? 'none' : '';
+      });
+      // ブロックの文字の大きさ：テーマを作り直してブロックを描き直す
+      if (layoutPrefs.blockFont !== appliedBlockFont) {
+        appliedBlockFont = layoutPrefs.blockFont;
+        try {
+          const theme = Blockly.Theme.defineTheme('robocode_' + appliedBlockFont, {
+            base: robocodeTheme, fontStyle: { family: 'Meiryo, sans-serif', size: appliedBlockFont } });
+          workspace.setTheme(theme);
+        } catch (err) { /* テーマを変えられなくても、ほかの設定は使える */ }
+      }
+      if (rebuildToolbox && originalSetup) {
+        const tb = layoutToolbox(originalSetup.toolbox);
+        workspace.updateToolbox(tb);
+        buildSearchIndex({ blocks: originalSetup.blocks, toolbox: tb });
+      }
+      const flyout = toolboxFlyout();
+      if (flyout && flyout.isVisible()) flyout.hide();   // 一覧は、次に開いたときに新しい大きさで出る
+      Blockly.svgResize(workspace);
+    }
+
+    // 設定の一覧に出すブロックの名前（%1 などは、選ぶ欄なら最初の選択肢、数字ならその数字、穴なら □ にする）
+    function blockLabel(type) {
+      const def = originalSetup && (originalSetup.blocks || []).find(b => b.type === type);
+      if (!def) return type;
+      const args = def.args0 || [];
+      const text = String(def.message0 || type).replace(/%(\d+)/g, (m, n) => {
+        const a = args[Number(n) - 1];
+        if (!a) return '';
+        if (a.type === 'field_dropdown') return '[' + (a.options && a.options[0] ? a.options[0][0] : '') + ']';
+        if (a.type === 'field_number') return String(a.value);
+        if (a.type === 'field_input') return '[' + (a.text || '') + ']';
+        if (a.type === 'input_statement') return '';
+        return '□';
+      });
+      return text.replace(/\s+/g, ' ').trim() || type;
+    }
+
+    // カテゴリとブロックの一覧（▲▼ で順番を変えられる）
+    const openCatNames = new Set();   // ▶ で開いているカテゴリ（順番を変えて描き直しても、開いたままにする）
+    function moveInOrder(list, index, dir) {
+      const j = index + dir;
+      if (j < 0 || j >= list.length) return list;
+      const copy = list.slice();
+      [copy[index], copy[j]] = [copy[j], copy[index]];
+      return copy;
+    }
+    function orderButtons(onUp, onDown, isFirst, isLast) {
+      const up = document.createElement('button');
+      up.className = 'rbOrder'; up.textContent = '▲'; up.title = '1つ上へ'; up.disabled = isFirst;
+      const down = document.createElement('button');
+      down.className = 'rbOrder'; down.textContent = '▼'; down.title = '1つ下へ'; down.disabled = isLast;
+      [up, down].forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); }));
+      up.addEventListener('click', onUp);
+      down.addEventListener('click', onDown);
+      return [up, down];
+    }
+    // ドラッグでならべかえる（⋮⋮ をつかんで動かす）
+    //   group が同じもの（カテゴリどうし・同じカテゴリの中のブロックどうし）だけ入れかえられる
+    let sortDrag = null;   // { group, index }
+    function makeSortable(el, grip, group, index, keys, onReorder) {
+      grip.draggable = true;
+      grip.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); });   // つかんでも開いたり閉じたりしない
+      grip.addEventListener('dragstart', (e) => {
+        e.stopPropagation();
+        sortDrag = { group, index };
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', group + ':' + index); } catch (err) { /* なくても動く */ }
+        setTimeout(() => el.classList.add('rbDragging'), 0);
+      });
+      grip.addEventListener('dragend', () => {
+        sortDrag = null;
+        el.classList.remove('rbDragging');
+        document.querySelectorAll('.rbDropBefore, .rbDropAfter').forEach(x => x.classList.remove('rbDropBefore', 'rbDropAfter'));
+      });
+      const after = (e) => { const r = el.getBoundingClientRect(); return e.clientY > r.top + Math.min(r.height, 34) / 2; };
+      el.addEventListener('dragover', (e) => {
+        if (!sortDrag || sortDrag.group !== group) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
+        el.classList.toggle('rbDropAfter', after(e));
+        el.classList.toggle('rbDropBefore', !after(e));
+      });
+      el.addEventListener('dragleave', () => el.classList.remove('rbDropBefore', 'rbDropAfter'));
+      el.addEventListener('drop', (e) => {
+        if (!sortDrag || sortDrag.group !== group) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const from = sortDrag.index;
+        let to = index + (after(e) ? 1 : 0);
+        sortDrag = null;
+        if (to > from) to--;   // 取り出した分だけ前にずれる
+        if (to === from) { el.classList.remove('rbDropBefore', 'rbDropAfter'); return; }
+        const list = keys.slice();
+        const [moved] = list.splice(from, 1);
+        list.splice(to, 0, moved);
+        onReorder(list);
+      });
+    }
+
+    function renderLayoutCats() {
+      const list = document.getElementById('layoutCatList');
+      const scrollTop = list.closest('.rbDialog').scrollTop;
+      list.innerHTML = '';
+      const cats = orderedCats(originalSetup && originalSetup.toolbox).filter(c => c.kind === 'category');
+      const catNames = cats.map(c => c.name);
+      cats.forEach((cat, ci) => {
+        const details = document.createElement('details');
+        details.className = 'rbCat';
+        details.open = openCatNames.has(cat.name);
+        details.addEventListener('toggle', () => { if (details.open) openCatNames.add(cat.name); else openCatNames.delete(cat.name); });
+        const summary = document.createElement('summary');
+        const check = document.createElement('input');
+        check.type = 'checkbox';
+        check.checked = !layoutPrefs.hiddenCats.includes(cat.name);
+        check.addEventListener('click', (e) => e.stopPropagation());   // チェックしても開いたり閉じたりしない
+        check.addEventListener('change', () => {
+          layoutPrefs.hiddenCats = layoutPrefs.hiddenCats.filter(n => n !== cat.name);
+          if (!check.checked) layoutPrefs.hiddenCats.push(cat.name);
+          saveLayout(); applyLayout(true);
+        });
+        const swatch = document.createElement('span');
+        swatch.className = 'swatch';
+        swatch.style.background = 'hsl(' + (Number(cat.colour) || 0) + ', 45%, 50%)';
+        const name = document.createElement('span');
+        name.className = 'rbCatName';
+        name.textContent = cat.name + (Array.isArray(cat.contents) ? '（' + cat.contents.length + '）' : '（自動で出るブロック）');
+        const moveCat = (dir) => {
+          layoutPrefs.catOrder = moveInOrder(catNames, ci, dir);
+          saveLayout(); applyLayout(true); renderLayoutCats();
+        };
+        const catGrip = document.createElement('span');
+        catGrip.className = 'rbGrip';
+        catGrip.textContent = '⋮⋮';
+        catGrip.title = 'ドラッグして、ならぶ順番を変える';
+        summary.append(catGrip, check, swatch, name, ...orderButtons(() => moveCat(-1), () => moveCat(1), ci === 0, ci === cats.length - 1));
+        details.appendChild(summary);
+        makeSortable(details, catGrip, 'cats', ci, catNames, (order) => {
+          layoutPrefs.catOrder = order;
+          saveLayout(); applyLayout(true); renderLayoutCats();
+        });
+        if (Array.isArray(cat.contents)) {
+          const blocks = document.createElement('div');
+          blocks.className = 'rbBlocks';
+          const items = orderedBlocks(cat).filter(i => i.kind === 'block');
+          const types = items.map(i => i.type);
+          items.forEach((item, bi) => {
+            const row = document.createElement('div');
+            row.className = 'rbBlockRow';
+            const label = document.createElement('label');
+            const c = document.createElement('input');
+            c.type = 'checkbox';
+            c.checked = !layoutPrefs.hiddenBlocks.includes(item.type);
+            c.addEventListener('change', () => {
+              layoutPrefs.hiddenBlocks = layoutPrefs.hiddenBlocks.filter(t => t !== item.type);
+              if (!c.checked) layoutPrefs.hiddenBlocks.push(item.type);
+              saveLayout(); applyLayout(true);
+            });
+            label.append(c, document.createTextNode(' ' + blockLabel(item.type)));
+            label.title = item.type;
+            const moveBlock = (dir) => {
+              layoutPrefs.blockOrder = Object.assign({}, layoutPrefs.blockOrder, { [cat.name]: moveInOrder(types, bi, dir) });
+              saveLayout(); applyLayout(true); renderLayoutCats();
+            };
+            const grip = document.createElement('span');
+            grip.className = 'rbGrip';
+            grip.textContent = '⋮⋮';
+            grip.title = 'ドラッグして、ならぶ順番を変える';
+            row.append(grip, label, ...orderButtons(() => moveBlock(-1), () => moveBlock(1), bi === 0, bi === items.length - 1));
+            blocks.appendChild(row);
+            makeSortable(row, grip, 'blocks:' + cat.name, bi, types, (order) => {
+              layoutPrefs.blockOrder = Object.assign({}, layoutPrefs.blockOrder, { [cat.name]: order });
+              saveLayout(); applyLayout(true); renderLayoutCats();
+            });
+          });
+          details.appendChild(blocks);
+        }
+        list.appendChild(details);
+      });
+      list.closest('.rbDialog').scrollTop = scrollTop;   // 描き直しても、見ていた場所のまま
+    }
+
+    function openLayout() {
+      // カテゴリとブロック
+      renderLayoutCats();
+
+      // 大きさ
+      const ranges = document.getElementById('layoutRanges');
+      ranges.innerHTML = '';
+      LAYOUT_RANGES.forEach(([key, text, min, max, step, show]) => {
+        const row = document.createElement('div');
+        row.className = 'rbRange';
+        const label = document.createElement('span');
+        label.textContent = text;
+        const input = document.createElement('input');
+        input.type = 'range'; input.min = min; input.max = max; input.step = step; input.value = layoutPrefs[key];
+        const out = document.createElement('output');
+        out.textContent = show(layoutPrefs[key]);
+        input.addEventListener('input', () => { out.textContent = show(Number(input.value)); });
+        input.addEventListener('change', () => {   // 手をはなしたときに反映する
+          layoutPrefs[key] = Number(input.value);
+          saveLayout(); applyLayout(false);
+        });
+        row.append(label, input, out);
+        ranges.appendChild(row);
+      });
+
+      // ボタン
+      const buttons = document.getElementById('layoutButtonList');
+      buttons.innerHTML = '';
+      LAYOUT_BUTTONS.forEach(([id, text]) => {
+        const label = document.createElement('label');
+        const c = document.createElement('input');
+        c.type = 'checkbox';
+        c.checked = !layoutPrefs.hiddenButtons.includes(id);
+        c.addEventListener('change', () => {
+          layoutPrefs.hiddenButtons = layoutPrefs.hiddenButtons.filter(b => b !== id);
+          if (!c.checked) layoutPrefs.hiddenButtons.push(id);
+          saveLayout(); applyLayout(false);
+        });
+        label.append(c, document.createTextNode(' ' + text));
+        buttons.appendChild(label);
+      });
+      document.getElementById('layoutOverlay').classList.add('open');
+    }
+    document.querySelectorAll('#layoutOverlay .rbTabs button').forEach(btn => btn.addEventListener('click', () => {
+      document.querySelectorAll('#layoutOverlay .rbTabs button').forEach(b => b.classList.toggle('active', b === btn));
+      document.querySelectorAll('#layoutOverlay .rbTabPage').forEach(p => p.classList.toggle('active', p.id === btn.dataset.tab));
+    }));
+    document.getElementById('layoutReset').addEventListener('click', () => {
+      if (!confirm('画面の設定を、はじめの設定にもどしますか？')) return;
+      layoutPrefs = Object.assign({}, LAYOUT_DEFAULT, { hiddenCats: [], hiddenBlocks: [], hiddenButtons: [], catOrder: [], blockOrder: {} });
+      saveLayout(); applyLayout(true); openLayout();
+    });
+    applyLayout(false);   // 起動したときに、覚えている設定を使う（カテゴリは、ブロックの定義が届いたときに）
   </script>
 </body>
 </html>

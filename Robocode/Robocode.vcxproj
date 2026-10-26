@@ -144,7 +144,6 @@
     <ClCompile Include="RobotInformation.cpp" />
     <ClCompile Include="JavaToBlocks.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="RobotMathBlocks.cpp" />
     <ClCompile Include="RobocodeBlocks.cpp" />
     <ClCompile Include="RobocodeBlocksCore.cpp" />
     <ClCompile Include="RobotAttack.cpp" />
