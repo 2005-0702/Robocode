@@ -62,7 +62,7 @@ ROBOCODE_BLOCKS(RobotSensor)
         .tooltip("今のレーダーの向きで、もう一度敵を探します\n"
             "※レーダーの向きに敵がいる場合「敵を発見したとき」の\n"
             "イベントが発生します")
-        .java("scan();");
+        .java("   scan();");
 
     // 敵が止まっている？
     Block("enemy_is_stopped")
@@ -125,18 +125,22 @@ ROBOCODE_BLOCKS(RobotSensor)
         .output("Number")
         .tooltip("ロボットの中心から、上下左右の壁までの距離を計算し、\n"
                     "最も近い壁までの距離を返します")
-        .java("Math.min(Math.min(getX(), getBattleFieldWidth() - getX()), "
-              "Math.min(getY(), getBattleFieldHeight() - getY()))");
+        .java(R"(Math.min(
+        Math.min(getX(), getBattleFieldWidth() - getX()), 
+        Math.min(getY(), getBattleFieldHeight() - getY())))");
 
-    // バトル場のまん中の方向
+    // バトル場の真ん中の方向
     Block("center_bearing")
         .category("センサー")
         .text("バトル場の真ん中の方向")
         .output("Number")
-        .tooltip("自分の正面を 0 度として、バトル場の中心がどの方向にあるかを表します\n"
+        .tooltip("自分の正面を 0 度として、バトル場の中心がどの方向にあるかを表します"
                  "右はプラス、左はマイナスです（-180～180 度）")
-        .java("robocode.util.Utils.normalRelativeAngleDegrees(Math.toDegrees(Math.atan2("
-              "getBattleFieldWidth() / 2 - getX(), getBattleFieldHeight() / 2 - getY())) - getHeading())");
+        .java(R"(robocode.util.Utils.normalRelativeAngleDegrees(
+                        Math.toDegrees(Math.atan2(
+                        getBattleFieldWidth() / 2 - getX(),
+                        getBattleFieldHeight() / 2 - getY()
+                        )) - getHeading()))");
 
 
 }

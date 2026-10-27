@@ -3,6 +3,7 @@
 // 
 // 2026/10/15 片山　if文,for文,and,orの追加
 // 2026/10/26 片山　プログラムの整理
+// 2026/10/27 片山　ブロックを変数の入る形にする。
 //
 // =====================================================================
 
@@ -71,15 +72,16 @@ ROBOCODE_BLOCKS(RobotControl)
     Block("robot_for")
         .category("制御")
         .text("%1 回繰り返す %2")
-        .number("COUNT", 5, 0)          // 繰り返す回数
-        .statements("DO")               // 繰り返す命令
+        .valueInput("COUNT", "Number")
+        .statements("DO")     // 繰り返す命令   
         .tooltip("指定した回数だけ、中の命令を繰り返します")
         .javaFunction([](BlockData& b) {
         static int counter = 0;
 
-        // 繰り返しごとに違う変数名を使う
+        // (ポイント)繰り返しごとに違う変数名を使う
         std::string i = "i" + std::to_string(counter++);
 
+        std::string count = b.text("COUNT");
         std::string inner = b.text("DO");
         std::string indented;
 
@@ -95,7 +97,7 @@ ROBOCODE_BLOCKS(RobotControl)
 
         // Javaのfor文を作る
         return "for (int " + i + " = 0; " + i + " < "
-            + b.text("COUNT") + "; " + i + "++) {\n"
+            + count + "; " + i + "++) {\n"
             + indented + "}";
             });
 
@@ -121,9 +123,9 @@ ROBOCODE_BLOCKS(RobotControl)
         .dropdown("OP", {
             {"<", "<"},
             {">", ">"},
-            {"=", "=="},
             {"≦","<="},
             {"≧",">="},
+            {"=", "=="},
             {"≠","!="},
             })
         .valueInput("B", "")         // 右側
@@ -143,8 +145,8 @@ ROBOCODE_BLOCKS(RobotControl)
             })
         .valueInput("B", "")
         .output("Boolean")
-        .tooltip("andは両方の条件が成立とき、\n"
-                 "orはどちらかが成立したのときに\n"
+        .tooltip("and : 両方の条件が成立とき、\n"
+                 "or : どちらかが成立したのときに\n"
                  "「はい」になります")
         .java("({A} {OP} {B})");
 
@@ -171,11 +173,11 @@ ROBOCODE_BLOCKS(RobotControl)
     Block("control_chance")
         .category("制御")
         .text("%1 ％の確率で")
-        .number("PERCENT", 50, 0, 100)
+        .valueInput("COUNT", "Number")
         .output("Boolean")
         .tooltip("決めた確率で「はい」になります\n"
             "動きをランダムに変えたいときに使います")
-        .java("(Math.random() * 100 < {PERCENT})");
+        .java("(Math.random() * 100 < {COUNT})");
 
     // ---------------- 記憶（変数） ----------------
     //   memA, memB, memC はロボットのクラスに用意しておく（ラウンドが変わると 0 にもどる）
