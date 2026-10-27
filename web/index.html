@@ -806,6 +806,25 @@
 
   <script>
     // ------------------------------------------------------------
+    // プログラムのエラーを、右の欄に出す（作っている人が原因を見つけやすいように）
+    //   エラーが起きると、Ctrl+Z などがうまく動かなくなることがあるので、出たら内容を教えてもらう
+    // ------------------------------------------------------------
+    let shownErrors = 0;
+    function reportPageError(text) {
+      if (shownErrors >= 5) return;   // 同じエラーが何回も出て、欄がうまらないように
+      shownErrors++;
+      try {
+        showStatus('error', 'プログラムのエラーが起きました（下の内容を開発の人に伝えてください）');
+        addMessage('detail', '', text);
+      } catch (err) { /* まだ画面ができていないとき */ }
+    }
+    window.addEventListener('error', (e) => {
+      const where = e.filename ? ' (' + String(e.filename).split('/').pop() + ':' + e.lineno + ')' : '';
+      reportPageError(String(e.message) + where + (e.error && e.error.stack ? '\n' + String(e.error.stack).split('\n').slice(0, 4).join('\n') : ''));
+    });
+    window.addEventListener('unhandledrejection', (e) => reportPageError('Promise: ' + String(e.reason)));
+
+    // ------------------------------------------------------------
     // ブロックの説明（tooltip）が出るまでの時間
     //   Blockly は 750 ミリ秒（0.75 秒）で決まっていて、設定では変えられない。
     //   そこで、Blockly が「750 ミリ秒後に説明を出す」タイマーを作るときだけ、
@@ -2066,7 +2085,7 @@
       const make = (flyoutBlock) => {
         if (flyoutBlock.isDeadOrDying()) return null;
         const state = Blockly.serialization.blocks.save(flyoutBlock, { addCoordinates: false, saveIds: false });
-        return Blockly.serialization.blocks.append(state, workspace);
+        return Blockly.serialization.blocks.append(state, workspace, { recordUndo: true });
       };
       const canChain = (upper, lower) => upper && lower && upper.nextConnection && lower.previousConnection &&
         workspace.connectionChecker.canConnect(upper.nextConnection, lower.previousConnection, false);
@@ -2162,9 +2181,9 @@
       e.stopPropagation();
       const picked = flyoutPick.list.length > 1 && flyoutPick.list.includes(block) ? flyoutPick.list.slice() : null;
       Blockly.Events.setGroup(true);
-      const group = Blockly.Events.getGroup();
       try {
         const newBlock = flyout.createBlock(block);
+        const group = Blockly.Events.getGroup();   // createBlock は新しいまとまりを作るので、そのあとで受け取る
         if (newBlock.snapToGrid) newBlock.snapToGrid();
         if (newBlock.bumpNeighbours) newBlock.bumpNeighbours();
         if (picked) {
@@ -2191,10 +2210,120 @@
           setTimeout(() => dropPickedBlocks(workspace.getBlockById(flyoutDrop && flyoutDrop.newId), e.group), 0);
         }
       }
-      if (e.type === Blockly.Events.BLOCK_DRAG && !e.isStart && flyoutDrop && e.blockId === flyoutDrop.newId) {
+      if (e.type === Blockly.Events.BLOCK_DRAG && e.isStart && flyoutDrop && e.blockId === flyoutDrop.newId) {
+        startPickedDrag(workspace.getBlockById(e.blockId), e.group);
+      } else if (e.type === Blockly.Events.BLOCK_DRAG && !e.isStart && flyoutDrop && e.blockId === flyoutDrop.newId) {
         setTimeout(() => dropPickedBlocks(workspace.getBlockById(e.blockId), e.group), 0);
       }
     });
+
+    // 選んだブロックを一覧からドラッグしはじめたとき：ほかのブロックもすぐに出して、いっしょに動かす
+    //   ・ドラッグしたブロックより下のもの → ドラッグしたブロックの下につなげる（いっしょに動く）
+    //   ・上のもの → ドラッグしたブロックの上にならべて、カーソルについてこさせる（離したときにつなげる）
+    //   ・つなげられないもの → 下にならべて、カーソルについてこさせる
+    function startPickedDrag(newBlock, group) {
+      const plan = flyoutDrop;
+      flyoutDrop = null;   // 離したときの dropPickedBlocks は使わない
+      if (!plan || !newBlock || newBlock.isDeadOrDying()) return;
+      const index = plan.list.indexOf(plan.source);
+      const make = (flyoutBlock) => {
+        if (flyoutBlock.isDeadOrDying()) return null;
+        const state = Blockly.serialization.blocks.save(flyoutBlock, { addCoordinates: false, saveIds: false });
+        return Blockly.serialization.blocks.append(state, workspace, { recordUndo: true });
+      };
+      const canChain = (upper, lower) => upper && lower && upper.nextConnection && lower.previousConnection &&
+        !upper.nextConnection.targetBlock() &&
+        workspace.connectionChecker.canConnect(upper.nextConnection, lower.previousConnection, false);
+      const start = newBlock.getRelativeToSurfaceXY();
+      const oldGroup = Blockly.Events.getGroup();
+      Blockly.Events.setGroup(group || true);   // ドラッグと同じまとまり：Ctrl+Z 1回で全部もどる
+      const loose = [];
+      let chain = [];
+      let made = 0;
+      try {
+        // 下の部分：ドラッグしているブロックの下につなげる
+        let upper = newBlock;
+        plan.list.slice(index + 1).forEach(fb => {
+          const b = make(fb);
+          if (!b) return;
+          made++;
+          if (canChain(upper, b)) {
+            upper.nextConnection.connect(b.previousConnection);
+            if (b.setDragging) b.setDragging(true);   // ドラッグ中のブロックの一部にする（自分につながろうとしないように）
+            upper = b;
+          } else {
+            loose.push(b);
+          }
+        });
+        // 上の部分：上にならべる
+        plan.list.slice(0, index).forEach(fb => {
+          const b = make(fb);
+          if (!b) return;
+          made++;
+          const last = chain.length ? chain[chain.length - 1] : null;
+          if (!last || canChain(last, b)) {
+            if (last) last.nextConnection.connect(b.previousConnection);
+            chain.push(b);
+          } else {
+            loose.push(b);
+          }
+        });
+        if (chain.length && !(chain[chain.length - 1].nextConnection && newBlock.previousConnection)) {
+          chain.forEach(b => loose.push(b));
+          chain = [];
+        }
+        const followers = [];
+        if (chain.length) {
+          const h = chain[0].getHeightWidth().height;
+          chain[0].moveTo(new Blockly.utils.Coordinate(start.x, start.y - h));
+          followers.push(chain[0]);
+        }
+        let y = start.y + newBlock.getHeightWidth().height + 20;
+        loose.forEach(b => {
+          if (b.getParent()) return;
+          b.moveTo(new Blockly.utils.Coordinate(start.x, y));
+          y += b.getHeightWidth().height + 20;
+          followers.push(b);
+        });
+        // ついてくるブロックには、ドラッグ中のブロックがくっつかないようにする（自分の仲間につながってしまうのを防ぐ）
+        followers.forEach(b => { if (b.setDragging) b.setDragging(true); });
+        // groupDrag のしくみで、カーソルについてこさせる（離したとき・ゴミ箱に入れたときの始末もそちらでする）
+        groupDrag = {
+          dragged: newBlock, start: start, group: group,
+          others: followers.map(b => ({ block: b, start: b.getRelativeToSurfaceXY() })),
+          pointer: { ...movePointer },
+          onFinish: (trashed) => {
+            clearFlyoutPick();
+            followers.forEach(b => {
+              if (b.isDeadOrDying() || !b.getSvgRoot()) return;
+              b.getSvgRoot().classList.remove('blocklyDragging');
+              b.getDescendants(false).forEach(d => d.getSvgRoot() && d.getSvgRoot().classList.remove('blocklyDragging'));
+            });
+            if (trashed) return;
+            // 上の部分を、ドラッグしたブロックの上につなげる
+            if (chain.length && !chain[0].isDeadOrDying() && !newBlock.isDeadOrDying()) {
+              const top = chain[0], bottom = chain[chain.length - 1];
+              const parentConnection = newBlock.previousConnection && newBlock.previousConnection.targetConnection;
+              const parentBlock = parentConnection && parentConnection.getSourceBlock();
+              if (parentBlock && chain.some(c => c === parentBlock || c.getDescendants(false).includes(parentBlock))) {
+                // もう上の部分につながっている（何もしない）
+              } else if (parentConnection && top.previousConnection &&
+                  workspace.connectionChecker.canConnect(parentConnection, top.previousConnection, false)) {
+                parentConnection.connect(top.previousConnection);   // つないだ場所の間に入れる
+              } else if (!parentConnection && bottom.nextConnection && newBlock.previousConnection &&
+                  workspace.connectionChecker.canConnect(bottom.nextConnection, newBlock.previousConnection, false)) {
+                const xy = newBlock.getRelativeToSurfaceXY();
+                top.moveTo(new Blockly.utils.Coordinate(xy.x, xy.y - top.getHeightWidth().height));
+                bottom.nextConnection.connect(newBlock.previousConnection);
+              }
+            }
+            showStatus('', (made + 1) + ' 個のブロックをまとめて出しました（Ctrl+Z で元に戻せます）');
+          },
+        };
+      } finally {
+        Blockly.Events.setGroup(oldGroup || false);
+      }
+    }
 
     // 選んだブロックをまとめて消す
     function deleteBoxSelection() {
@@ -2282,7 +2411,7 @@
           }
           state.x = (state.x || 0) + offset;
           state.y = (state.y || 0) + offset;
-          created.push(Blockly.serialization.blocks.append(state, workspace));
+          created.push(Blockly.serialization.blocks.append(state, workspace, { recordUndo: true }));
         });
       } finally {
         Blockly.Events.setGroup(false);
@@ -2322,6 +2451,8 @@
     }
     let lastPointer = { x: 0, y: 0 };
     document.addEventListener('pointerdown', (e) => { lastPointer = { x: e.clientX, y: e.clientY }; }, true);
+    let movePointer = { x: 0, y: 0 };   // 今のマウスの位置
+    document.addEventListener('pointermove', (e) => { movePointer = { x: e.clientX, y: e.clientY }; }, true);
     document.addEventListener('pointermove', (e) => {
       if (!groupDrag) return;
       // ドラッグ中は、見た目だけいっしょに動かす（終わったときに本当に動かす）
@@ -2333,6 +2464,7 @@
       if (e.type !== Blockly.Events.BLOCK_DRAG) return;
       const block = workspace.getBlockById(e.blockId);
       if (e.isStart) {
+        if (groupDrag && groupDrag.onFinish && groupDrag.dragged === block) return;   // 一覧からまとめて出しているところ
         if (!block || boxSelected.size < 2 || !boxSelected.has(block)) { groupDrag = null; return; }
         const others = selectedRoots(block).filter(b => !b.isDeadOrDying());
         // つながっている途中のブロックは、先にはずす（はずすと位置が変わらないように、今の位置をおぼえてから）
@@ -2345,7 +2477,7 @@
         } finally {
           Blockly.Events.setGroup(oldGroup || false);
         }
-        groupDrag = { dragged: block, start: startOf(block), others: list, pointer: { ...lastPointer } };
+        groupDrag = { dragged: block, start: startOf(block), others: list, pointer: { ...lastPointer }, group: e.group };
         // 消すブロック（ゴミ箱に入れたとき）に、ほかのブロックが巻きこまれないように、ドラッグ中だけ選ぶのをやめない
       } else if (groupDrag && e.blockId === groupDrag.dragged.id) {
         // ゴミ箱に入れたときは、ドラッグしたブロックはもう消えているので、id で比べる
@@ -2363,7 +2495,9 @@
       const trashed = plan.dragged.isDeadOrDying();   // ドラッグしたブロックがゴミ箱に入った（消えた）
       const end = trashed ? null : plan.dragged.getRelativeToSurfaceXY();
       const oldGroup = Blockly.Events.getGroup();
-      Blockly.Events.setGroup(group || true);   // 「元に戻す」1回で、まとめてもどせるように
+      // 「元に戻す」1回で、まとめてもどせるように、ドラッグと同じまとまり（group）にする
+      //   （ここで新しいまとまりにすると、Ctrl+Z 1回目でほかのブロックだけ、2回目でドラッグしたブロックがもどる、になってしまう）
+      Blockly.Events.setGroup(group || plan.group || true);
       try {
         plan.others.forEach(o => {
           if (o.block.isDeadOrDying()) return;
@@ -2374,9 +2508,11 @@
             o.block.moveBy(end.x - plan.start.x, end.y - plan.start.y);   // 本当に動かす（元に戻せる）
           }
         });
+        if (plan.onFinish) plan.onFinish(trashed);
       } finally {
         Blockly.Events.setGroup(oldGroup || false);
       }
+      if (plan.onFinish) return;   // 一覧から出したときは、onFinish でお知らせを出す
       if (trashed) {
         const n = plan.others.length + 1;
         boxSelected.clear();
@@ -2420,7 +2556,7 @@
           const s2 = JSON.parse(JSON.stringify(state));
           s2.x = (s2.x || 0) + offset;
           s2.y = (s2.y || 0) + offset;
-          created.push(Blockly.serialization.blocks.append(s2, workspace));
+          created.push(Blockly.serialization.blocks.append(s2, workspace, { recordUndo: true }));
         });
       } finally {
         Blockly.Events.setGroup(false);
@@ -2587,6 +2723,62 @@
       if (e.type === Blockly.Events.BLOCK_CREATE || e.type === Blockly.Events.BLOCK_DELETE || e.type === Blockly.Events.BLOCK_CHANGE) {
         runFind(true);
       }
+    });
+
+    // ------------------------------------------------------------
+    // 一覧から出したブロックを、そのままゴミ箱（や一覧の上）に入れたとき
+    //   「出した → 消した」で何も変わっていないのに、「元に戻す」の記録が1つ増えてしまう。
+    //   そのままだと、次の Ctrl+Z は「何も起きない1回」になり、Ctrl+Z が効かないように見える。
+    //   なので、出して消しただけのまとまりは、記録から取りのぞく。
+    // ------------------------------------------------------------
+    function pruneNoOpGroup(group) {
+      if (!group) return;
+      const stack = workspace.getUndoStack();
+      // まとまりは、記録の一番うしろに続けて入っているはず
+      let start = stack.length;
+      while (start > 0 && stack[start - 1].group === group) start--;
+      if (start === stack.length) return;
+      const events = stack.slice(start);
+      const created = new Set(), deleted = new Set(), touched = new Set();
+      for (const ev of events) {
+        if (ev.type === Blockly.Events.BLOCK_CREATE) (ev.ids || [ev.blockId]).forEach(id => created.add(id));
+        else if (ev.type === Blockly.Events.BLOCK_DELETE) (ev.ids || [ev.blockId]).forEach(id => deleted.add(id));
+        else if (ev.type === Blockly.Events.BLOCK_MOVE || ev.type === Blockly.Events.BLOCK_CHANGE) {
+          touched.add(ev.blockId);
+          if (ev.newParentId) touched.add(ev.newParentId);
+          if (ev.oldParentId) touched.add(ev.oldParentId);
+        } else {
+          return;   // 変数を作ったなど、ほかのことも起きている → そのままにする
+        }
+      }
+      if (created.size === 0) return;
+      for (const id of created) if (!deleted.has(id)) return;   // 出したものが残っている
+      for (const id of deleted) if (!created.has(id)) return;   // もともとあったブロックも消している
+      for (const id of touched) if (!created.has(id)) return;   // もともとあったブロックも動かしている
+      stack.splice(start);   // 何も変わっていないので、記録から取りのぞく
+      updateUndoButtons();
+    }
+    // 一覧からブロックをドラッグして出すと、Blockly が「まとまり（group）」を終わらせずに残してしまう。
+    //   そのままだと、次の操作（ゴミ箱に入れるなど）まで同じまとまりになり、
+    //   Ctrl+Z 1回で「出した」も「消した」もいっしょに取り消されてしまう。
+    //   なので、ドラッグが終わったら、まとまりを終わらせる。
+    function endEventGroupAfterDrag() {
+      setTimeout(() => {
+        if (Blockly.Gesture && Blockly.Gesture.inProgress && Blockly.Gesture.inProgress()) return;   // まだドラッグ中
+        if (groupDrag) return;   // まとめて動かしている途中
+        Blockly.Events.setGroup(false);
+      }, 30);
+    }
+    document.addEventListener('pointerup', endEventGroupAfterDrag);
+    workspace.addChangeListener((e) => {
+      if (e.type === Blockly.Events.BLOCK_DRAG && !e.isStart) endEventGroupAfterDrag();
+    });
+
+    workspace.addChangeListener((e) => {
+      if (e.type !== Blockly.Events.BLOCK_DELETE || !e.group) return;
+      // いっしょに出したブロックを消すのは少しあとになるので、少し待ってから調べる
+      const group = e.group;
+      setTimeout(() => pruneNoOpGroup(group), 120);
     });
 
     // ------------------------------------------------------------
