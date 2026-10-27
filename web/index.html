@@ -401,10 +401,10 @@
 
     /* ブロックの検索 */
       #searchBox {
-          width: 220px !important;
+          width: 160px !important;   /* 左上に歯車のボタンを足した分、少しせまくした（1段に収まるように） */
           border-radius: 12px;
           border: none;
-          margin-left: 20px;
+          margin-left: 8px;
       }
 
     /* ゴミ箱の中身の横スクロールバー（横に長いブロックがあるときだけ出る） */
@@ -631,6 +631,10 @@
 <body>
   <div id="toolbar">
     <div class="row">
+    <!-- 画面の設定（カテゴリ・ブロック・大きさ・上の欄のボタン） -->
+    <button id="layoutButton" class="sub icon tip-left" data-tip="画面の設定：カテゴリ・ブロック・文字の大きさ・上の欄のボタン" aria-label="画面の設定"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+    <span class="sep"></span>
+
     <!-- 作品のファイル -->
     <button id="newButton" class="sub icon tip-left" data-tip="新しく作る" aria-label="新しく作る"><svg viewBox="0 0 24 24"><path d="M13 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9z"/><path d="M13 3v6h6"/><path d="M12 12v6M9 15h6"/></svg></button>
     <button id="openButton" class="sub icon" data-tip="保存した作品を開く" aria-label="開く"><svg viewBox="0 0 24 24"><path d="M3 7a1 1 0 0 1 1-1h5l2 2h8a1 1 0 0 1 1 1v2"/><path d="M3 7v12a1 1 0 0 0 1 1h14l3-9H7l-3 8"/></svg></button>
@@ -650,7 +654,7 @@
     <span class="sep"></span>
 
     <!-- チュートリアルとサンプル -->
-    <button id="tutorialButton" class="sub icon emoji" data-tip="ヘルプ：チュートリアル・ショートカットキー一覧・画面の設定" aria-label="ヘルプ">❓</button>
+    <button id="tutorialButton" class="sub icon emoji" data-tip="ヘルプ：チュートリアル・ショートカットキーの一覧" aria-label="ヘルプ">❓</button>
     <button id="sampleButton" class="sub icon emoji" data-tip="サンプル：見本のロボットを開いて参考にできます" aria-label="サンプルのロボット">🤖</button>
 
     <span class="sep"></span>
@@ -688,7 +692,6 @@
   <div id="helpMenu" role="menu">
     <button id="helpTutorial" role="menuitem">▶ チュートリアルを始める</button>
     <button id="helpShortcuts" role="menuitem">⌨ ショートカットキーの一覧</button>
-    <button id="helpLayout" role="menuitem">⚙ 画面の設定（カテゴリ・ブロック・文字の大きさ）</button>
   </div>
 
   <!-- ショートカットキーの一覧 -->
@@ -3556,7 +3559,7 @@
     document.addEventListener('pointerup', () => { tutCard.classList.remove('passthrough'); }, true);
     document.addEventListener('pointercancel', () => { tutCard.classList.remove('passthrough'); }, true);
 
-    // ❓：メニューを出す（チュートリアル・ショートカット一覧・画面の設定）
+    // ❓：メニューを出す（チュートリアル・ショートカット一覧）
     const helpMenu = document.getElementById('helpMenu');
     document.getElementById('tutorialButton').addEventListener('click', (e) => {
       e.stopPropagation();
@@ -3572,7 +3575,8 @@
     }, true);
     document.getElementById('helpTutorial').addEventListener('click', () => { helpMenu.classList.remove('open'); tutStart(); });
     document.getElementById('helpShortcuts').addEventListener('click', () => { helpMenu.classList.remove('open'); openShortcuts(); });
-    document.getElementById('helpLayout').addEventListener('click', () => { helpMenu.classList.remove('open'); openLayout(); });
+    // 歯車：画面の設定を開く
+    document.getElementById('layoutButton').addEventListener('click', () => { helpMenu.classList.remove('open'); openLayout(); });
     document.getElementById('tutNext').addEventListener('click', tutNextStep);
     document.getElementById('tutBack').addEventListener('click', () => { if (tutIndex > 0) { TUTORIAL[tutIndex - 1]._advanced = true; tutShow(tutIndex - 1); } });
     document.getElementById('tutQuit').addEventListener('click', tutEnd);
