@@ -1,0 +1,66 @@
+{
+  "format": "robocode-blocks",
+  "package": "student",
+  "robotName": "MyRobot",
+  "version": 1,
+  "workspace": {
+    "blocks": {
+      "blocks": [
+        {
+          "id": "_U?`:-:oAp=!XI3~^Uh8",
+          "inputs": {
+            "DO": {
+              "block": {
+                "fields": {
+                  "DIRECTION": "ahead"
+                },
+                "id": "CPrOa4qUSJ{`*?NCoKrU",
+                "inputs": {
+                  "DIST": {
+                    "shadow": {
+                      "fields": {
+                        "NUM": 0
+                      },
+                      "id": "CP84GpugzcE/)JvT.w,p",
+                      "type": "rb_number"
+                    }
+                  }
+                },
+                "type": "act_move"
+              }
+            }
+          },
+          "type": "robot_event_run",
+          "x": 88,
+          "y": 38
+        },
+        {
+          "id": "3!$4wa8vX[R3cIEFoB$W",
+          "inputs": {
+            "D0": {
+              "block": {
+                "id": "2%dOZN1}^ecT!7|bEAhX",
+                "inputs": {
+                  "POWER": {
+                    "shadow": {
+                      "fields": {
+                        "NUM": 0
+                      },
+                      "id": "Qo~$^VqUDedIthqXFCC*",
+                      "type": "rb_number"
+                    }
+                  }
+                },
+                "type": "robot_fire"
+              }
+            }
+          },
+          "type": "robot_event_enemyDetected",
+          "x": 88,
+          "y": 138
+        }
+      ],
+      "languageVersion": 0
+    }
+  }
+}
