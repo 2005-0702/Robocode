@@ -2,8 +2,8 @@
 //  RobotColor.cpp  ―  「色」のブロック
 // 
 // 2026/10/14 片山　ロボットの色作成
-//
-// %1・・引数の第1引数
+// 2026/10/27 片山　プログラムの整理
+// 
 // =====================================================================
 
 /* ======== BlockDef ― ブロック設定関数一覧 =============
@@ -39,7 +39,7 @@
 #include "RobocodeBlocks.h"
 
 
-ROBOCODE_BLOCKS(RobotEvent)
+ROBOCODE_BLOCKS(RobotColor)
 {
     //本体の色を変更
     Block("robot_color_bodyColor")
@@ -55,7 +55,7 @@ ROBOCODE_BLOCKS(RobotEvent)
     Block("robot_color_gunColor")
         .category("色")
         .text("砲塔の色を変更 R %1 G %2 B %3")
-        .tooltip("砲塔の色を変更します(各0～255)")
+        .tooltip("ロボットの砲塔の色を変更します(各0～255)")
         .number("R", 0, 0, 255)
         .number("G", 0, 0, 255)
         .number("B", 0, 0, 255)
@@ -65,7 +65,7 @@ ROBOCODE_BLOCKS(RobotEvent)
     Block("robot_color_radarColor")
         .category("色")
         .text("レーダーの色を変更 R %1 G %2 B %3")
-        .tooltip("レーダーの色を変更します(各0～255)")
+        .tooltip("ロボットのレーダーの色を変更します(各0～255)")
         .number("R", 0, 0, 255)
         .number("G", 0, 0, 255)
         .number("B", 0, 0, 255)
@@ -75,7 +75,7 @@ ROBOCODE_BLOCKS(RobotEvent)
     Block("robot_color_bulletColor")
         .category("色")
         .text("弾の色を変更 R %1 G %2 B %3")
-        .tooltip("弾の色を変更します(各0～255)")
+        .tooltip("ロボットが発射する弾の色を変更します(各0～255)")
         .number("R", 0, 0, 255)
         .number("G", 0, 0, 255)
         .number("B", 0, 0, 255)
@@ -85,8 +85,8 @@ ROBOCODE_BLOCKS(RobotEvent)
     // 索敵時の色を変更
     Block("robot_color_scanColor")
         .category("色")
-        .text("索敵の色を変更 R %1 G %2 B %3")
-        .tooltip("索敵時の色を変更します(各0～255)")
+        .text("索敵時の色を変更 R %1 G %2 B %3")
+        .tooltip("ロボットが敵を探知したときの色を変更します(各0～255)")
         .number("R", 0, 0, 255)
         .number("G", 0, 0, 255)
         .number("B", 0, 0, 255)

@@ -1,4 +1,4 @@
-// =====================================================================
+﻿// =====================================================================
 //  RobotControl.cpp  ―  「制御」のブロック
 // 
 // 2026/10/15 片山　if文,for文,and,orの追加
@@ -115,39 +115,54 @@ ROBOCODE_BLOCKS(RobotControl)
             "    {DO}\n"
             "}");
 
-    // 2つの値を比べる
+    // 数値同士を比べる（大小比較ができるのは数値）
     Block("robot_compare")
         .category("制御")
         .text("%1 %2 %3")
-        .valueInput("A", "")              // 左側の値
+        .valueInput("A", "Number")       // 左側は数値
         .dropdown("OP", {
             {"<", "<"},
             {">", ">"},
-            {"≦","<="},
-            {"≧",">="},
+            {"≦", "<="},
+            {"≧", ">="},
             {"=", "=="},
-            {"≠","!="},
-            })
-        .valueInput("B", "")         // 右側
-        .output("Boolean")           // 比べた結果は「はい／いいえ」
-        .tooltip("2つの値を比べます")
+            {"≠", "!="},
+        })
+        .valueInput("B", "Number")       // 右側も数値
+        .output("Boolean")
+        .tooltip("2つの数値を比べます\n"
+                 "<、>、≦、≧で大小を比べたり、=、≠で同じかどうかを調べたりできます")
         .java("({A} {OP} {B})");
 
+    // 「はい／いいえ」の結果同士を比べる
+    // Booleanには大小比較（<、>、≦、≧）を使えないため、= と ≠ のみ
+    Block("robot_compare_boolean")
+        .category("制御")
+        .text("%1 %2 %3")
+        .valueInput("A", "Boolean")
+        .dropdown("OP", {
+            {"=", "=="},
+            {"≠", "!="},
+        })
+        .valueInput("B", "Boolean")
+        .output("Boolean")
+        .tooltip("2つの「はい／いいえ」の結果を比べます\n"
+                 "例：NaNかどうかの確認結果と、別の条件を比べます")
+        .java("({A} {OP} {B})");
 
-    // 条件を複数つなげる（AND / OR）
+    // 条件を複数つなげる（AND / OR）。左右とも「はい／いいえ」の条件
     Block("robot_logic")
         .category("制御")
         .text("%1 %2 %3")
-        .valueInput("A", "")
+        .valueInput("A", "Boolean")
         .dropdown("OP", {
             {"and", "&&"},
             {"or", "||"}
-            })
-        .valueInput("B", "")
+        })
+        .valueInput("B", "Boolean")
         .output("Boolean")
-        .tooltip("and : 両方の条件が成立とき、\n"
-                 "or : どちらかが成立したのときに\n"
-                 "「はい」になります")
+        .tooltip("and：両方の条件が成立したときに「はい」になります\n"
+                 "or：どちらか一方の条件が成立したときに「はい」になります")
         .java("({A} {OP} {B})");
 
     // はい / いいえ
