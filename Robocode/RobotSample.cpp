@@ -39,7 +39,6 @@ ROBOCODE_BLOCKS(RobotSample)
         .category("サンプル戦術")
         .text("弾の方向を向いてスキャン")
         .tooltip("弾が当たった方向をもとに向きを調整し、敵をスキャンします")
-        .color(330)
         .java(R"(
     turnRight(e.getHeading() - getHeading() + 180);
     turnGunRight(getHeading() - getGunHeading());
@@ -52,7 +51,6 @@ ROBOCODE_BLOCKS(RobotSample)
         .category("サンプル戦術")
         .text("相手に車体を向ける")
         .tooltip("相手にぶつかったとき、車体の向きを調整してスキャンします")
-        .color(330)
         .java(R"(
     double bodyTurnAmt = normalRelativeAngleDegrees(e.getBearing() + getHeading() - getGunHeading());
     
@@ -70,7 +68,6 @@ ROBOCODE_BLOCKS(RobotSample)
         .category("サンプル戦術")
         .text("相手に砲塔を向ける")
         .tooltip("相手にぶつかったとき、砲塔を相手の方向に向けてスキャンします")
-        .color(330)
         .java(R"(
     double gunTurnAmt = normalRelativeAngleDegrees(e.getBearing() + getHeading() - getGunHeading());
     
