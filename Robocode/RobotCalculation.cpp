@@ -2,8 +2,8 @@
 //  RobotCalculation.cpp  ―  「計算」のブロック
 // 
 // 2026/10/16 片山　計算クラスの作成
+// 2026/10/27 片山　プログラムの整理
 //
-// %1・・引数の第1引数
 // =====================================================================
 
 /* ======== BlockDef ― ブロック設定関数一覧 =============
@@ -41,6 +41,11 @@
 
 ROBOCODE_BLOCKS(RobotCalculation)
 {
+
+    //--------------------
+    // 1.基本の計算
+    //--------------------
+    
     // 演算子
     Block("robot_calculation_operator")
         .category("計算")
@@ -52,50 +57,49 @@ ROBOCODE_BLOCKS(RobotCalculation)
             {"×", "*"},
             {"÷", "/"}
             })
+
         .valueInput("B")
         .output("Number")
         .tooltip("2つの数を指定した演算子で計算します")
         .java("({A} {OP} {B})");
 
-    // 角度をラジアンに変換する
-    Block("math_to_radians")
-        .category("計算")
-        .text("角度 %1 をラジアンに変換")
-        .valueInput("ANGLE", "Number")
-        .output("Number")
-        .tooltip("度数法の角度をラジアンに変換します")
-        .java("Math.toRadians({ANGLE})");
 
-    // 〇〜〇 のランダムな数
+    // ランダムな数
     Block("math_random")
         .category("計算")
         .text("%1 から %2 のランダムな数")
         .valueInput("MIN", "Number")
         .valueInput("MAX", "Number")
         .output("Number")
-        .tooltip("毎回ちがう数になります。動きを読まれにくくするのに使います")
+        .tooltip("指定した範囲からランダムな数を作ります\n"
+            "使い方 : 動きを読まれにくくするのに使います")
         .java("({MIN} + Math.random() * ({MAX} - {MIN}))");
 
     // 絶対値
     Block("math_abs")
         .category("計算")
-        .text("%1 の絶対値(0以外の値はプラスになる)")
+        .text("%1 の絶対値")
         .valueInput("A", "Number")
         .output("Number")
-        .tooltip("マイナスをとった数です（-30 なら 30）")
+        .tooltip("マイナスをとった数です\n"
+                "（例: -30 → 30、30 → 30）")
         .java("Math.abs({A})");
 
-    // 角度を -180〜180 に直す
+    // ----------------
+    // 2.角度の計算
+    // ----------------
     Block("math_normalize_angle")
         .category("計算")
-        .text("%1 回る角度を近い方に直す")
-        .valueInput("A", "")
+        .text("%1 回る角度を近い向きに直す")
+        .valueInput("A", "Number")
         .output("Number")
-        .tooltip("自分の車体の正面から見て角度を -180〜180 に直します。"
-            "270 なら -90 になるので、近い方に回れます")
+        .tooltip("自分の車体の正面から見て角度を -180〜180 の範囲に直します\n"
+            "使い方 : 270 なら -90 になるので、近い方に回れます")
         .java("robocode.util.Utils.normalRelativeAngleDegrees({A})");
 
-    // Math：1つの数を使う計算
+    //-----------------------
+    //3. 1つの数を使う計算
+    //-----------------------
     Block("java_math_1")
         .category("計算")
         .text("%1 の %2")
@@ -109,10 +113,18 @@ ROBOCODE_BLOCKS(RobotCalculation)
             {"ラジアン → 度",          "toDegrees"},
             })
             .output("Number")
-        .tooltip("Java の Math を使った計算です")
+        .tooltip("1つの数を使って計算します\n"
+            "平方根：2乗すると元の数になる数を求めます\n"
+            "四捨五入：整数に近い値に丸めます\n"
+            "切り捨て：小数部分を切り捨てます\n"
+            "切り上げ：小数部分を切り上げます\n"
+            "度 → ラジアン：度で表した角度を変換します\n"
+            "ラジアン → 度：ラジアンで表した角度を変換します")
         .java("Math.{FN}({A})");
 
-    // Math：2つの数を使う計算
+    //-----------------------
+    //4. 2つの数を使う計算
+    //-----------------------
     Block("java_math_2")
         .category("計算")
         .text("%1 と %2 の %3")
@@ -121,35 +133,47 @@ ROBOCODE_BLOCKS(RobotCalculation)
         .dropdown("FN", {
             {"〇の△乗",               "pow"},
             {"斜めの長さ（√(A²+B²)）", "hypot"},
-            {"角度（atan2、ラジアン）", "atan2"},
+            {"方向の角度(ラジアン）", "atan2"},//2つの数から、向きを表す角度を求める
             { "小さいほう",              "min" },
             { "大きいほう",              "max" },
             })
             .output("Number")
-        .tooltip("Java の Math を使った計算です")
+        .tooltip("2つの数を使った応用計算です\n"
+            "〇の△乗：1つ目の数を、2つ目の数だけ掛け合わせます\n"
+            "斜めの長さ：2つの長さから、斜めの長さを求めます\n"
+            "方向の角度：X方向とY方向の値から、向きの角度を求めます（ラジアン）\n"
+            "※方向の角度は、1つ目にY方向、2つ目にX方向の値を指定します\n"
+            "小さいほう：2つの数のうち、小さいほうを求めます\n"
+            "大きいほう：2つの数のうち、大きいほうを求めます")
         .java("Math.{FN}({A}, {B})");
 
-    // 角度（度）で sin・cos・tan
+    //-------------------------
+    // 5. 三角関数（度で指定）
+    //-------------------------
     Block("java_math_trig")
         .category("計算")
         .text("%1 度 の %2")
         .valueInput("A", "Number")
         .dropdown("FN", { {"sin", "sin"}, {"cos", "cos"}, {"tan", "tan"} })
         .output("Number")
-        .tooltip("角度（度）の sin・cos・tan です（Java の Math はラジアンなので、中で直しています）")
+        .tooltip("角度（度）から sin・cos・tan を計算します")
         .java("Math.{FN}(Math.toRadians({A}))");
 
-    // ラジアンの sin・cos・tan（Java の Math そのまま）
+    //------------------------------
+    // 6. 三角関数（ラジアンで指定）
+    //-------------------------------
     Block("java_math_trig_rad")
         .category("計算")
         .text("%1 ラジアン の %2")
         .valueInput("A", "Number")
         .dropdown("FN", { {"sin", "sin"}, {"cos", "cos"}, {"tan", "tan"} })
         .output("Number")
-        .tooltip("角度（ラジアン）の sin・cos・tan です。getHeadingRadians() などの値に使います")
+        .tooltip("ラジアンから sin・cos・tan を計算します")
         .java("Math.{FN}({A})");
 
-    // 決まった数（Math・Double）
+    //-------------------------
+    // 7. 特別な数
+    //-------------------------
     Block("java_constant")
         .category("計算")
         .text("%1")
@@ -160,16 +184,23 @@ ROBOCODE_BLOCKS(RobotCalculation)
             {"無限大",           "Double.POSITIVE_INFINITY"},
             })
             .output("Number")
-        .tooltip("Java に最初から用意されている数です")
+        .tooltip("計算に使う特別な数です\n"
+                 "円周率：円の計算などに使う数（約3.14）\n"
+                 "最大の有限数：double型で表せる最大の有限数\n"
+                 "最小の正の浮動小数点数：double型で表せる最小の正の値\n"
+                 "正の無限大：無限に大きいことを表す特別な値")
         .java("{C}");
 
-    // Double：数ではない（計算できなかった）か
+    // ================================================================
+    // 8. NaN（数値として扱えない計算結果）の確認
+    // ================================================================
     Block("java_double_isnan")
         .category("計算")
-        .text("%1 が 数ではない（NaN）")
+        .text("%1 がNaNか調べる")
         .valueInput("A", "Number")
         .output("Boolean")
-        .tooltip("0 ÷ 0 のように、計算できなかったときに「はい」になります")
+        .tooltip("計算結果がNaNかどうかを調べます。\n"
+                  "例：0.0 ÷ 0.0 の計算結果")
         .java("Double.isNaN({A})");
 }
 
