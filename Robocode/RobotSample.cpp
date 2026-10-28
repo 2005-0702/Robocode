@@ -1,7 +1,8 @@
 // =====================================================================
-//  RobotSample.cpp  ―  「完成済みの動きのサンプル」のブロック
+//  RobotSample.cpp  ―  「サンプル戦術」のブロック
 // 
 // 2026/10/15 片山　ロボットのサンプル作成
+// 2026/10/28 片山　サンプル戦術の整理
 //
 // =====================================================================
 
@@ -34,11 +35,54 @@
 
 ROBOCODE_BLOCKS(RobotSample)
 {  
+   
+    // 前進・後退しながら砲塔を回す
+    Block("robot_sample_aheadAndBack")
+        .category("サンプル戦術")
+        .text("前進・後退しながら砲塔を回す")
+        .tooltip("前進、砲塔の回転、後退を組み合わせたサンプルです")
+        .java(
+            "ahead(100);\n"
+            "turnGunRight(360);\n"
+            "back(100);\n"
+            "turnGunRight(360);"
+        );
+
+    //曲がりながら動く
+    Block("robot_sample_limpRunnning")
+        .category("サンプル戦術")
+        .text("曲がりながら動く")
+        .tooltip("前進、車体の回転、待機を組み合わせたサンプルです")
+        .java(R"(
+for (int step = 0; step < 6; step++) {    // 右に曲がりながら進む（15度 × 6回 = 90度）
+    turnRight(15);
+    ahead(25);
+}
+for (int step = 0; step < 12; step++) {   // 左に曲がりながら進む（15度 × 12回 = 180度）
+    turnLeft(15);
+    ahead(25);
+}
+for (int step = 0; step < 6; step++) {    // 右に曲がりながら進む（90度。向きが元にもどる）
+    turnRight(15);
+    ahead(25);
+}
+    )");
+
+
+    // 回転してから前進
+    Block("robot_sample_spinRunning")
+        .category("サンプル戦術")
+        .text("回転してから前進")
+        .tooltip("車体を旋回させながら前進するサンプルです")
+        .java("turnRight(30);\n"
+            "ahead(60);\n");
+
     //  弾の方向を向いてスキャン
     Block("robot_sample_turnFlewBullet")
         .category("サンプル戦術")
         .text("弾の方向を向いてスキャン")
-        .tooltip("弾が当たった方向をもとに向きを調整し、敵をスキャンします")
+        .tooltip("弾が当たった方向をもとに向きを調整し、\n"
+            "敵ロボットをスキャンするサンプルです")
         .java(R"(
     turnRight(e.getHeading() - getHeading() + 180);
     turnGunRight(getHeading() - getGunHeading());
@@ -50,7 +94,8 @@ ROBOCODE_BLOCKS(RobotSample)
     Block("robot_sample_turnBodyToEnemy")
         .category("サンプル戦術")
         .text("相手に車体を向ける")
-        .tooltip("相手にぶつかったとき、車体の向きを調整してスキャンします")
+        .tooltip("敵ロボットにぶつかったとき、\n"
+            "車体の向きを調整してスキャンするサンプルです")
         .java(R"(
     double bodyTurnAmt = normalRelativeAngleDegrees(e.getBearing() + getHeading() - getGunHeading());
     
@@ -67,7 +112,8 @@ ROBOCODE_BLOCKS(RobotSample)
     Block("robot_sample_turnGunToEnemy")
         .category("サンプル戦術")
         .text("相手に砲塔を向ける")
-        .tooltip("相手にぶつかったとき、砲塔を相手の方向に向けてスキャンします")
+        .tooltip("敵ロボットにぶつかったとき、\n"
+                 "砲塔を相手の方向に向けてスキャンするサンプルです")
         .java(R"(
     double gunTurnAmt = normalRelativeAngleDegrees(e.getBearing() + getHeading() - getGunHeading());
     
@@ -79,7 +125,8 @@ ROBOCODE_BLOCKS(RobotSample)
     Block("smart_fire")
         .category("サンプル戦術")
         .text("距離と残りエネルギーで強さを決めて撃つ")   // 入力欄がないので %1 はなし
-        .tooltip("敵が近いほど強い弾を撃ちます。エネルギーが少ないときは、弱い弾にして節約します")
+        .tooltip("敵ロボットが近いほど強い弾を撃ちます\n"
+                "エネルギーが少ないときは、弱い弾にして節約するサンプルです")
         .java(R"({
         double power;
         if (e.getDistance() < 150) {                 // 近い → 当たりやすいので強く
