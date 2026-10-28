@@ -448,7 +448,8 @@ namespace rb {
                 .category("Java")
                 .text("Java %1")
                 .textField("CODE", "")
-                .tooltip("書いた Java がそのまま入ります（例：ahead(100);）")
+                .tooltip("書いた Java がそのまま入ります\n"
+                    "例：ahead(100);")
                 .java("{CODE}");
 
             Block(kRawExpressionBlock)
@@ -456,7 +457,8 @@ namespace rb {
                 .text("Java の式 %1")
                 .textField("CODE", "0")
                 .output("")                      // どの穴にもはまる
-                .tooltip("書いた Java の式がそのまま入ります（例：getX() * 2）")
+                .tooltip("書いた Java の式がそのまま入ります\n"
+                        "例：getX() * 2")
                 .java("{CODE}");
 
             Block(kRawMemberBlock)
@@ -464,7 +466,8 @@ namespace rb {
                 .text("Java（メソッド・変数） %1")
                 .textField("CODE", "")
                 .event()                         // 一番上に置く（クラスの中にそのまま入る）
-                .tooltip("ロボットのクラスの中に、書いた Java がそのまま入ります（メソッドや変数）")
+                .tooltip("ロボットのクラスの中に、\n"
+                    "書いた Java がそのまま入ります（メソッドや変数）")
                 .java("{CODE}");
 
             // ---- 関数やイベントを、とちゅうで終わりにする（Java の return;）----
