@@ -1,4 +1,4 @@
-﻿// =====================================================================
+// =====================================================================
 //  RobocodeBlocksCore.cpp  ―  ブロックのしくみ（難しい部分）
 // 
 // 2026/10/16 片山　カテゴリー色に色とサンプル戦術追加,Javaコードの親クラス名を修正。
@@ -37,6 +37,7 @@ namespace rb {
         // ---------------------------------------------------------------------
         const char* const kJavaPackage = "student";   // Java の package 名（robots\student に保存する）
         const char* const kNumberBlock = "rb_number";  // 数字ブロック（穴に最初から入っている）
+        const char* const kTextBlock = "rb_text";      // 文字列ブロック（文字列型の初期値）
         const char* const kRawStatementBlock = "java_raw_statement";    // Java をそのまま書く（命令）
         const char* const kRawExpressionBlock = "java_raw_expression";  // Java をそのまま書く（式）
         const char* const kRawMemberBlock = "java_raw_member";          // Java をそのまま書く（メソッド・変数）
@@ -442,6 +443,15 @@ namespace rb {
                 .tooltip("数字")
                 .java("{NUM}");
 
+            // 文字列型の値入力に最初から入る、編集可能な文字列ブロック。
+            Block(kTextBlock)
+                .category("計算")
+                .text("%1")
+                .textField("TEXT", "")
+                .output("String")
+                .tooltip("文字列。文字を入力できます")
+                .java("\"{TEXT}\"");
+
             // ---- Java からブロックにもどしたとき、当てはまるブロックがなかった部分 ----
             //   入力した Java がそのまま入る。自分で Java を書きたいときにも使える。
             Block(kRawStatementBlock)
@@ -572,6 +582,12 @@ namespace rb {
                             {"fields", {{"NUM", 0}}}
                         };
                     }
+                    else if (arg.kind == BlockDef::Arg::OptionalValue && arg.valueType == "String") {
+                        a["shadow"] = {
+                            {"type", kTextBlock},
+                            {"fields", {{"TEXT", ""}}}
+                        };
+                    }
                     hasValue = true;
                     break;
                 case BlockDef::Arg::Statements:
@@ -637,6 +653,9 @@ namespace rb {
                     for (const auto& arg : d.args) {
                         if (arg.kind == BlockDef::Arg::Value && arg.valueType == "Number") {
                             item["inputs"][arg.name]["shadow"] = { {"type", kNumberBlock}, {"fields", {{"NUM", 0}}} };
+                        }
+                        else if (arg.kind == BlockDef::Arg::OptionalValue && arg.valueType == "String") {
+                            item["inputs"][arg.name]["shadow"] = { {"type", kTextBlock}, {"fields", {{"TEXT", ""}}} };
                         }
                     }
                     items.push_back(item);

@@ -1,4 +1,4 @@
-// =====================================================================
+﻿// =====================================================================
 //  JavaToBlocks.cpp  ―  Java（.java ファイル）をブロックにもどす
 // =====================================================================
 //
@@ -38,6 +38,7 @@ using Info = BlockDef::Info;
 using Arg = BlockDef::Arg;
 
 const char* const kNumberBlock = "rb_number";
+const char* const kTextBlock = "rb_text";
 const char* const kRawStatement = "java_raw_statement";
 const char* const kRawExpression = "java_raw_expression";
 const char* const kRawMember = "java_raw_member";
@@ -1577,16 +1578,57 @@ public:
                     if (valueEnd < toks.size() && toks[valueEnd].s == ";" &&
                         valueEnd + 1 == toks.size() && !initialValue.empty()) {
                         ++converted;
-                        return json{
+                        // 変数宣言ブロックの初期値はフィールドではなく、
+                        // INITIAL_VALUE_BLOCK の shadow / block として設定する。
+                        // 以前の INITIAL_VALUE フィールドではブロック側に対応する欄がなく、
+                        // Java から読み込んだ初期値が画面に反映されなかった。
+                        json result = {
                             {"type", "robot_variable_declare"},
                             {"fields", {
                                 {"ACCESS", access},
                                 {"STATIC", staticText},
                                 {"NAME", name},
-                                {"TYPE", type},
-                                {"INITIAL_VALUE", initialValue}
+                                {"TYPE", type}
                             }}
                         };
+
+                        if (type == "boolean" &&
+                            (initialValue == "true" || initialValue == "false")) {
+                            result["fields"]["INITIAL_BOOLEAN"] = initialValue;
+                        }
+                        // String 型は直接入力欄に初期値を復元する（Java の引用符を除く）。
+                        else if (type == "String") {
+                            std::string textValue = initialValue;
+                            if (textValue.size() >= 2 && textValue.front() == '\"' && textValue.back() == '\"') {
+                                textValue = textValue.substr(1, textValue.size() - 2);
+                            }
+                            result["fields"]["INITIAL_STRING"] = textValue;
+                        }
+                        else if (type == "int" || type == "long" ||
+                                 type == "float" || type == "double") {
+                            // 数字リテラルは編集できる数字 shadow として表示する。
+                            double numberValue = 0.0;
+                            if (parseNumberLiteral(toks, valueStart, valueEnd, numberValue)) {
+                                result["inputs"]["INITIAL_VALUE_BLOCK"]["shadow"] = {
+                                    {"type", kNumberBlock},
+                                    {"fields", {{"NUM", numberValue}}}
+                                };
+                            }
+                            else {
+                                // Double.MAX_VALUE や計算式などは式ブロックとして復元する。
+                                int rawCount = 0;
+                                Toks expression(toks.begin() + valueStart, toks.begin() + valueEnd);
+                                result["inputs"]["INITIAL_VALUE_BLOCK"]["block"] =
+                                    convertValue(expression, "Number", "", rawCount);
+                                result["inputs"]["INITIAL_VALUE_BLOCK"]["shadow"] = {
+                                    {"type", kNumberBlock},
+                                    {"fields", {{"NUM", 0}}}
+                                };
+                            }
+                        }
+                        // String 型など、数字用入力欄に接続できない値は、
+                        // Java の既定値（String は null）を変数ブロック側で補う。
+                        return result;
                     }
                 }
                 else if (valueStart < toks.size() && toks[valueStart].s == ";" &&
@@ -1599,16 +1641,29 @@ public:
                     else initialValue = "0";
 
                     ++converted;
-                    return json{
+                    json result = {
                         {"type", "robot_variable_declare"},
                         {"fields", {
                             {"ACCESS", access},
                             {"STATIC", staticText},
                             {"NAME", name},
-                            {"TYPE", type},
-                            {"INITIAL_VALUE", initialValue}
+                            {"TYPE", type}
                         }}
                     };
+                    if (type == "boolean") {
+                        result["fields"]["INITIAL_BOOLEAN"] = "false";
+                    }
+                    else if (type == "int" || type == "long" ||
+                             type == "float" || type == "double") {
+                        double numberValue = 0.0;
+                        if (parseNumberLiteral(toks, valueStart, valueStart, numberValue)) {
+                            result["inputs"]["INITIAL_VALUE_BLOCK"]["shadow"] = {
+                                {"type", kNumberBlock},
+                                {"fields", {{"NUM", numberValue}}}
+                            };
+                        }
+                    }
+                    return result;
                 }
             }
         }
