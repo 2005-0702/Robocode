@@ -13,7 +13,7 @@ ROBOCODE_BLOCKS(RobotVariable)
 
     Block("robot_variable_declare")
         .category("変数")
-        .text("公開範囲 %1 %2 型 %3 変数名 %4 初期値 %5 %6")
+        .text("公開範囲 %1 %2 型 %3 変数名 %4 初期値 %5 %6 %7")
         .dropdown("ACCESS", {
             {"指定なし", ""},
             {"どこからでも使える", "public"},
@@ -32,11 +32,12 @@ ROBOCODE_BLOCKS(RobotVariable)
             {"真偽値", "boolean"}
             })
         .textField("NAME", "item")
-        // 初期値は編集可能な数字ブロックを最初から表示し、別の値ブロックにも置き換えられる。
+        // 数値型はブロック接続、文字列型は直接入力、真偽値型は「はい／いいえ」を使用する。
+        .textField("INITIAL_STRING", "")
         .optionalValueInput("INITIAL_VALUE_BLOCK", "Number")
         .dropdown("INITIAL_BOOLEAN", {
-            {"false", "false"},
-            {"true", "true"}
+            {"いいえ", "false"},
+            {"はい", "true"}
             })
         .javaFunction([](BlockData& data) -> std::string {
         const std::string accessText = data.text("ACCESS");
@@ -46,11 +47,23 @@ ROBOCODE_BLOCKS(RobotVariable)
         std::string initialValue = data.text("INITIAL_VALUE_BLOCK");
         const bool hasRealValueBlock = data.hasConnectedValue("INITIAL_VALUE_BLOCK");
         const std::string booleanInitialValue = data.text("INITIAL_BOOLEAN");
+        const std::string stringInitialValue = data.text("INITIAL_STRING");
 
         // 実際の値ブロックが接続されている場合はそれを優先する。
         // 接続されていない boolean 型では true/false の選択肢を使用する。
         if (type == "boolean" && !hasRealValueBlock) {
             initialValue = booleanInitialValue;
+        }
+        // String 型は専用のテキスト欄から値を取得する。Java文字列として引用符を付ける。
+        else if (type == "String") {
+            std::string escaped;
+            for (char c : stringInitialValue) {
+                if (c == '\\' || c == '"') escaped += '\\';
+                if (c == '\n') { escaped += "\\n"; continue; }
+                if (c == '\r') { escaped += "\\r"; continue; }
+                escaped += c;
+            }
+            initialValue = stringInitialValue.empty() ? "\"\"" : "\"" + escaped + "\"";
         }
         // 初期値の shadow がない場合は型に応じた既定値を使う。
         if (initialValue.empty()) {
@@ -65,13 +78,6 @@ ROBOCODE_BLOCKS(RobotVariable)
         // すでに式ブロック（例：Double.MAX_VALUE）が接続されている場合は式を維持する。
         if (type == "boolean") {
             if (initialValue != "true" && initialValue != "false") initialValue = "false";
-        }
-        else if (type == "String") {
-            if (initialValue != "null" &&
-                (initialValue.size() < 2 || initialValue.front() != '"' || initialValue.back() != '"')) {
-                // 接続式はそのまま使う。通常の数字 shadow などは文字列の初期値として扱わない。
-                if (initialValue == "0") initialValue = "\\";
-            }
         }
         else if (type == "int") {
             // 0 などの整数式はそのまま
@@ -134,67 +140,7 @@ ROBOCODE_BLOCKS(RobotVariable)
         .java("{NAME}")
         .tooltip("宣言した変数を選び、その変数の値を計算や比較に使います。");
 
-    // ④-② 特殊な初期値を持つ変数（Double.MAX_VALUE）
-    // Java クラス直下のフィールドとして出力します。
-    Block("robot_variable_target_distance")
-        .category("変数")
-        .text("敵までの距離の初期値を最大値にする")
-        .classMember()
-        .java("private double targetDistance = Double.MAX_VALUE;")
-        .tooltip(
-            "targetDistance を double 型で宣言し、初期値に Double.MAX_VALUE を設定します。\n"
-            "Double.MAX_VALUE は double 型で表せる最大の有限値です。"
-        );
-
-    // ④-③ 敵の情報をまとめる内部クラス
-    // Java クラス直下に配置する必要があるため、classMember を指定します。
-    Block("robot_enemy_info_class")
-        .category("変数")
-        .text("敵の情報をまとめる EnemyInfo クラス")
-        .classMember()
-        .java(
-            "private static class EnemyInfo {\n"
-            "    String name;\n"
-            "    double v_x;\n"
-            "    double v_y;\n"
-            "    double v_distance;\n"
-            "    double v_energy;\n"
-            "    long lastSeen;\n"
-            "}"
-        )
-        .tooltip(
-            "敵の名前、位置、距離、エネルギー、最後に確認した時刻をまとめるクラスです。\n"
-            "ロボット本体のクラスの中に配置してください。"
-        );
-
-    // ④-④ EnemyInfo を複数保存するリスト
-    Block("robot_enemy_info_list")
-        .category("変数")
-        .text("敵の情報を保存する enemies リスト")
-        .classMember()
-        .java(
-            "private final List<EnemyInfo> enemies = new ArrayList<EnemyInfo>();"
-        )
-        .tooltip(
-            "EnemyInfo を複数保存するリストです。\n"
-            "使用する Java ファイルの先頭に java.util.List と java.util.ArrayList の import が必要です。"
-        );
-
-    // 真偽値の値ブロック。boolean 型の変数や条件式に接続して使います。
-    Block("robot_boolean_true")
-        .category("変数")
-        .text("真（true）")
-        .output("Boolean")
-        .java("true")
-        .tooltip("条件が正しいことを表す true です。");
-
-    Block("robot_boolean_false")
-        .category("変数")
-        .text("偽（false）")
-        .output("Boolean")
-        .java("false")
-        .tooltip("条件が正しくないことを表す false です。");
-
+ 
     // null（何も参照していない状態）
     Block("java_null")
         .category("変数")

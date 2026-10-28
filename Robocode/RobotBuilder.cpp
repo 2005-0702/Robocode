@@ -140,24 +140,8 @@ std::wstring GetRobocodeFolder(HWND owner, bool forceChoose) {
 // ---------------------------------------------------------------------
 //  javac を探して実行する
 // ---------------------------------------------------------------------
-// アプリといっしょに入れた JDK（exe の横の jdk フォルダ）
-//   インストーラーで JDK もいっしょに入れると、JAVA_HOME や PATH を設定しなくても動く
-static std::wstring BundledJdkFolder() {
-    wchar_t buf[MAX_PATH];
-    DWORD n = GetModuleFileNameW(nullptr, buf, MAX_PATH);
-    if (n == 0 || n >= MAX_PATH) return L"";
-    std::wstring dir(buf);
-    dir = dir.substr(0, dir.find_last_of(L"\\/"));   // exe のあるフォルダ
-    std::wstring jdk = dir + L"\\jdk";
-    return FileExists(jdk + L"\\bin\\javac.exe") ? jdk : L"";
-}
-
 static std::wstring FindJavac() {
     wchar_t buf[MAX_PATH];
-
-    // 0. アプリといっしょに入れた JDK（いちばん先に使う）
-    std::wstring bundled = BundledJdkFolder();
-    if (!bundled.empty()) return bundled + L"\\bin\\javac.exe";
 
     // 1. JAVA_HOME\bin\javac.exe
     DWORD n = GetEnvironmentVariableW(L"JAVA_HOME", buf, MAX_PATH);
@@ -710,23 +694,6 @@ bool LaunchRobocode(const std::wstring& robocodeFolder, std::string& message) {
         CloseHandle(g_robocodeJob);
         g_robocodeJob = nullptr;
         if (restarted) Sleep(500);  // 閉じ終わるのを少し待つ
-    }
-
-    // robocode.bat は、PATH の中の java で Robocode を起動する。
-    // アプリといっしょに入れた JDK があれば、その bin を PATH の先頭に足しておく
-    // （このアプリから起動するものにだけ効く。パソコンの設定は変えない）
-    //   → Java を入れていないパソコンでも、Robocode が起動できる
-    std::wstring bundled = BundledJdkFolder();
-    if (!bundled.empty()) {
-        std::wstring bin = bundled + L"\\bin";
-        DWORD size = GetEnvironmentVariableW(L"PATH", nullptr, 0);
-        std::wstring path(size, L'\0');
-        if (size > 0) path.resize(GetEnvironmentVariableW(L"PATH", &path[0], size));
-        else path.clear();
-        if (path.compare(0, bin.size() + 1, bin + L";") != 0) {   // まだ足していなければ
-            SetEnvironmentVariableW(L"PATH", (bin + L";" + path).c_str());
-        }
-        SetEnvironmentVariableW(L"JAVA_HOME", bundled.c_str());
     }
 
     // robocode.bat を、Robocode のフォルダで実行する

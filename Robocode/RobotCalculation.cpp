@@ -55,7 +55,8 @@ ROBOCODE_BLOCKS(RobotCalculation)
             {"＋", "+"},
             {"－", "-"},
             {"×", "*"},
-            {"÷", "/"}
+            {"÷", "/"},
+            {"余り", "%"}
             })
 
         .valueInput("B")

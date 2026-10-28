@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="utf-8">
@@ -1415,77 +1415,51 @@
         }
         Blockly.defineBlocksWithJsonArray(msg.setup.blocks);
 
-        // 変数宣言ブロック：型に応じて初期値フィールドを文字入力／選択式に切り替える。
-        // C++ 側の Java 変換は INITIAL_VALUE の値を読むため、フィールド名は変更しない。
+        // 変数宣言ブロック：型に応じて初期値欄を切り替える。
+        // 数値型は値ブロック、String 型は直接入力欄、boolean 型は「はい／いいえ」のみ。
         const variableDefinition = Blockly.Blocks['robot_variable_declare'];
         if (variableDefinition && !variableDefinition._initialValueSwitchInstalled) {
           const originalVariableInit = variableDefinition.init;
           variableDefinition.init = function() {
             originalVariableInit.call(this);
+            const block = this;
 
-            const updateInitialValueField = (type, preferredValue) => {
-              const block = this;
-              const oldField = block.getField('INITIAL_VALUE');
-              if (!oldField) return;
+            const updateInitialValueControl = (type) => {
+              const booleanField = block.getField('INITIAL_BOOLEAN');
+              const stringField = block.getField('INITIAL_STRING');
+              const valueInput = block.getInput('INITIAL_VALUE_BLOCK');
+              const isBoolean = type === 'boolean';
+              const isString = type === 'String';
+              const showValueInput = !isBoolean && !isString;
 
-              const input = block.inputList.find(item => item.fieldRow.includes(oldField));
-              if (!input) return;
-              const fieldIndex = input.fieldRow.indexOf(oldField);
-              const oldValue = preferredValue !== undefined ? preferredValue : oldField.getValue();
-              let newField;
-
-              if (type === 'boolean') {
-                const booleanValue = (oldValue === 'true' || oldValue === 'false') ? oldValue : 'false';
-                newField = new Blockly.FieldDropdown([
-                  ['true', 'true'],
-                  ['false', 'false']
-                ]);
-                newField.setValue(booleanValue);
-              } else if (type === 'double') {
-                // 型を真偽値などから切り替えた場合、以前の値を double の初期値として誤用しない。
-                let doubleValue = oldValue;
-                if (doubleValue === 'true' || doubleValue === 'false' ||
-                    doubleValue === null || doubleValue === undefined || doubleValue === '') {
-                  doubleValue = '0.0';
+              if (booleanField) booleanField.setVisible(isBoolean);
+              if (stringField) stringField.setVisible(isString);
+              if (valueInput) {
+                valueInput.setVisible(showValueInput);
+                if (valueInput.connection) {
+                  valueInput.connection.setCheck('Number');
+                  if (showValueInput && !valueInput.connection.targetBlock()) {
+                    valueInput.connection.setShadowState({
+                      type: 'rb_number', fields: { NUM: 0 }
+                    });
+                  } else if (!showValueInput) {
+                    valueInput.connection.setShadowState(null);
+                  }
                 }
-                // 倍精度の小数でよく使う初期値を日本語で選べるようにする。
-                // 表示名は日本語、値はJavaに出力するコード。
-                const options = [
-                  ['0（ゼロ）', '0.0'],
-                  ['1（1.0）', '1.0'],
-                  ['最大の有限値', 'Double.MAX_VALUE'],
-                  ['最小の正の値', 'Double.MIN_VALUE']
-                ];
-                if (doubleValue !== null && doubleValue !== undefined && doubleValue !== '' &&
-                    !options.some(option => option[1] === doubleValue)) {
-                  // 既存の任意の数値や定数は失わず、直接入力として保持する。
-                  newField = new Blockly.FieldTextInput(String(doubleValue));
-                } else {
-                  newField = new Blockly.FieldDropdown(options);
-                  newField.setValue(options.some(option => option[1] === doubleValue) ? doubleValue : '0.0');
-                }
-              } else {
-                let textValue = oldValue;
-                if (textValue === 'true' || textValue === 'false' || textValue === null || textValue === undefined) {
-                  if (type === 'float' || type === 'double') textValue = '0.0';
-                  else if (type === 'String') textValue = '';
-                  else textValue = '0';
-                }
-                newField = new Blockly.FieldTextInput(String(textValue));
               }
 
-              input.removeField('INITIAL_VALUE', true);
-              input.insertFieldAt(fieldIndex, newField, 'INITIAL_VALUE');
+              if (isBoolean && booleanField) {
+                const value = booleanField.getValue();
+                if (value !== 'true' && value !== 'false') booleanField.setValue('false');
+              }
               block.render();
             };
 
-            // 読み込み時も、保存された型に合う入力欄にする。
-            updateInitialValueField(this.getFieldValue('TYPE'), this.getFieldValue('INITIAL_VALUE'));
-
+            updateInitialValueControl(this.getFieldValue('TYPE'));
             this.setOnChange(function(event) {
               if (!event || event.type !== Blockly.Events.BLOCK_CHANGE ||
                   event.blockId !== this.id || event.name !== 'TYPE') return;
-              updateInitialValueField(this.getFieldValue('TYPE'));
+              updateInitialValueControl(this.getFieldValue('TYPE'));
             });
           };
           variableDefinition._initialValueSwitchInstalled = true;
