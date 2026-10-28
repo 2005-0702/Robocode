@@ -19,7 +19,7 @@ ROBOCODE_BLOCKS(RobotAttack)
         .text("パワー %1 で撃つ")                         
         .valueInput("POWER", "Number")                    
         .tooltip("弾を撃ちます。パワーが大きいほど、\n"
-            "相手に与えるダメージが大きくなるります\n"
+            "相手に与えるダメージが大きくなるります（0.1〜3)\n"
             "※大きいと自分のエネルギーも多く消費します")
         .check([](BlockData& b) {     
             std::string t = b.text("POWER");
@@ -28,7 +28,7 @@ ROBOCODE_BLOCKS(RobotAttack)
             if (end != t.c_str() &&
                 *end == '\0' &&
                 (v < MIN_FIRE_POWER || v > MAX_FIRE_POWER)) {
-                b.error("パワーは0.1～3にしてください");
+                b.error("パワーは0.1～3.0にしてください");
             }
         })
         .java("fire({POWER});");                           // 作られるJava（{POWER} に入力した数字が入る）

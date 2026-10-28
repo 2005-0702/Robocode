@@ -3275,12 +3275,12 @@
         "id": "yoyaku",
         "cls": "SampleYoyaku",
         "level": 3,
-        "name": "同時に動く（予約）",
-        "what": "「予約」のブロックで、進む・車体を回す・レーダーを回すを同時に行います。敵を見つけたら砲塔を敵に向けて、距離に合わせたパワーで撃ちます。",
+        "name": "まとめて動く",
+        "what": "動きや回転を先に決めてから「まとめて動かす」を使い、進みながら車体やレーダーを回します。敵を見つけたら砲塔を敵に向け、距離に合わせたパワーで撃ちます。",
         "tips": [
-          "予約で回す角度（30）を変えると、円の大きさが変わるよ",
-          "「400」を変えて、パワーの決め方を工夫しよう",
-          "壁にぶつかったときの予約を変えてみよう"
+          "車体を回す角度（30）を変えると、進むコースが変わるよ",
+          "「400」を変えて、敵との距離に合わせたパワーを工夫しよう",
+          "壁にぶつかったときの動きを変えてみよう"
         ],
         "java": "package sample;\nimport robocode.*;\npublic class SampleYoyaku extends AdvancedRobot {\n    public void run() {\n        while (true) {\n            setAhead(100);\n            setTurnRight(30);\n            setTurnRadarRight(360);\n            execute();\n        }\n    }\n    public void onScannedRobot(ScannedRobotEvent e) {\n        turnGunRight(robocode.util.Utils.normalRelativeAngleDegrees(e.getBearing() + getHeading() - getGunHeading()));\n        fire(Math.min(3, 400 / e.getDistance()));\n    }\n    public void onHitWall(HitWallEvent e) {\n        setBack(100);\n        setTurnRight(90);\n        execute();\n    }\n}\n"
       },
