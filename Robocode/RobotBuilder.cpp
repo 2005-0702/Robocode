@@ -3,6 +3,7 @@
 // 
 //  2026/10/26 片山 変数も攻撃の上限のエラーが出るようにする。
 // =====================================================================
+#include <cstring>
 #include "RobotBuilder.h"
 
 #include <shlobj.h>     // SHGetKnownFolderPath（設定の保存場所）
@@ -452,11 +453,11 @@ namespace
     };
 
 
-    std::string CheckFirePower(const std::string& javaCode)
+    std::string CheckAdvancedValues(const std::string& javaCode)
     {
         std::map<std::string, double> variables;
 
-        // 数値型変数の初期値を取得する
+        // 数値型変数の初期値を取得する（前に宣言された変数を使う計算にも対応）
         const std::regex declaration(
             R"(\b(?:byte|short|int|long|float|double)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*([^;]+);)"
         );
@@ -479,109 +480,105 @@ namespace
             }
         }
 
-        // fire(...) の引数を探す
-        size_t searchPosition = 0;
-
-        while (true)
+        struct CallRule
         {
-            size_t firePosition = javaCode.find("fire", searchPosition);
+            const char* name;
+            double minimum;
+            double maximum;
+            const char* label;
+            const char* rangeText;
+        };
 
-            if (firePosition == std::string::npos)
-                break;
+        const CallRule rules[] = {
+            { "fire",           0.1, 3.0, "攻撃エラー", "パワーは0.1～3.0にしてください。" },
+            { "setFire",        0.1, 3.0, "攻撃エラー", "パワーは0.1～3.0にしてください。" },
+            { "setMaxVelocity", 0.0, 8.0, "速度エラー", "最高速度は0～8にしてください。" }
+        };
 
-            searchPosition = firePosition + 4;
+        for (const auto& rule : rules)
+        {
+            size_t searchPosition = 0;
 
-            // fire が別の単語の一部ではないか確認する
-            if (firePosition > 0)
+            while (true)
             {
-                char before = javaCode[firePosition - 1];
+                size_t callPosition = javaCode.find(rule.name, searchPosition);
+                if (callPosition == std::string::npos)
+                    break;
 
-                if (std::isalnum(static_cast<unsigned char>(before)) ||
-                    before == '_' || before == '$')
+                searchPosition = callPosition + std::strlen(rule.name);
+
+                // メソッド名の一部に一致した場合は除外する
+                if (callPosition > 0)
                 {
-                    continue;
-                }
-            }
-
-            size_t openPosition = searchPosition;
-
-            while (openPosition < javaCode.size() &&
-                std::isspace(static_cast<unsigned char>(
-                    javaCode[openPosition])))
-            {
-                ++openPosition;
-            }
-
-            if (openPosition >= javaCode.size() ||
-                javaCode[openPosition] != '(')
-            {
-                continue;
-            }
-
-            // fire の引数が終わる位置を探す
-            size_t argumentStart = openPosition + 1;
-            size_t position = argumentStart;
-            int depth = 1;
-
-            while (position < javaCode.size() && depth > 0)
-            {
-                if (javaCode[position] == '(')
-                    ++depth;
-                else if (javaCode[position] == ')')
-                    --depth;
-
-                ++position;
-            }
-
-            if (depth != 0)
-                continue;
-
-            size_t argumentEnd = position - 1;
-
-            std::string argument = javaCode.substr(
-                argumentStart,
-                argumentEnd - argumentStart);
-
-            searchPosition = position;
-
-
-            try
-            {
-                ExpressionParser parser(argument, variables);
-                double power = parser.Calculate();
-
-                if (power < MIN_FIRE_POWER || power > MAX_FIRE_POWER)
-                {
-                    // 計算結果を文字列に変換する
-                    std::ostringstream powerText;
-                    powerText << std::setprecision(10) << power;
-
-                    std::string powerString = powerText.str();
-
-                    // 小数点以下の不要な0を削除する
-                    if (powerString.find('.') != std::string::npos)
+                    char before = javaCode[callPosition - 1];
+                    if (std::isalnum(static_cast<unsigned char>(before)) ||
+                        before == '_' || before == '$')
                     {
-                        powerString.erase(
-                            powerString.find_last_not_of('0') + 1);
-
-                        if (!powerString.empty() && powerString.back() == '.')
-                        {
-                            powerString.pop_back();
-                        }
+                        continue;
                     }
+                }
 
-                    return
-                        "攻撃エラー：fire に指定したパワーが範囲外です。\n"
-                        "パワーは0.1～3.0にしてください。\n"
-                        "計算結果：" + powerString;
+                size_t openPosition = searchPosition;
+                while (openPosition < javaCode.size() &&
+                    std::isspace(static_cast<unsigned char>(javaCode[openPosition])))
+                {
+                    ++openPosition;
+                }
+
+                if (openPosition >= javaCode.size() || javaCode[openPosition] != '(')
+                    continue;
+
+                size_t argumentStart = openPosition + 1;
+                size_t position = argumentStart;
+                int depth = 1;
+
+                while (position < javaCode.size() && depth > 0)
+                {
+                    if (javaCode[position] == '(')
+                        ++depth;
+                    else if (javaCode[position] == ')')
+                        --depth;
+                    ++position;
+                }
+
+                if (depth != 0)
+                    continue;
+
+                const size_t argumentEnd = position - 1;
+                const std::string argument = javaCode.substr(
+                    argumentStart, argumentEnd - argumentStart);
+
+                searchPosition = position;
+
+                try
+                {
+                    ExpressionParser parser(argument, variables);
+                    const double value = parser.Calculate();
+
+                    if (value < rule.minimum || value > rule.maximum)
+                    {
+                        std::ostringstream valueText;
+                        valueText << std::setprecision(10) << value;
+                        std::string valueString = valueText.str();
+
+                        if (valueString.find('.') != std::string::npos)
+                        {
+                            valueString.erase(valueString.find_last_not_of('0') + 1);
+                            if (!valueString.empty() && valueString.back() == '.')
+                                valueString.pop_back();
+                        }
+
+                        return std::string(rule.label) + "：" + rule.name +
+                            " に指定した値が範囲外です。\n" +
+                            rule.rangeText +
+                            "計算結果：" + valueString;
+                    }
+                }
+                catch (...)
+                {
+                    // 値を計算できない式は、この簡易検査では判定しない
                 }
             }
-            catch (...)
-            {
-                // 計算できない式は、この簡易検査では判定しない
-            }
-
-            
         }
 
         return "";
@@ -605,7 +602,7 @@ BuildResult BuildRobot(const std::wstring& robocodeFolder,
     if (!r.message.empty()) return r;
 
     // 攻撃パワーの検査
-    r.message = CheckFirePower(javaCode);
+    r.message = CheckAdvancedValues(javaCode);
     if (!r.message.empty()) return r;
 
     // 1. robots\パッケージ名\ロボット名.java に保存する
