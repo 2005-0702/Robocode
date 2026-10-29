@@ -2268,57 +2268,186 @@
         // robot_variable_declare の NAME を一覧の元にするため、名前の入力ミスを減らせる。
         const variableUseBlockTypes = ['robot_variable_assign', 'robot_variable_get'];
         const variableUseBlockNamesInstalled = new Set();
+
+        // 変数宣言ブロックから、利用できる変数の一覧を取得する。
         function getDeclaredVariableBlocks(block) {
           let workspace = block && block.workspace;
-          // ツールボックスや検索の一覧（フライアウト）の中のブロックは、ブロックの画面の宣言から選ぶ
+          // ツールボックスや検索の一覧（フライアウト）では、作業領域側の変数を参照する。
           if (workspace && workspace.isFlyout && workspace.targetWorkspace) workspace = workspace.targetWorkspace;
           if (!workspace) return [];
           return workspace.getAllBlocks(false)
             .filter(candidate => candidate.type === 'robot_variable_declare')
             .filter(candidate => /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(String(candidate.getFieldValue('NAME') || '').trim()));
         }
+
         function getDeclaredVariableOptions(block) {
           const declarations = getDeclaredVariableBlocks(block);
           const uniqueNames = [...new Set(declarations.map(candidate => String(candidate.getFieldValue('NAME')).trim()))];
           if (uniqueNames.length === 0) return [['先に変数を宣言してください', 'item']];
           return uniqueNames.map(name => [name, name]);
         }
+
+        function getDeclaredVariableType(block, name) {
+          const declaration = getDeclaredVariableBlocks(block)
+            .find(candidate => String(candidate.getFieldValue('NAME') || '').trim() === String(name || '').trim());
+          return declaration ? (declaration.getFieldValue('TYPE') || 'int') : 'double';
+        }
+
+        const variableTypeOptions = [
+          ['整数', 'int'],
+          ['小数', 'float'],
+          ['倍精度の小数', 'double'],
+          ['長整数', 'long'],
+          ['文字列', 'String'],
+          ['真偽値', 'boolean']
+        ];
+        const variableBooleanOptions = [
+          ['いいえ', 'false'],
+          ['はい', 'true']
+        ];
+
+        // 代入ブロックを、選択した変数の型に合う形へ組み直す。
+        // 数値型：数値ブロック、String：文字列ブロック／値なしブロック、
+        // boolean：「はい／いいえ」の選択欄を表示する。
+        function rebuildVariableAssignment(block, requestedType, forceRebuild = false) {
+          if (!block || block.type !== 'robot_variable_assign') return;
+
+          const javaType = variableTypeOptions.some(option => option[1] === requestedType)
+            ? requestedType : 'double';
+          const oldName = String(block.getFieldValue('NAME') || 'item');
+          const oldBoolean = block.getFieldValue('VALUE_BOOLEAN') || 'false';
+          const currentType = block.getFieldValue('VARIABLE_TYPE') || '';
+          const isBoolean = javaType === 'boolean';
+          const hasValueInput = !!block.getInput('VALUE');
+
+          // 型が変わっていなければ、入力欄を作り直さずに接続できる型を整える。
+          // String には String 型のブロックだけ、数値型には Number 型のブロックだけを接続できる。
+          if (!forceRebuild && currentType === javaType && (isBoolean ? !hasValueInput : hasValueInput)) {
+            const valueInput = block.getInput('VALUE');
+            if (valueInput && valueInput.connection) {
+              const expectedCheck = javaType === 'String' ? 'String' : 'Number';
+              valueInput.connection.setCheck(expectedCheck);
+
+              // 値ブロックが未接続なら、型に合う初期ブロックを表示する。
+              // 実際に接続済みのブロックは置き換えない。
+              if (!valueInput.connection.targetBlock()) {
+                const shadowState = javaType === 'String'
+                  ? { type: 'java_null' }
+                  : { type: 'rb_number', fields: { NUM: 0 } };
+                valueInput.connection.setShadowState(shadowState);
+              }
+            }
+            return;
+          }
+
+          // 型が変わった場合は、古い入力欄を削除して正しい形を作り直す。
+          // 古い型の値ブロックは、新しい型に合わない可能性があるため接続を外す。
+          block.inputList.slice().forEach(input => block.removeInput(input.name, true));
+          block.setInputsInline(true);
+
+          const nameRow = block.appendDummyInput('NAME_ROW');
+          const nameField = new Blockly.FieldDropdown(() => getDeclaredVariableOptions(block));
+          nameRow.appendField(nameField, 'NAME').appendField('に');
+
+          // 型情報はコード生成用に保持するが、学習者の画面には表示しない。
+          const hiddenTypeField = new Blockly.FieldDropdown(variableTypeOptions);
+          nameRow.appendField(hiddenTypeField, 'VARIABLE_TYPE');
+          hiddenTypeField.setVisible(false);
+          hiddenTypeField.setValue(javaType);
+
+          if (isBoolean) {
+            // 真偽値は値ブロックを接続せず、選択肢で値を指定する。
+            block.appendDummyInput('BOOLEAN_ROW')
+              .appendField(new Blockly.FieldDropdown(variableBooleanOptions), 'VALUE_BOOLEAN');
+            const booleanField = block.getField('VALUE_BOOLEAN');
+            if (booleanField) {
+              try {
+                booleanField.setValue(oldBoolean === 'true' ? 'true' : 'false');
+              } catch (_) {}
+            }
+          } else {
+            // 数値または文字列を接続する入力欄。
+            const check = javaType === 'String' ? 'String' : 'Number';
+            const valueInput = block.appendValueInput('VALUE').setCheck(check);
+            if (valueInput.connection) {
+              // 入力欄に既定値を表示する。ユーザーは別のブロックに置き換えられる。
+              const shadowState = javaType === 'String'
+                ? { type: 'java_null' }
+                : { type: 'rb_number', fields: { NUM: 0 } };
+              valueInput.connection.setShadowState(shadowState);
+            }
+          }
+
+          block.appendDummyInput('END_ROW').appendField('を代入');
+
+          // 変数名の選択を維持できる場合は維持する。
+          const nameOptions = getDeclaredVariableOptions(block);
+          const validName = nameOptions.some(option => option[1] === oldName);
+          const nameDropdown = block.getField('NAME');
+          if (nameDropdown) {
+            try {
+              nameDropdown.setValue(validName ? oldName : nameOptions[0][1]);
+            } catch (_) {}
+          }
+
+          block.render();
+        }
+
         function syncVariableUseType(block) {
           if (!block) return;
           const name = String(block.getFieldValue('NAME') || '');
-          const declaration = getDeclaredVariableBlocks(block).find(candidate => candidate.getFieldValue('NAME') === name);
-          const javaType = declaration ? declaration.getFieldValue('TYPE') : 'double';
+          const javaType = getDeclaredVariableType(block, name);
           const check = javaType === 'String' ? 'String' :
             javaType === 'boolean' ? 'Boolean' : 'Number';
+
           if (block.type === 'robot_variable_get') {
             block.setOutput(true, check);
           } else if (block.type === 'robot_variable_assign') {
-            const input = block.getInput('VALUE');
-            if (input && input.connection) input.connection.setCheck(check);
+            rebuildVariableAssignment(block, javaType);
           }
         }
+
         for (const type of variableUseBlockTypes) {
           const definition = Blockly.Blocks[type];
           if (!definition || variableUseBlockNamesInstalled.has(type)) continue;
           const originalInit = definition.init;
+
           definition.init = function() {
             originalInit.call(this);
+
             const oldField = this.getField('NAME');
             if (!oldField) return;
-            const input = this.inputList.find(item => item.fieldRow.includes(oldField));
-            if (!input) return;
             const oldValue = oldField.getValue();
-            const field = new Blockly.FieldDropdown(() => getDeclaredVariableOptions(this));
-            input.removeField('NAME', true);
-            input.insertFieldAt(input.fieldRow.length, field, 'NAME');
-            const options = getDeclaredVariableOptions(this);
-            const valid = options.some(option => option[1] === oldValue);
-            field.setValue(valid ? oldValue : options[0][1]);
+
+            // 変数名を、宣言済み変数から選べるドロップダウンにする。
+            const input = this.inputList.find(item => item.fieldRow.includes(oldField));
+            if (input) {
+              const field = new Blockly.FieldDropdown(() => getDeclaredVariableOptions(this));
+              input.removeField('NAME', true);
+              input.insertFieldAt(input.fieldRow.length, field, 'NAME');
+              const options = getDeclaredVariableOptions(this);
+              const valid = options.some(option => option[1] === oldValue);
+              field.setValue(valid ? oldValue : options[0][1]);
+            }
+
+            if (type === 'robot_variable_assign') {
+              // 選択中の変数の型に合わせて、入力欄を作り直す。
+              rebuildVariableAssignment(this, getDeclaredVariableType(this, this.getFieldValue('NAME')), true);
+            }
+
+            // 変数名を選び直した直後にも、入力欄の型を更新する。
+            // ワークスペース全体の変更監視だけに頼らず、代入ブロック自身でも反応する。
+            this.setOnChange(function(event) {
+              if (!event || event.type !== Blockly.Events.BLOCK_CHANGE ||
+                  event.blockId !== this.id || event.name !== 'NAME') return;
+              syncVariableUseType(this);
+            });
           };
+
           variableUseBlockNamesInstalled.add(type);
         }
 
-        // 宣言した変数の追加・名前変更・削除後に、変数選択欄を再描画する。
+        // 宣言した変数の追加・名前変更・型変更・削除後に、変数選択欄を更新する。
         if (!workspace._robotVariableDropdownListenerInstalled) {
           workspace.addChangeListener(event => {
             if (!event || event.isUiEvent) return;
@@ -2326,21 +2455,25 @@
                 event.type !== Blockly.Events.BLOCK_DELETE &&
                 event.type !== Blockly.Events.BLOCK_CHANGE &&
                 event.type !== Blockly.Events.BLOCK_MOVE) return;
+
             const declarations = workspace.getAllBlocks(false)
               .filter(block => block.type === 'robot_variable_declare');
             const names = new Set(declarations
               .map(block => String(block.getFieldValue('NAME') || '').trim())
               .filter(name => /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name)));
+
             workspace.getAllBlocks(false).forEach(block => {
               if (!variableUseBlockTypes.includes(block.type)) return;
               const field = block.getField('NAME');
               if (!field) return;
               const current = field.getValue();
+
               if (names.size === 0) {
                 if (current !== 'item') field.setValue('item');
               } else if (!names.has(current)) {
                 field.setValue([...names][0]);
               }
+
               syncVariableUseType(block);
             });
           });
