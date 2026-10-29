@@ -1,1358 +1,632 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="utf-8">
-    <title>Robocode Blocks</title>
-
-    <!-- いまは確認用にネットから Blockly を読み込む（あとで web フォルダに同梱する）
-         バージョンを固定しておく（固定しないと、Blockly が更新されたときに急に動かなくなることがある） -->
-    <script src="blockly/blockly.min.js"></script>
-    <script src="blockly/msg/ja.js"></script>
-
-    <style>
-         html, body {
-             margin: 0;
-             height: 100%;
-             overflow: hidden;
-             font-family: "Meiryo", sans-serif;
-             font-size: 14px;
-         }
-
-         /* 上のバー（ロボット名とボタン） */
-         #toolbar {
-             position: absolute;
-             top: 0;
-             left: 0;
-             right: var(--panel-width, 400px); /* 右の結果の欄は一番上まであるので、その手前まで */
-             display: flex;
-             flex-direction: column; /* 2段にする（1段目：作品・編集・検索／2段目：フォルダから右） */
-             gap: 4px;
-             padding: 6px 12px;
-             background: #2c3e50;
-             color: #fff;
-             box-sizing: border-box;
-             z-index: 100; /* ツールチップがブロックの画面より上に出るように */
-         }
-
-             #toolbar input {
-                 font-size: 14px;
-                 padding: 4px 8px;
-                 width: 150px;
-             }
-
-                 #toolbar input#packageName {
-                     width: 110px;
-                 }
-
-                 #toolbar input.invalid {
-                     outline: 2px solid #e74c3c;
-                 }
-
-             #toolbar .sep {
-                 width: 1px;
-                 height: 28px;
-                 background: #4b6278;
-                 margin: 0 4px;
-             }
-
-             #toolbar .dot {
-                 font-weight: bold;
-             }
-
-             #toolbar .row {
-                 display: flex;
-                 flex-wrap: wrap; /* とてもせまいときは、さらに折り返す */
-                 align-items: center;
-                 gap: 6px 8px;
-             }
-
-                 #toolbar .row .spacer {
-                     flex: 1;
-                 }
-         /* 右の結果の欄をかくしているときは、2段を1行にまとめる（入らないときだけ折り返す） */
-         body.panel-collapsed #toolbar {
-             flex-direction: row;
-             flex-wrap: wrap;
-             align-items: center;
-             gap: 6px 8px;
-         }
-
-             body.panel-collapsed #toolbar .row {
-                 display: contents;
-             }
-         /* 2つの段の中身を、1つの行にならべる */
-         #toolbar .keep {
-             display: flex;
-             align-items: center;
-             gap: 8px;
-             flex-shrink: 0;
-         }
-         /* 折り返してもばらばらにしないまとまり */
-         #toolbar .rowSep {
-             display: none;
-         }
-         /* 1段目と2段目の区切りの線（1行のときだけ出す） */
-         body.panel-collapsed #toolbar .rowSep {
-             display: block;
-         }
-
-         #toolbar [data-tip] {
-             position: relative;
-         }
-
-         #toolbar label,
-         #toolbar button {
-             white-space: nowrap; /* 文字が2行に折り返さないように */
-             flex-shrink: 0;
-         }
-
-         #fileName {
-             font-size: 12px;
-             color: #c8d3de;
-             max-width: 180px;
-             overflow: hidden;
-             text-overflow: ellipsis;
-             white-space: nowrap;
-         }
-
-         #toolbar button {
-             font-size: 14px;
-             padding: 6px 16px;
-             border: none;
-             border-radius: 4px;
-             background: #27ae60;
-             color: #fff;
-             cursor: pointer;
-         }
-
-             #toolbar button:hover {
-                 background: #2ecc71;
-             }
-
-             #toolbar button.sub {
-                 background: #5d6d7e;
-             }
-
-                 #toolbar button.sub:hover {
-                     background: #7f8c8d;
-                 }
-
-             #toolbar button:disabled {
-                 background: #95a5a6;
-                 cursor: wait;
-             }
-
-         /* 左：ブロックを組む場所 */
-         #blocklyDiv {
-             position: absolute;
-             top: var(--bar-height, 104px);
-             left: 0;
-             bottom: 0; /* 上のバーの高さ */
-             right: var(--panel-width, 400px); /* 右の結果の欄の幅 */
-         }
-
-         /* ブロックを置くあいだだけ、上のバーと右の結果を消して、ブロックの画面を広くする */
-         body.focus-mode #toolbar,
-         body.focus-mode #resultPanel,
-         body.focus-mode #panelTab {
-             display: none;
-         }
-
-         body.focus-mode #blocklyDiv {
-             top: 0;
-             right: 0;
-         }
-         /* 画面を広くしているあいだだけ出る、右上のボタン */
-         #focusBar {
-             display: none;
-             position: fixed;
-             top: 10px; /* 最初の場所（ドラッグで動かすと JS で left / top を変える） */
-             right: 28px; /* 右のスクロールバーに重ならないように */
-             z-index: 100;
-             align-items: center;
-             gap: 8px;
-             padding: 6px;
-             border-radius: 10px;
-             background: rgba(44, 62, 80, 0.92);
-             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-         }
-
-         body.focus-mode #focusBar {
-             display: flex;
-         }
-
-         #focusBar button {
-             position: relative;
-             height: 44px;
-             min-width: 44px;
-             padding: 0 12px;
-             border: none;
-             border-radius: 6px;
-             background: #5d6d7e;
-             color: #fff;
-             font-size: 15px;
-             cursor: pointer;
-             display: inline-flex;
-             align-items: center;
-             justify-content: center;
-             gap: 6px;
-             white-space: nowrap;
-         }
-
-             #focusBar button:hover {
-                 background: #7f8c8d;
-             }
-
-             #focusBar button:disabled {
-                 opacity: 0.4;
-                 cursor: default;
-                 background: #5d6d7e;
-             }
-
-             #focusBar button.primary {
-                 background: #27ae60;
-             }
-
-                 #focusBar button.primary:hover {
-                     background: #2ecc71;
-                 }
-         /* つまんで動かすところ */
-         #focusGrip {
-             width: 18px;
-             height: 44px;
-             cursor: grab;
-             display: flex;
-             align-items: center;
-             justify-content: center;
-             color: #aab7c4;
-             font-size: 18px;
-             letter-spacing: -3px;
-             user-select: none;
-             touch-action: none;
-         }
-
-             #focusGrip:active {
-                 cursor: grabbing;
-             }
-
-         #focusBar button.hide {
-             min-width: 32px;
-             padding: 0 6px;
-             font-size: 20px;
-         }
-
-         /* 横にかくしたときに出る、小さな矢印のつまみ */
-         #focusTab {
-             display: none;
-             position: fixed;
-             z-index: 100;
-             width: 30px;
-             height: 64px;
-             border: none;
-             background: rgba(44, 62, 80, 0.92);
-             color: #fff;
-             font-size: 22px;
-             cursor: pointer;
-             align-items: center;
-             justify-content: center;
-             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-             touch-action: none;
-         }
-
-             #focusTab.left {
-                 left: 0;
-                 border-radius: 0 10px 10px 0;
-             }
-
-             #focusTab.right {
-                 right: 0;
-                 border-radius: 10px 0 0 10px;
-             }
-
-             #focusTab:hover {
-                 background: rgba(61, 86, 110, 0.95);
-             }
-
-         body.focus-mode.focus-collapsed #focusBar {
-             display: none;
-         }
-
-         body.focus-mode.focus-collapsed #focusTab {
-             display: flex;
-         }
-
-         #focusBar svg {
-             width: 26px;
-             height: 26px;
-             fill: none;
-             stroke: currentColor;
-             stroke-width: 1.8;
-             stroke-linecap: round;
-             stroke-linejoin: round;
-             pointer-events: none;
-         }
-
-         /* 右：結果を表示する場所 */
-         #resultPanel {
-             position: absolute;
-             top: 0;
-             right: 0;
-             bottom: 0; /* 一番上から一番下まで */
-             width: var(--panel-width, 400px);
-             box-sizing: border-box;
-             display: flex;
-             flex-direction: column;
-             border-left: 1px solid #ccc;
-             background: #fafafa;
-         }
-         /* 結果の欄の一番上（タイトルと、かくすボタン） */
-         #panelHeader {
-             display: flex;
-             align-items: center;
-             gap: 8px;
-             min-height: 44px;
-             padding: 0 8px 0 14px;
-             background: #2c3e50;
-             color: #fff;
-             font-weight: bold;
-             flex-shrink: 0;
-         }
-
-             #panelHeader span {
-                 flex: 1;
-                 white-space: nowrap;
-                 overflow: hidden;
-                 text-overflow: ellipsis;
-             }
-
-         #panelHideButton {
-             width: 36px;
-             height: 32px;
-             border: none;
-             border-radius: 4px;
-             background: #5d6d7e;
-             color: #fff;
-             font-size: 18px;
-             cursor: pointer;
-         }
-
-             #panelHideButton:hover {
-                 background: #7f8c8d;
-             }
-         /* 結果の欄の左はし：ドラッグして幅を変える */
-         #panelResizer {
-             position: absolute;
-             top: 0;
-             bottom: 0;
-             left: -4px;
-             width: 8px;
-             cursor: col-resize;
-             z-index: 5;
-         }
-
-             #panelResizer:hover, #panelResizer.dragging {
-                 background: rgba(41, 128, 185, 0.35);
-             }
-
-         body.panel-resizing, body.panel-resizing * {
-             cursor: col-resize !important;
-             user-select: none;
-         }
-         /* 結果の欄をかくしたときに、右はしに出る矢印 */
-         #panelTab {
-             display: none;
-             position: absolute;
-             top: 0;
-             right: 0;
-             bottom: 0;
-             width: 24px;
-             padding: 0;
-             border: none;
-             border-left: 1px solid #1b2631;
-             background: #2c3e50;
-             color: #fff;
-             font-size: 18px;
-             cursor: pointer;
-             z-index: 90;
-         }
-
-             #panelTab:hover {
-                 background: #3d566e;
-             }
-
-         body.panel-collapsed #resultPanel {
-             display: none;
-         }
-
-         body.panel-collapsed #panelTab {
-             display: block;
-         }
-         /* 保存した場所のボタン */
-         .message .folderButton {
-             margin-left: 6px;
-             padding: 3px 10px;
-             border: none;
-             border-radius: 4px;
-             background: #2980b9;
-             color: #fff;
-             font-size: 13px;
-             cursor: pointer;
-         }
-
-             .message .folderButton:hover {
-                 background: #3498db;
-             }
-
-         .message .savedPath {
-             display: block;
-             word-break: break-all;
-             margin-bottom: 4px;
-         }
-
-         #status {
-             padding: 8px 12px;
-             font-weight: bold;
-             border-bottom: 1px solid #ddd;
-         }
-
-             #status.ok {
-                 background: #e8f8ee;
-                 color: #1e7e34;
-             }
-
-             #status.error {
-                 background: #fdecea;
-                 color: #b02a1f;
-             }
-
-         #messages {
-             max-height: 40%;
-             overflow-y: auto;
-             border-bottom: 1px solid #ddd;
-         }
-
-         .message {
-             padding: 6px 12px;
-             border-bottom: 1px solid #eee;
-         }
-
-             .message.error {
-                 color: #b02a1f;
-             }
-
-             .message.warning {
-                 color: #8a6d00;
-             }
-
-             .message.info {
-                 color: #1e7e34;
-             }
-
-             .message.detail {
-                 color: #333;
-                 font-family: Consolas, monospace;
-                 font-size: 12px;
-                 white-space: pre-wrap;
-                 background: #fff;
-             }
-
-             .message.clickable {
-                 cursor: pointer;
-             }
-
-                 .message.clickable:hover {
-                     background: #eef3fb;
-                 }
-
-         #javaHeader {
-             display: flex;
-             justify-content: space-between;
-             align-items: center;
-             padding: 6px 12px;
-             color: #555;
-         }
-
-             #javaHeader button {
-                 font-size: 12px;
-             }
-
-         #javaCode {
-             flex: 1;
-             margin: 0;
-             padding: 8px 12px;
-             overflow: auto;
-             background: #1e1e1e;
-             color: #d4d4d4;
-             font-family: Consolas, monospace;
-             font-size: var(--java-font, 13px); /* 画面の設定で変えられる */
-             white-space: pre;
-         }
-
-         /* カテゴリを左の枠いっぱいに広げて並べる（カテゴリが増えると、1つ分の高さが小さくなる） */
-         .blocklyToolboxDiv > .blocklyToolboxContents {
-             flex-wrap: nowrap; /* 入りきらなくても横に折り返さない（そのときはスクロール） */
-             height: 100%;
-         }
-
-             .blocklyToolboxDiv > .blocklyToolboxContents > .blocklyToolboxCategory {
-                 flex: 1 1 0; /* 高さを等分する */
-                 min-height: var(--cat-row, 34px); /* これより小さくはしない（入りきらなければスクロール）。画面の設定で変えられる */
-                 display: flex;
-                 flex-direction: column;
-             }
-
-                 .blocklyToolboxDiv > .blocklyToolboxContents > .blocklyToolboxCategory > .blocklyTreeRow {
-                     flex: 1 1 auto;
-                     height: auto;
-                     min-height: 30px;
-                     margin-bottom: 0;
-                     display: flex;
-                     align-items: center; /* カテゴリ名を上下のまん中に */
-                     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-                 }
-
-         .blocklyToolboxDiv .blocklyTreeLabel {
-             font-size: var(--cat-font, 15px); /* 画面の設定で変えられる */
-         }
-
-         .blocklyToolboxDiv {
-             min-width: var(--cat-width, 0px);
-         }
-
-         /* アイコンのボタン（新規・開く・保存・別名で保存・元に戻す・やり直す） */
-         #toolbar button.icon {
-             position: relative;
-             width: 44px;
-             height: 44px;
-             padding: 0;
-             display: inline-flex;
-             align-items: center;
-             justify-content: center;
-         }
-
-             #toolbar button.icon svg {
-                 width: 30px;
-                 height: 30px;
-                 fill: none;
-                 stroke: currentColor;
-                 stroke-width: 1.8;
-                 stroke-linecap: round;
-                 stroke-linejoin: round;
-                 pointer-events: none;
-             }
-
-             #toolbar button.icon:disabled {
-                 opacity: 0.4;
-                 cursor: default;
-                 background: #5d6d7e;
-             }
-
-         /* カーソルを乗せると出る説明（data-tip に書いた文字） */
-         #toolbar [data-tip]::after {
-             content: attr(data-tip);
-             position: absolute;
-             top: calc(100% + 8px);
-             left: 50%;
-             transform: translateX(-50%);
-             padding: 6px 12px;
-             border-radius: 6px;
-             background: #1b2631;
-             color: #fff;
-             font-size: 15px;
-             white-space: nowrap;
-             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-             opacity: 0;
-             visibility: hidden;
-             transition: opacity 0.15s;
-             pointer-events: none;
-             z-index: 1000;
-         }
-
-         #toolbar [data-tip]:hover::after {
-             opacity: 1;
-             visibility: visible;
-             transition-delay: 0.3s; /* 少し止めたら出る */
-         }
-
-         #toolbar [data-tip].tip-left::after { /* 左はしのボタンは、説明が画面からはみ出さないように */
-             left: 0;
-             transform: none;
-         }
-
-         /* ブロックの検索 */
-         #searchBox {
-             width: 160px !important; /* 左上に歯車のボタンを足した分、少しせまくした（1段に収まるように） */
-             border-radius: 12px;
-             border: none;
-             margin-left: 8px;
-         }
-
-         /* ゴミ箱の中身の横スクロールバー（横に長いブロックがあるときだけ出る） */
-         /* ゴミ箱を開いたときに、中身の一覧の上に出る「ゴミ箱を空にする」ボタン */
-         #emptyTrashButton {
-             display: none;
-             position: fixed;
-             z-index: 95;
-             padding: 6px 12px;
-             border: none;
-             border-radius: 6px;
-             background: #c0392b;
-             color: #fff;
-             font-size: 14px;
-             cursor: pointer;
-             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-         }
-
-             #emptyTrashButton:hover {
-                 background: #e74c3c;
-             }
-
-         #trashScroll {
-             display: none;
-             position: fixed;
-             height: 16px;
-             overflow-x: auto;
-             overflow-y: hidden;
-             z-index: 95;
-             background: rgba(255, 255, 255, 0.9);
-         }
-
-             #trashScroll > div {
-                 height: 1px;
-             }
-
-         /* クリックできるメッセージ（保存した場所など） */
-         .message.link {
-             cursor: pointer;
-             text-decoration: underline;
-         }
-
-             .message.link:hover {
-                 background: #eef3fb;
-             }
-
-         /* 囲んで選ぶときの四角 */
-         /* カテゴリの一覧で選んだブロックの、黄色いわく
-        （Blockly の「マウスを乗せたときのわく」とは別にしているので、マウスを動かしても消えない） */
-         .blocklyFlyout .rbPicked > .blocklyPath {
-             stroke: #fc3 !important;
-             stroke-width: 4px !important;
-         }
-         /* カテゴリの一覧のブロックの左上に出す「置いてある数」 */
-         .rbCount circle {
-             fill: #e74c3c;
-             stroke: #fff;
-             stroke-width: 1.5px;
-         }
-
-         .rbCount text {
-             fill: #fff;
-             font-size: 11px;
-             font-weight: bold;
-             font-family: Meiryo, sans-serif;
-         }
-         /* Ctrl + F：置いてあるブロックをさがす欄 */
-         #findBar {
-             display: none;
-             position: fixed;
-             top: 12px;
-             left: 50%;
-             transform: translateX(-50%);
-             z-index: 2000;
-             align-items: center;
-             gap: 6px;
-             padding: 6px 10px;
-             background: #2c3e50;
-             color: #fff;
-             border-radius: 8px;
-             box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
-             font-size: 14px;
-         }
-
-             #findBar.open {
-                 display: flex;
-             }
-
-         #findInput {
-             width: 220px;
-             font-size: 14px;
-             padding: 4px 8px;
-             border: none;
-             border-radius: 4px;
-         }
-
-         #findBar button {
-             border: none;
-             border-radius: 4px;
-             background: #5d6d7e;
-             color: #fff;
-             padding: 4px 9px;
-             cursor: pointer;
-             font-size: 14px;
-         }
-
-             #findBar button:hover {
-                 background: #7f8c8d;
-             }
-
-         #findCount {
-             min-width: 64px;
-             text-align: center;
-             color: #c8d3de;
-             font-size: 13px;
-         }
-
-         #toolbar button.icon.emoji {
-             font-size: 22px;
-             line-height: 1;
-         }
-         /* ---------- ❓ のメニュー ---------- */
-         #helpMenu {
-             display: none;
-             position: fixed;
-             z-index: 2300;
-             min-width: 240px;
-             background: #fff;
-             border-radius: 10px;
-             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-             padding: 6px;
-         }
-
-             #helpMenu.open {
-                 display: block;
-             }
-
-             #helpMenu button {
-                 display: block;
-                 width: 100%;
-                 text-align: left;
-                 border: none;
-                 background: none;
-                 color: #222;
-                 padding: 9px 12px;
-                 border-radius: 6px;
-                 font-size: 14px;
-                 cursor: pointer;
-             }
-
-                 #helpMenu button:hover {
-                     background: #eef3fb;
-                 }
-         /* ---------- ショートカット一覧・画面の設定（同じ形のダイアログ） ---------- */
-         .rbDialogOverlay {
-             position: fixed;
-             inset: 0;
-             z-index: 2400;
-             display: none;
-             align-items: center;
-             justify-content: center;
-             background: rgba(0, 0, 0, 0.45);
-         }
-
-             .rbDialogOverlay.open {
-                 display: flex;
-             }
-
-         .rbDialog {
-             width: 680px;
-             max-width: calc(100vw - 32px);
-             max-height: calc(100vh - 48px);
-             overflow: auto;
-             box-sizing: border-box;
-             background: #fff;
-             color: #222;
-             border-radius: 14px;
-             padding: 18px 20px;
-             box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
-             font-size: 14px;
-         }
-
-             .rbDialog h3 {
-                 margin: 0 0 10px;
-                 font-size: 18px;
-                 color: #2c3e50;
-             }
-
-             .rbDialog h4 {
-                 margin: 14px 0 6px;
-                 font-size: 15px;
-                 color: #1f5f8b;
-             }
-
-             .rbDialog .rbClose {
-                 float: right;
-                 border: none;
-                 background: #5d6d7e;
-                 color: #fff;
-                 border-radius: 6px;
-                 padding: 4px 10px;
-                 cursor: pointer;
-             }
-
-             .rbDialog table {
-                 border-collapse: collapse;
-                 width: 100%;
-             }
-
-             .rbDialog td {
-                 padding: 5px 8px;
-                 border-bottom: 1px solid #eef0f3;
-                 vertical-align: top;
-             }
-
-                 .rbDialog td.key {
-                     white-space: nowrap;
-                     width: 38%;
-                 }
-
-             .rbDialog kbd {
-                 display: inline-block;
-                 padding: 1px 6px;
-                 border: 1px solid #c8cfd8;
-                 border-bottom-width: 2px;
-                 border-radius: 4px;
-                 background: #f6f8fa;
-                 font-family: inherit;
-                 font-size: 12px;
-             }
-
-         .rbTabs {
-             display: flex;
-             gap: 6px;
-             margin-bottom: 10px;
-         }
-
-             .rbTabs button {
-                 border: 1px solid #c8cfd8;
-                 background: #f4f6f8;
-                 border-radius: 6px;
-                 padding: 5px 12px;
-                 cursor: pointer;
-                 font-size: 14px;
-             }
-
-                 .rbTabs button.active {
-                     background: #2c3e50;
-                     color: #fff;
-                     border-color: #2c3e50;
-                 }
-
-         .rbTabPage {
-             display: none;
-         }
-
-             .rbTabPage.active {
-                 display: block;
-             }
-
-         .rbCat {
-             border: 1px solid #e3e7ec;
-             border-radius: 8px;
-             margin-bottom: 6px;
-         }
-
-             .rbCat summary {
-                 padding: 6px 10px;
-                 cursor: pointer;
-                 display: flex;
-                 align-items: center;
-                 gap: 8px;
-             }
-
-                 .rbCat summary .swatch {
-                     width: 12px;
-                     height: 12px;
-                     border-radius: 3px;
-                     display: inline-block;
-                 }
-
-             .rbCat .rbBlocks {
-                 padding: 4px 12px 8px 34px;
-                 display: flex;
-                 flex-direction: column;
-                 gap: 2px;
-                 font-size: 13px;
-             }
-
-                 .rbCat .rbBlocks .rbBlockRow {
-                     display: flex;
-                     align-items: center;
-                     gap: 6px;
-                     padding: 2px 4px;
-                     border-radius: 4px;
-                 }
-
-                     .rbCat .rbBlocks .rbBlockRow:hover {
-                         background: #f4f7fb;
-                     }
-
-                     .rbCat .rbBlocks .rbBlockRow label {
-                         flex: 1;
-                     }
-
-             .rbCat summary .rbCatName {
-                 flex: 1;
-             }
-             /* 開いているか分かるように、カテゴリの名前の前に ▸ ▾ を出す */
-             .rbCat summary {
-                 list-style: none;
-             }
-
-                 .rbCat summary::-webkit-details-marker {
-                     display: none;
-                 }
-
-                 .rbCat summary .rbCatName::before {
-                     content: '▸ ';
-                     color: #888;
-                 }
-
-             .rbCat[open] summary .rbCatName::before {
-                 content: '▾ ';
-             }
-         /* ドラッグでならべかえる */
-         .rbGrip {
-             cursor: grab;
-             color: #9aa4af;
-             padding: 0 2px;
-             user-select: none;
-             font-size: 14px;
-             letter-spacing: -2px;
-         }
-
-             .rbGrip:active {
-                 cursor: grabbing;
-             }
-
-         .rbDragging {
-             opacity: 0.4;
-         }
-
-         .rbDropBefore {
-             box-shadow: inset 0 3px 0 #2980b9;
-         }
-
-         .rbDropAfter {
-             box-shadow: inset 0 -3px 0 #2980b9;
-         }
-
-         .rbOrder {
-             border: 1px solid #c8cfd8;
-             background: #fff;
-             border-radius: 4px;
-             width: 26px;
-             height: 22px;
-             padding: 0;
-             cursor: pointer;
-             font-size: 12px;
-             line-height: 1;
-         }
-
-             .rbOrder:hover {
-                 background: #eef3fb;
-             }
-
-             .rbOrder:disabled {
-                 opacity: 0.3;
-                 cursor: default;
-             }
-
-         .rbRange {
-             display: grid;
-             grid-template-columns: 220px 1fr 56px;
-             align-items: center;
-             gap: 10px;
-             margin: 8px 0;
-         }
-
-             .rbRange output {
-                 text-align: right;
-                 color: #555;
-             }
-
-         .rbChecks {
-             display: grid;
-             grid-template-columns: 1fr 1fr;
-             gap: 4px 12px;
-         }
-
-         .rbDialogFoot {
-             margin-top: 14px;
-             display: flex;
-             gap: 8px;
-             justify-content: flex-end;
-         }
-
-             .rbDialogFoot button {
-                 border: none;
-                 border-radius: 6px;
-                 padding: 6px 14px;
-                 cursor: pointer;
-                 font-size: 14px;
-                 background: #5d6d7e;
-                 color: #fff;
-             }
-
-                 .rbDialogFoot button.primary {
-                     background: #27ae60;
-                 }
-         /* ---------- チュートリアル ---------- */
-         #tutSpot {
-             display: none;
-             position: fixed;
-             z-index: 2500;
-             border-radius: 8px;
-             box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
-             outline: 3px solid #f1c40f;
-             pointer-events: none; /* 下の画面はそのまま操作できる */
-             transition: all 0.25s;
-         }
-
-             #tutSpot.none {
-                 box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
-                 outline: none;
-                 width: 0;
-                 height: 0;
-             }
-             /* ブロックを置くステップ：画面を暗くしない（置く場所が見えるように）。光らせる枠だけ出す */
-             #tutSpot.soft {
-                 box-shadow: 0 0 0 4px rgba(241, 196, 15, 0.35);
-             }
-         /* ブロックを置くステップのカード：小さめにして、ブロックの画面のじゃまにならない場所に置く */
-         #tutCard.docked {
-             width: 300px;
-             padding: 12px 14px 10px;
-             font-size: 13px;
-             transition: opacity 0.15s;
-         }
-
-             #tutCard.docked h3 {
-                 font-size: 15px;
-             }
-         /* ブロックを置くステップ：開くカテゴリのわくを点滅させる */
-         #tutSpot.soft {
-             animation: rbSpotBlink 0.9s ease-in-out infinite;
-         }
-
-         @keyframes rbSpotBlink {
-             0%, 100% {
-                 outline-color: #f1c40f;
-                 box-shadow: 0 0 0 4px rgba(241, 196, 15, 0.45);
-             }
-
-             50% {
-                 outline-color: rgba(241, 196, 15, 0.15);
-                 box-shadow: 0 0 0 4px rgba(241, 196, 15, 0);
-             }
-         }
-         /* ブロックを置くステップ：一覧の中の「置くブロック」を点滅させる */
-         .blocklyFlyout .rbTutBlink > .blocklyPath {
-             stroke: #ffcc00 !important;
-             stroke-width: 5px !important;
-             animation: rbBlockBlink 0.9s ease-in-out infinite;
-         }
-
-         .blocklyFlyout .rbTutBlink {
-             animation: rbBlockGlow 0.9s ease-in-out infinite;
-         }
-
-         @keyframes rbBlockBlink {
-             0%, 100% {
-                 stroke-opacity: 1;
-             }
-
-             50% {
-                 stroke-opacity: 0.15;
-             }
-         }
-
-         @keyframes rbBlockGlow {
-             0%, 100% {
-                 filter: drop-shadow(0 0 6px rgba(255, 204, 0, 0.95));
-             }
-
-             50% {
-                 filter: drop-shadow(0 0 0 rgba(255, 204, 0, 0));
-             }
-         }
-         /* ドラッグしているあいだは、カードをうすくして、マウスが通りぬけるようにする */
-         #tutCard.passthrough {
-             opacity: 0.25;
-             pointer-events: none;
-         }
-
-         #tutCard {
-             display: none;
-             position: fixed;
-             z-index: 2600;
-             width: 360px;
-             max-width: calc(100vw - 32px);
-             box-sizing: border-box;
-             padding: 16px 18px 12px;
-             background: #fff;
-             color: #222;
-             border-radius: 12px;
-             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-             font-size: 14px;
-             line-height: 1.6;
-         }
-
-             #tutCard h3 {
-                 margin: 0 0 6px;
-                 font-size: 16px;
-                 color: #2c3e50;
-             }
-
-             #tutCard .tutText {
-                 margin: 0 0 8px;
-             }
-
-             #tutCard .tutWait {
-                 margin: 0 0 8px;
-                 padding: 6px 10px;
-                 border-radius: 6px;
-                 background: #fff7d6;
-                 color: #7a5b00;
-                 font-size: 13px;
-             }
-
-                 #tutCard .tutWait.done {
-                     background: #e8f8ee;
-                     color: #1e7e34;
-                 }
-
-             #tutCard .tutFoot {
-                 display: flex;
-                 align-items: center;
-                 gap: 8px;
-                 margin-top: 10px;
-             }
-
-                 #tutCard .tutFoot .tutStep {
-                     flex: 1;
-                     color: #888;
-                     font-size: 12px;
-                 }
-
-             #tutCard button {
-                 border: none;
-                 border-radius: 6px;
-                 padding: 6px 12px;
-                 font-size: 14px;
-                 cursor: pointer;
-                 background: #5d6d7e;
-                 color: #fff;
-             }
-
-                 #tutCard button.primary {
-                     background: #27ae60;
-                 }
-
-                 #tutCard button:disabled {
-                     opacity: 0.4;
-                     cursor: default;
-                 }
-         /* ---------- サンプルのロボット ---------- */
-         #sampleOverlay {
-             position: fixed;
-             inset: 0;
-             z-index: 2400;
-             display: none;
-             align-items: center;
-             justify-content: center;
-             background: rgba(0, 0, 0, 0.45);
-         }
-
-             #sampleOverlay.open {
-                 display: flex;
-             }
-
-         #sampleDialog {
-             width: 640px;
-             max-width: calc(100vw - 32px);
-             max-height: calc(100vh - 48px);
-             overflow: auto;
-             box-sizing: border-box;
-             background: #fff;
-             border-radius: 14px;
-             padding: 18px 20px;
-             box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
-         }
-
-             #sampleDialog h3 {
-                 margin: 0 0 4px;
-                 font-size: 18px;
-                 color: #2c3e50;
-             }
-
-             #sampleDialog .sampleLead {
-                 margin: 0 0 12px;
-                 color: #555;
-                 font-size: 13px;
-             }
-
-         .sampleCard {
-             border: 1px solid #dfe4ea;
-             border-radius: 10px;
-             padding: 10px 14px;
-             margin-bottom: 10px;
-         }
-
-             .sampleCard .sampleHead {
-                 display: flex;
-                 align-items: center;
-                 gap: 8px;
-             }
-
-             .sampleCard .sampleName {
-                 font-weight: bold;
-                 font-size: 15px;
-                 flex: 1;
-             }
-
-             .sampleCard .sampleLevel {
-                 color: #e67e22;
-                 font-size: 13px;
-                 white-space: nowrap;
-             }
-
-             .sampleCard p {
-                 margin: 6px 0;
-                 font-size: 13px;
-                 line-height: 1.6;
-             }
-
-             .sampleCard ul {
-                 margin: 4px 0 0;
-                 padding-left: 20px;
-                 font-size: 13px;
-                 color: #1f5f8b;
-             }
-
-             .sampleCard button {
-                 border: none;
-                 border-radius: 6px;
-                 padding: 6px 14px;
-                 background: #27ae60;
-                 color: #fff;
-                 cursor: pointer;
-                 font-size: 14px;
-             }
-
-         #sampleClose {
-             float: right;
-             border: none;
-             background: #5d6d7e;
-             color: #fff;
-             border-radius: 6px;
-             padding: 4px 10px;
-             cursor: pointer;
-         }
-
-         #selectBand {
-             position: fixed;
-             border: 2px dashed #2980b9;
-             background: rgba(41, 128, 185, 0.12);
-             pointer-events: none;
-             z-index: 50;
-         }
-
-         /* RGBノード用の円形カラーピッカー */
-         #colorPickerOverlay {
-             position: fixed;
-             inset: 0;
-             background: rgba(0,0,0,.42);
-             z-index: 3000;
-             display: none;
-             align-items: center;
-             justify-content: center;
-         }
-
-             #colorPickerOverlay.open {
-                 display: flex;
-             }
-
-         #colorPickerDialog {
-             background: #fff;
-             border-radius: 14px;
-             padding: 20px;
-             width: 350px;
-             box-sizing: border-box;
-             box-shadow: 0 12px 45px #0005;
-         }
-
-             #colorPickerDialog h3 {
-                 margin: 0 0 12px;
-                 font-size: 17px;
-             }
-
-         #colorWheelCanvas {
-             display: block;
-             margin: auto;
-             width: 300px;
-             height: 300px;
-             cursor: crosshair;
-             touch-action: none;
-         }
-
-         #colorBrightnessRow {
-             display: flex;
-             align-items: center;
-             gap: 10px;
-             margin: 12px 0 4px;
-             font-size: 13px;
-         }
-
-         #colorBrightness {
-             flex: 1;
-             accent-color: #2563eb;
-         }
-
-         #colorPickerValues {
-             display: flex;
-             gap: 12px;
-             align-items: center;
-             margin: 14px 0;
-         }
-
-         #colorPickerPreview {
-             width: 64px;
-             height: 44px;
-             border: 1px solid #aaa;
-             border-radius: 6px;
-             flex: none;
-         }
-
-         #colorPickerNumbers {
-             font-family: Consolas,monospace;
-             font-size: 13px;
-             line-height: 1.7;
-         }
-
-         #colorPickerDialog .actions {
-             display: flex;
-             justify-content: flex-end;
-             gap: 8px;
-         }
-
-         #colorPickerDialog button {
-             border: 0;
-             border-radius: 6px;
-             padding: 8px 18px;
-             cursor: pointer;
-         }
-
-         #colorPickerApply {
-             background: #27ae60;
-             color: white;
-         }
-
-         #colorPickerHint {
-             font-size: 12px;
-             color: #666;
-             margin: 8px 0 12px;
-         }
-    </style>
+  <meta charset="utf-8">
+  <title>Robocode Blocks</title>
+
+  <!-- いまは確認用にネットから Blockly を読み込む（あとで web フォルダに同梱する）
+       バージョンを固定しておく（固定しないと、Blockly が更新されたときに急に動かなくなることがある） -->
+  <script src="https://unpkg.com/blockly@11.2.1/blockly.min.js"></script>
+  <script src="https://unpkg.com/blockly@11.2.1/msg/ja.js"></script>
+
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      font-family: "Meiryo", sans-serif;
+      font-size: 14px;
+    }
+
+    /* 上のバー（ロボット名とボタン） */
+    #toolbar {
+      position: absolute;
+      top: 0; left: 0;
+      right: var(--panel-width, 400px);   /* 右の結果の欄は一番上まであるので、その手前まで */
+      display: flex;
+      flex-direction: column;  /* 2段にする（1段目：作品・編集・検索／2段目：フォルダから右） */
+      gap: 4px;
+      padding: 6px 12px;
+      background: #2c3e50;
+      color: #fff;
+      box-sizing: border-box;
+      z-index: 100;           /* ツールチップがブロックの画面より上に出るように */
+    }
+    #toolbar input {
+      font-size: 14px;
+      padding: 4px 8px;
+      width: 150px;
+    }
+    #toolbar input#packageName { width: 110px; }
+    #toolbar input.invalid { outline: 2px solid #e74c3c; }
+    #toolbar .sep {
+      width: 1px;
+      height: 28px;
+      background: #4b6278;
+      margin: 0 4px;
+    }
+    #toolbar .dot { font-weight: bold; }
+    #toolbar .row {
+      display: flex;
+      flex-wrap: wrap;         /* とてもせまいときは、さらに折り返す */
+      align-items: center;
+      gap: 6px 8px;
+    }
+    #toolbar .row .spacer { flex: 1; }
+    /* 右の結果の欄をかくしているときは、2段を1行にまとめる（入らないときだけ折り返す） */
+    body.panel-collapsed #toolbar {
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px 8px;
+    }
+    body.panel-collapsed #toolbar .row { display: contents; }   /* 2つの段の中身を、1つの行にならべる */
+    #toolbar .keep { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }   /* 折り返してもばらばらにしないまとまり */
+    #toolbar .rowSep { display: none; }                           /* 1段目と2段目の区切りの線（1行のときだけ出す） */
+    body.panel-collapsed #toolbar .rowSep { display: block; }
+    #toolbar [data-tip] { position: relative; }
+    #toolbar label,
+    #toolbar button {
+      white-space: nowrap;    /* 文字が2行に折り返さないように */
+      flex-shrink: 0;
+    }
+    #fileName {
+      font-size: 12px;
+      color: #c8d3de;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #toolbar button {
+      font-size: 14px;
+      padding: 6px 16px;
+      border: none;
+      border-radius: 4px;
+      background: #27ae60;
+      color: #fff;
+      cursor: pointer;
+    }
+    #toolbar button:hover { background: #2ecc71; }
+    #toolbar button.sub { background: #5d6d7e; }
+    #toolbar button.sub:hover { background: #7f8c8d; }
+    #toolbar button:disabled { background: #95a5a6; cursor: wait; }
+
+    /* 左：ブロックを組む場所 */
+    #blocklyDiv {
+      position: absolute;
+      top: var(--bar-height, 104px); left: 0; bottom: 0;   /* 上のバーの高さ */
+      right: var(--panel-width, 400px);                    /* 右の結果の欄の幅 */
+    }
+
+    /* ブロックを置くあいだだけ、上のバーと右の結果を消して、ブロックの画面を広くする */
+    body.focus-mode #toolbar,
+    body.focus-mode #resultPanel,
+    body.focus-mode #panelTab {
+      display: none;
+    }
+    body.focus-mode #blocklyDiv {
+      top: 0;
+      right: 0;
+    }
+    /* 画面を広くしているあいだだけ出る、右上のボタン */
+    #focusBar {
+      display: none;
+      position: fixed;
+      top: 10px;              /* 最初の場所（ドラッグで動かすと JS で left / top を変える） */
+      right: 28px;            /* 右のスクロールバーに重ならないように */
+      z-index: 100;
+      align-items: center;
+      gap: 8px;
+      padding: 6px;
+      border-radius: 10px;
+      background: rgba(44, 62, 80, 0.92);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    }
+    body.focus-mode #focusBar {
+      display: flex;
+    }
+    #focusBar button {
+      position: relative;
+      height: 44px;
+      min-width: 44px;
+      padding: 0 12px;
+      border: none;
+      border-radius: 6px;
+      background: #5d6d7e;
+      color: #fff;
+      font-size: 15px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    #focusBar button:hover { background: #7f8c8d; }
+    #focusBar button:disabled { opacity: 0.4; cursor: default; background: #5d6d7e; }
+    #focusBar button.primary { background: #27ae60; }
+    #focusBar button.primary:hover { background: #2ecc71; }
+    /* つまんで動かすところ */
+    #focusGrip {
+      width: 18px;
+      height: 44px;
+      cursor: grab;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #aab7c4;
+      font-size: 18px;
+      letter-spacing: -3px;
+      user-select: none;
+      touch-action: none;
+    }
+    #focusGrip:active { cursor: grabbing; }
+    #focusBar button.hide { min-width: 32px; padding: 0 6px; font-size: 20px; }
+
+    /* 横にかくしたときに出る、小さな矢印のつまみ */
+    #focusTab {
+      display: none;
+      position: fixed;
+      z-index: 100;
+      width: 30px;
+      height: 64px;
+      border: none;
+      background: rgba(44, 62, 80, 0.92);
+      color: #fff;
+      font-size: 22px;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+      touch-action: none;
+    }
+    #focusTab.left  { left: 0;  border-radius: 0 10px 10px 0; }
+    #focusTab.right { right: 0; border-radius: 10px 0 0 10px; }
+    #focusTab:hover { background: rgba(61, 86, 110, 0.95); }
+    body.focus-mode.focus-collapsed #focusBar { display: none; }
+    body.focus-mode.focus-collapsed #focusTab { display: flex; }
+
+    #focusBar svg {
+      width: 26px;
+      height: 26px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+
+    /* 右：結果を表示する場所 */
+    #resultPanel {
+      position: absolute;
+      top: 0; right: 0; bottom: 0;           /* 一番上から一番下まで */
+      width: var(--panel-width, 400px);
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid #ccc;
+      background: #fafafa;
+    }
+    /* 結果の欄の一番上（タイトルと、かくすボタン） */
+    #panelHeader {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 0 8px 0 14px;
+      background: #2c3e50;
+      color: #fff;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+    #panelHeader span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #panelHideButton {
+      width: 36px; height: 32px;
+      border: none; border-radius: 4px;
+      background: #5d6d7e; color: #fff;
+      font-size: 18px; cursor: pointer;
+    }
+    #panelHideButton:hover { background: #7f8c8d; }
+    /* 結果の欄の左はし：ドラッグして幅を変える */
+    #panelResizer {
+      position: absolute;
+      top: 0; bottom: 0; left: -4px;
+      width: 8px;
+      cursor: col-resize;
+      z-index: 5;
+    }
+    #panelResizer:hover, #panelResizer.dragging { background: rgba(41, 128, 185, 0.35); }
+    body.panel-resizing, body.panel-resizing * { cursor: col-resize !important; user-select: none; }
+    /* 結果の欄をかくしたときに、右はしに出る矢印 */
+    #panelTab {
+      display: none;
+      position: absolute;
+      top: 0; right: 0; bottom: 0;
+      width: 24px;
+      padding: 0;
+      border: none;
+      border-left: 1px solid #1b2631;
+      background: #2c3e50;
+      color: #fff;
+      font-size: 18px;
+      cursor: pointer;
+      z-index: 90;
+    }
+    #panelTab:hover { background: #3d566e; }
+    body.panel-collapsed #resultPanel { display: none; }
+    body.panel-collapsed #panelTab { display: block; }
+    /* 保存した場所のボタン */
+    .message .folderButton {
+      margin-left: 6px;
+      padding: 3px 10px;
+      border: none;
+      border-radius: 4px;
+      background: #2980b9;
+      color: #fff;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .message .folderButton:hover { background: #3498db; }
+    .message .savedPath { display: block; word-break: break-all; margin-bottom: 4px; }
+    #status {
+      padding: 8px 12px;
+      font-weight: bold;
+      border-bottom: 1px solid #ddd;
+    }
+    #status.ok    { background: #e8f8ee; color: #1e7e34; }
+    #status.error { background: #fdecea; color: #b02a1f; }
+    #messages {
+      max-height: 40%;
+      overflow-y: auto;
+      border-bottom: 1px solid #ddd;
+    }
+    .message {
+      padding: 6px 12px;
+      border-bottom: 1px solid #eee;
+    }
+    .message.error   { color: #b02a1f; }
+    .message.warning { color: #8a6d00; }
+    .message.info    { color: #1e7e34; }
+    .message.detail  {
+      color: #333;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      background: #fff;
+    }
+    .message.clickable { cursor: pointer; }
+    .message.clickable:hover { background: #eef3fb; }
+    #javaHeader {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 12px;
+      color: #555;
+    }
+    #javaHeader button { font-size: 12px; }
+    #javaCode {
+      flex: 1;
+      margin: 0;
+      padding: 8px 12px;
+      overflow: auto;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      font-family: Consolas, monospace;
+      font-size: var(--java-font, 13px);   /* 画面の設定で変えられる */
+      white-space: pre;
+    }
+
+    /* カテゴリを左の枠いっぱいに広げて並べる（カテゴリが増えると、1つ分の高さが小さくなる） */
+    .blocklyToolboxDiv > .blocklyToolboxContents {
+      flex-wrap: nowrap;      /* 入りきらなくても横に折り返さない（そのときはスクロール） */
+      height: 100%;
+    }
+    .blocklyToolboxDiv > .blocklyToolboxContents > .blocklyToolboxCategory {
+      flex: 1 1 0;            /* 高さを等分する */
+      min-height: var(--cat-row, 34px);   /* これより小さくはしない（入りきらなければスクロール）。画面の設定で変えられる */
+      display: flex;
+      flex-direction: column;
+    }
+    .blocklyToolboxDiv > .blocklyToolboxContents > .blocklyToolboxCategory > .blocklyTreeRow {
+      flex: 1 1 auto;
+      height: auto;
+      min-height: 30px;
+      margin-bottom: 0;
+      display: flex;
+      align-items: center;    /* カテゴリ名を上下のまん中に */
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .blocklyToolboxDiv .blocklyTreeLabel {
+      font-size: var(--cat-font, 15px);   /* 画面の設定で変えられる */
+    }
+    .blocklyToolboxDiv { min-width: var(--cat-width, 0px); }
+
+    /* アイコンのボタン（新規・開く・保存・別名で保存・元に戻す・やり直す） */
+    #toolbar button.icon {
+      position: relative;
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #toolbar button.icon svg {
+      width: 30px;
+      height: 30px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+    #toolbar button.icon:disabled {
+      opacity: 0.4;
+      cursor: default;
+      background: #5d6d7e;
+    }
+
+    /* カーソルを乗せると出る説明（data-tip に書いた文字） */
+    #toolbar [data-tip]::after {
+      content: attr(data-tip);
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 12px;
+      border-radius: 6px;
+      background: #1b2631;
+      color: #fff;
+      font-size: 15px;
+      white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.15s;
+      pointer-events: none;
+      z-index: 1000;
+    }
+    #toolbar [data-tip]:hover::after {
+      opacity: 1;
+      visibility: visible;
+      transition-delay: 0.3s;  /* 少し止めたら出る */
+    }
+    #toolbar [data-tip].tip-left::after {   /* 左はしのボタンは、説明が画面からはみ出さないように */
+      left: 0;
+      transform: none;
+    }
+
+    /* ブロックの検索 */
+      #searchBox {
+          width: 160px !important;   /* 左上に歯車のボタンを足した分、少しせまくした（1段に収まるように） */
+          border-radius: 12px;
+          border: none;
+          margin-left: 8px;
+      }
+
+    /* ゴミ箱の中身の横スクロールバー（横に長いブロックがあるときだけ出る） */
+    /* ゴミ箱を開いたときに、中身の一覧の上に出る「ゴミ箱を空にする」ボタン */
+    #emptyTrashButton {
+      display: none;
+      position: fixed;
+      z-index: 95;
+      padding: 6px 12px;
+      border: none;
+      border-radius: 6px;
+      background: #c0392b;
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+    #emptyTrashButton:hover { background: #e74c3c; }
+
+    #trashScroll {
+      display: none;
+      position: fixed;
+      height: 16px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      z-index: 95;
+      background: rgba(255, 255, 255, 0.9);
+    }
+    #trashScroll > div { height: 1px; }
+
+    /* クリックできるメッセージ（保存した場所など） */
+    .message.link { cursor: pointer; text-decoration: underline; }
+    .message.link:hover { background: #eef3fb; }
+
+    /* 囲んで選ぶときの四角 */
+    /* カテゴリの一覧で選んだブロックの、黄色いわく
+       （Blockly の「マウスを乗せたときのわく」とは別にしているので、マウスを動かしても消えない） */
+    .blocklyFlyout .rbPicked > .blocklyPath {
+      stroke: #fc3 !important;
+      stroke-width: 4px !important;
+    }
+    /* カテゴリの一覧のブロックの左上に出す「置いてある数」 */
+    .rbCount circle { fill: #e74c3c; stroke: #fff; stroke-width: 1.5px; }
+    .rbCount text { fill: #fff; font-size: 11px; font-weight: bold; font-family: Meiryo, sans-serif; }
+    /* Ctrl + F：置いてあるブロックをさがす欄 */
+    #findBar {
+      display: none;
+      position: fixed;
+      top: 12px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 2000;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: #2c3e50;
+      color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+      font-size: 14px;
+    }
+    #findBar.open { display: flex; }
+    #findInput { width: 220px; font-size: 14px; padding: 4px 8px; border: none; border-radius: 4px; }
+    #findBar button { border: none; border-radius: 4px; background: #5d6d7e; color: #fff; padding: 4px 9px; cursor: pointer; font-size: 14px; }
+    #findBar button:hover { background: #7f8c8d; }
+    #findCount { min-width: 64px; text-align: center; color: #c8d3de; font-size: 13px; }
+    #toolbar button.icon.emoji { font-size: 22px; line-height: 1; }
+    /* ---------- ❓ のメニュー ---------- */
+    #helpMenu {
+      display: none; position: fixed; z-index: 2300; min-width: 240px;
+      background: #fff; border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); padding: 6px;
+    }
+    #helpMenu.open { display: block; }
+    #helpMenu button {
+      display: block; width: 100%; text-align: left; border: none; background: none; color: #222;
+      padding: 9px 12px; border-radius: 6px; font-size: 14px; cursor: pointer;
+    }
+    #helpMenu button:hover { background: #eef3fb; }
+    /* ---------- ショートカット一覧・画面の設定（同じ形のダイアログ） ---------- */
+    .rbDialogOverlay { position: fixed; inset: 0; z-index: 2400; display: none; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.45); }
+    .rbDialogOverlay.open { display: flex; }
+    .rbDialog { width: 680px; max-width: calc(100vw - 32px); max-height: calc(100vh - 48px); overflow: auto; box-sizing: border-box;
+      background: #fff; color: #222; border-radius: 14px; padding: 18px 20px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4); font-size: 14px; }
+    .rbDialog h3 { margin: 0 0 10px; font-size: 18px; color: #2c3e50; }
+    .rbDialog h4 { margin: 14px 0 6px; font-size: 15px; color: #1f5f8b; }
+    .rbDialog .rbClose { float: right; border: none; background: #5d6d7e; color: #fff; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+    .rbDialog table { border-collapse: collapse; width: 100%; }
+    .rbDialog td { padding: 5px 8px; border-bottom: 1px solid #eef0f3; vertical-align: top; }
+    .rbDialog td.key { white-space: nowrap; width: 38%; }
+    .rbDialog kbd { display: inline-block; padding: 1px 6px; border: 1px solid #c8cfd8; border-bottom-width: 2px; border-radius: 4px; background: #f6f8fa; font-family: inherit; font-size: 12px; }
+    .rbTabs { display: flex; gap: 6px; margin-bottom: 10px; }
+    .rbTabs button { border: 1px solid #c8cfd8; background: #f4f6f8; border-radius: 6px; padding: 5px 12px; cursor: pointer; font-size: 14px; }
+    .rbTabs button.active { background: #2c3e50; color: #fff; border-color: #2c3e50; }
+    .rbTabPage { display: none; }
+    .rbTabPage.active { display: block; }
+    .rbCat { border: 1px solid #e3e7ec; border-radius: 8px; margin-bottom: 6px; }
+    .rbCat summary { padding: 6px 10px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+    .rbCat summary .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+    .rbCat .rbBlocks { padding: 4px 12px 8px 34px; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+    .rbCat .rbBlocks .rbBlockRow { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 4px; }
+    .rbCat .rbBlocks .rbBlockRow:hover { background: #f4f7fb; }
+    .rbCat .rbBlocks .rbBlockRow label { flex: 1; }
+    .rbCat summary .rbCatName { flex: 1; }
+    /* 開いているか分かるように、カテゴリの名前の前に ▸ ▾ を出す */
+    .rbCat summary { list-style: none; }
+    .rbCat summary::-webkit-details-marker { display: none; }
+    .rbCat summary .rbCatName::before { content: '▸ '; color: #888; }
+    .rbCat[open] summary .rbCatName::before { content: '▾ '; }
+    /* ドラッグでならべかえる */
+    .rbGrip { cursor: grab; color: #9aa4af; padding: 0 2px; user-select: none; font-size: 14px; letter-spacing: -2px; }
+    .rbGrip:active { cursor: grabbing; }
+    .rbDragging { opacity: 0.4; }
+    .rbDropBefore { box-shadow: inset 0 3px 0 #2980b9; }
+    .rbDropAfter { box-shadow: inset 0 -3px 0 #2980b9; }
+    .rbOrder { border: 1px solid #c8cfd8; background: #fff; border-radius: 4px; width: 26px; height: 22px; padding: 0; cursor: pointer; font-size: 12px; line-height: 1; }
+    .rbOrder:hover { background: #eef3fb; }
+    .rbOrder:disabled { opacity: 0.3; cursor: default; }
+    .rbRange { display: grid; grid-template-columns: 220px 1fr 56px; align-items: center; gap: 10px; margin: 8px 0; }
+    .rbRange output { text-align: right; color: #555; }
+    .rbChecks { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+    .rbDialogFoot { margin-top: 14px; display: flex; gap: 8px; justify-content: flex-end; }
+    .rbDialogFoot button { border: none; border-radius: 6px; padding: 6px 14px; cursor: pointer; font-size: 14px; background: #5d6d7e; color: #fff; }
+    .rbDialogFoot button.primary { background: #27ae60; }
+    /* ---------- チュートリアル ---------- */
+    #tutSpot {
+      display: none;
+      position: fixed;
+      z-index: 2500;
+      border-radius: 8px;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+      outline: 3px solid #f1c40f;
+      pointer-events: none;          /* 下の画面はそのまま操作できる */
+      transition: all 0.25s;
+    }
+    #tutSpot.none { box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45); outline: none; width: 0; height: 0; }
+    /* ブロックを置くステップ：画面を暗くしない（置く場所が見えるように）。光らせる枠だけ出す */
+    #tutSpot.soft { box-shadow: 0 0 0 4px rgba(241, 196, 15, 0.35); }
+    /* ブロックを置くステップのカード：小さめにして、ブロックの画面のじゃまにならない場所に置く */
+    #tutCard.docked { width: 300px; padding: 12px 14px 10px; font-size: 13px; transition: opacity 0.15s; }
+    #tutCard.docked h3 { font-size: 15px; }
+    /* ブロックを置くステップ：開くカテゴリのわくを点滅させる */
+    #tutSpot.soft { animation: rbSpotBlink 0.9s ease-in-out infinite; }
+    @keyframes rbSpotBlink {
+      0%, 100% { outline-color: #f1c40f; box-shadow: 0 0 0 4px rgba(241, 196, 15, 0.45); }
+      50%      { outline-color: rgba(241, 196, 15, 0.15); box-shadow: 0 0 0 4px rgba(241, 196, 15, 0); }
+    }
+    /* ブロックを置くステップ：一覧の中の「置くブロック」を点滅させる */
+    .blocklyFlyout .rbTutBlink > .blocklyPath {
+      stroke: #ffcc00 !important;
+      stroke-width: 5px !important;
+      animation: rbBlockBlink 0.9s ease-in-out infinite;
+    }
+    .blocklyFlyout .rbTutBlink { animation: rbBlockGlow 0.9s ease-in-out infinite; }
+    @keyframes rbBlockBlink { 0%, 100% { stroke-opacity: 1; } 50% { stroke-opacity: 0.15; } }
+    @keyframes rbBlockGlow {
+      0%, 100% { filter: drop-shadow(0 0 6px rgba(255, 204, 0, 0.95)); }
+      50%      { filter: drop-shadow(0 0 0 rgba(255, 204, 0, 0)); }
+    }
+    /* ドラッグしているあいだは、カードをうすくして、マウスが通りぬけるようにする */
+    #tutCard.passthrough { opacity: 0.25; pointer-events: none; }
+    #tutCard {
+      display: none;
+      position: fixed;
+      z-index: 2600;
+      width: 360px;
+      max-width: calc(100vw - 32px);
+      box-sizing: border-box;
+      padding: 16px 18px 12px;
+      background: #fff;
+      color: #222;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    #tutCard h3 { margin: 0 0 6px; font-size: 16px; color: #2c3e50; }
+    #tutCard .tutText { margin: 0 0 8px; }
+    #tutCard .tutWait { margin: 0 0 8px; padding: 6px 10px; border-radius: 6px; background: #fff7d6; color: #7a5b00; font-size: 13px; }
+    #tutCard .tutWait.done { background: #e8f8ee; color: #1e7e34; }
+    #tutCard .tutFoot { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+    #tutCard .tutFoot .tutStep { flex: 1; color: #888; font-size: 12px; }
+    #tutCard button { border: none; border-radius: 6px; padding: 6px 12px; font-size: 14px; cursor: pointer; background: #5d6d7e; color: #fff; }
+    #tutCard button.primary { background: #27ae60; }
+    #tutCard button:disabled { opacity: 0.4; cursor: default; }
+    /* ---------- サンプルのロボット ---------- */
+    #sampleOverlay { position: fixed; inset: 0; z-index: 2400; display: none; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.45); }
+    #sampleOverlay.open { display: flex; }
+    #sampleDialog { width: 640px; max-width: calc(100vw - 32px); max-height: calc(100vh - 48px); overflow: auto; box-sizing: border-box;
+      background: #fff; border-radius: 14px; padding: 18px 20px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4); }
+    #sampleDialog h3 { margin: 0 0 4px; font-size: 18px; color: #2c3e50; }
+    #sampleDialog .sampleLead { margin: 0 0 12px; color: #555; font-size: 13px; }
+    .sampleCard { border: 1px solid #dfe4ea; border-radius: 10px; padding: 10px 14px; margin-bottom: 10px; }
+    .sampleCard .sampleHead { display: flex; align-items: center; gap: 8px; }
+    .sampleCard .sampleName { font-weight: bold; font-size: 15px; flex: 1; }
+    .sampleCard .sampleLevel { color: #e67e22; font-size: 13px; white-space: nowrap; }
+    .sampleCard p { margin: 6px 0; font-size: 13px; line-height: 1.6; }
+    .sampleCard ul { margin: 4px 0 0; padding-left: 20px; font-size: 13px; color: #1f5f8b; }
+    .sampleCard button { border: none; border-radius: 6px; padding: 6px 14px; background: #27ae60; color: #fff; cursor: pointer; font-size: 14px; }
+    #sampleClose { float: right; border: none; background: #5d6d7e; color: #fff; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+    #selectBand {
+      position: fixed;
+      border: 2px dashed #2980b9;
+      background: rgba(41, 128, 185, 0.12);
+      pointer-events: none;
+      z-index: 50;
+    }
+
+    /* RGBノード用の円形カラーピッカー */
+    #colorPickerOverlay { position:fixed; inset:0; background:rgba(0,0,0,.42); z-index:3000; display:none; align-items:center; justify-content:center; }
+    #colorPickerOverlay.open { display:flex; }
+    #colorPickerDialog { background:#fff; border-radius:14px; padding:20px; width:350px; box-sizing:border-box; box-shadow:0 12px 45px #0005; }
+    #colorPickerDialog h3 { margin:0 0 12px; font-size:17px; }
+    #colorWheelCanvas { display:block; margin:auto; width:300px; height:300px; cursor:crosshair; touch-action:none; }
+    #colorBrightnessRow { display:flex; align-items:center; gap:10px; margin:12px 0 4px; font-size:13px; }
+    #colorBrightness { flex:1; accent-color:#2563eb; }
+    #colorPickerValues { display:flex; gap:12px; align-items:center; margin:14px 0; }
+    #colorPickerPreview { width:64px; height:44px; border:1px solid #aaa; border-radius:6px; flex:none; }
+    #colorPickerNumbers { font-family:Consolas,monospace; font-size:13px; line-height:1.7; }
+    #colorPickerDialog .actions { display:flex; justify-content:flex-end; gap:8px; }
+    #colorPickerDialog button { border:0; border-radius:6px; padding:8px 18px; cursor:pointer; }
+    #colorPickerApply { background:#27ae60; color:white; }
+    #colorPickerHint { font-size:12px; color:#666; margin:8px 0 12px; }
+  </style>
 </head>
 <body>
   <div id="toolbar">
@@ -1598,8 +872,7 @@
     const workspace = Blockly.inject('blocklyDiv', {
       toolbox: { kind: 'categoryToolbox', contents: [] },
       theme: robocodeTheme,
-        trashcan: true,                     // 右下にゴミ箱を出す
-        media: 'blockly/media/',            // ゴミ箱やズームの絵と音（ネットなしでも出るように）
+      trashcan: true,                     // 右下にゴミ箱を出す
 
       // 方眼を表示して、ブロックを方眼にそろえる
       grid: {
@@ -2143,8 +1416,9 @@
         Blockly.defineBlocksWithJsonArray(msg.setup.blocks);
 
         //----------------------------------------------------------------------------------------
-        // 変数宣言ブロック：公開範囲・static・型・変数名は常に表示し、初期値欄だけ切り替える。
-        // 数値型は数値ブロック、String 型は null / 文字列ブロック、boolean 型ははい／いいえ。
+        // 変数宣言ブロック：型変更でブロックの一部だけを隠すのではなく、
+        // 入力行を作り直して、公開範囲・static・型・変数名を常に表示する。
+        // String は null / 文字列ブロック、boolean は「はい／いいえ」を使う。
         //-----------------------------------------------------------------------------------------
         const variableDefinition = Blockly.Blocks['robot_variable_declare'];
         if (variableDefinition && !variableDefinition._initialValueSwitchInstalled) {
@@ -2153,43 +1427,111 @@
             originalVariableInit.call(this);
             const block = this;
 
-            const updateInitialValueControl = (type) => {
-              // 基本設定のフィールドは型変更後も必ず表示する。
-              ['ACCESS', 'STATIC', 'TYPE', 'NAME'].forEach((name) => {
-                const field = block.getField(name);
-                if (field && typeof field.setVisible === 'function') field.setVisible(true);
-              });
+            // JSONから作られた元のフィールド値を保存する。
+            const saved = {
+              ACCESS: block.getFieldValue('ACCESS') || '',
+              STATIC: block.getFieldValue('STATIC') || '',
+              TYPE: block.getFieldValue('TYPE') || 'int',
+              NAME: block.getFieldValue('NAME') || 'item',
+              INITIAL_BOOLEAN: block.getFieldValue('INITIAL_BOOLEAN') || 'false'
+            };
 
-              const booleanField = block.getField('INITIAL_BOOLEAN');
-              const valueInput = block.getInput('INITIAL_VALUE_BLOCK');
-              const isBoolean = type === 'boolean';
-              const isString = type === 'String';
-              if (booleanField) booleanField.setVisible(isBoolean);
-              if (valueInput) {
-                valueInput.setVisible(!isBoolean);
-                if (valueInput.connection) {
-                  valueInput.connection.setCheck(isString ? 'String' : 'Number');
-                  if (isBoolean) {
-                    valueInput.connection.setShadowState(null);
-                  } else if (!valueInput.connection.targetBlock()) {
-                    valueInput.connection.setShadowState(isString
-                      ? { type: 'java_null' }
-                      : { type: 'rb_number', fields: { NUM: 0 } });
+            const rebuildVariableDeclaration = (requestedType, keepValues = true) => {
+              const oldValues = {
+                ACCESS: block.getFieldValue('ACCESS') ?? saved.ACCESS,
+                STATIC: block.getFieldValue('STATIC') ?? saved.STATIC,
+                TYPE: requestedType || block.getFieldValue('TYPE') || saved.TYPE,
+                NAME: block.getFieldValue('NAME') ?? saved.NAME,
+                INITIAL_BOOLEAN: block.getFieldValue('INITIAL_BOOLEAN') ?? saved.INITIAL_BOOLEAN
+              };
+
+              // 旧入力を消す。これにより、隠した入力や余分な初期値が残らない。
+              block.inputList.slice().forEach(input => block.removeInput(input.name, true));
+
+              const accessOptions = [
+                ['指定なし', ''],
+                ['どこからでも使える', 'public'],
+                ['このクラス内だけ', 'private']
+              ];
+              const staticOptions = [
+                ['個別の変数', ''],
+                ['クラスで共有', 'static']
+              ];
+              const typeOptions = [
+                ['整数', 'int'],
+                ['小数', 'float'],
+                ['倍精度の小数', 'double'],
+                ['長整数', 'long'],
+                ['文字列', 'String'],
+                ['真偽値', 'boolean']
+              ];
+              const booleanOptions = [
+                ['いいえ', 'false'],
+                ['はい', 'true']
+              ];
+
+              // 値を接続する型は、入力行に設定項目をすべて置く。
+              // boolean は値入力を作らず、同じ場所に選択欄を置く。
+              const isBoolean = oldValues.TYPE === 'boolean';
+              const input = isBoolean
+                ? block.appendDummyInput('DECLARATION_ROW')
+                : block.appendValueInput('INITIAL_VALUE_BLOCK')
+                    .setCheck(oldValues.TYPE === 'String' ? 'String' : 'Number');
+
+              input
+                .appendField('公開範囲')
+                .appendField(new Blockly.FieldDropdown(accessOptions), 'ACCESS')
+                .appendField(new Blockly.FieldDropdown(staticOptions), 'STATIC')
+                .appendField('型')
+                .appendField(new Blockly.FieldDropdown(typeOptions), 'TYPE')
+                .appendField('変数名')
+                .appendField(new Blockly.FieldTextInput(oldValues.NAME || 'item'), 'NAME')
+                .appendField('初期値');
+
+              if (isBoolean) {
+                input.appendField(new Blockly.FieldDropdown(booleanOptions), 'INITIAL_BOOLEAN');
+              }
+
+              // フィールドを作り直したあとに、選択していた設定を戻す。
+              ['ACCESS', 'STATIC', 'TYPE'].forEach(name => {
+                const field = block.getField(name);
+                if (field) {
+                  const value = oldValues[name];
+                  if (value !== undefined && value !== null) {
+                    try { field.setValue(value); } catch (_) { /* 選択肢にない値は既定値を使う */ }
                   }
                 }
+              });
+              const nameField = block.getField('NAME');
+              if (nameField) nameField.setValue(oldValues.NAME || 'item');
+              if (isBoolean) {
+                const booleanField = block.getField('INITIAL_BOOLEAN');
+                if (booleanField) booleanField.setValue(oldValues.INITIAL_BOOLEAN === 'true' ? 'true' : 'false');
+              } else if (block.getInput('INITIAL_VALUE_BLOCK')?.connection) {
+                // shadow は初期値欄に接続する。ワークスペース上の別ブロックにはしない。
+                const shadowState = oldValues.TYPE === 'String'
+                  ? { type: 'java_null' }
+                  : { type: 'rb_number', fields: { NUM: 0 } };
+                block.getInput('INITIAL_VALUE_BLOCK').connection.setShadowState(shadowState);
               }
-              if (isBoolean && booleanField) {
-                const value = booleanField.getValue();
-                if (value !== 'true' && value !== 'false') booleanField.setValue('false');
-              }
+
+              saved.ACCESS = oldValues.ACCESS;
+              saved.STATIC = oldValues.STATIC;
+              saved.TYPE = oldValues.TYPE;
+              saved.NAME = oldValues.NAME;
+              saved.INITIAL_BOOLEAN = oldValues.INITIAL_BOOLEAN;
               block.render();
             };
 
-            updateInitialValueControl(this.getFieldValue('TYPE'));
-            this.setOnChange(function(event) {
+            // 既存の入力行を、最初から同じルールで組み直す。
+            rebuildVariableDeclaration(saved.TYPE, false);
+            block.setOnChange(function(event) {
               if (!event || event.type !== Blockly.Events.BLOCK_CHANGE ||
                   event.blockId !== this.id || event.name !== 'TYPE') return;
-              updateInitialValueControl(this.getFieldValue('TYPE'));
+              const selectedType = this.getFieldValue('TYPE');
+              if (selectedType && selectedType !== saved.TYPE) {
+                rebuildVariableDeclaration(selectedType, true);
+              }
             });
           };
           variableDefinition._initialValueSwitchInstalled = true;
