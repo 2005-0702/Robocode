@@ -2176,13 +2176,13 @@
               block.inputList.slice().forEach(input => block.removeInput(input.name, true));
 
               const accessOptions = [
-                ['指定なし', ''],
-                ['どこからでも使える', 'public'],
-                ['このクラス内だけ', 'private']
+                  ['基本', ''],
+                  ['ほかから使える', 'public'],
+                  ['この中だけ', 'private']
               ];
               const staticOptions = [
-                ['個別の変数', ''],
-                ['クラスで共有', 'static']
+                ['個別', ''],
+                ['共有', 'static']
               ];
               const typeOptions = [
                 ['整数', 'int'],
@@ -2206,7 +2206,7 @@
                     .setCheck(oldValues.TYPE === 'String' ? 'String' : 'Number');
 
               input
-                .appendField('公開範囲')
+                .appendField('範囲')
                 .appendField(new Blockly.FieldDropdown(accessOptions), 'ACCESS')
                 .appendField(new Blockly.FieldDropdown(staticOptions), 'STATIC')
                 .appendField('型')
@@ -2314,9 +2314,6 @@
             const options = getDeclaredVariableOptions(this);
             const valid = options.some(option => option[1] === oldValue);
             field.setValue(valid ? oldValue : options[0][1]);
-            this.setTooltip(type === 'robot_variable_assign'
-              ? '宣言した変数を選び、その変数に値を代入します。先に「変数を宣言する」ブロックを置いてください。'
-              : '宣言した変数を選び、その変数の値を計算や比較に使います。');
           };
           variableUseBlockNamesInstalled.add(type);
         }

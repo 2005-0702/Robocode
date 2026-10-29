@@ -13,15 +13,15 @@ ROBOCODE_BLOCKS(RobotVariable)
 
     Block("robot_variable_declare")
         .category("変数")
-        .text("公開範囲 %1 %2 型 %3 変数名 %4 初期値 %5 %6")
+        .text("範囲 %1 %2 型 %3 変数名 %4 初期値 %5 %6")
         .dropdown("ACCESS", {
-            {"指定なし", ""},
-            {"どこからでも使える", "public"},
-            {"このクラス内だけ", "private"}
+            {"基本", ""},
+            {"ほかから使える", "public"},
+            {"この中だけ", "private"}
             })
         .dropdown("STATIC", {
-            {"個別の変数", ""},
-            {"クラスで共有", "static"}
+            {"個別", ""},
+            {"共有", "static"}
             })
         .dropdown("TYPE", {
             {"整数", "int"},
@@ -106,10 +106,17 @@ ROBOCODE_BLOCKS(RobotVariable)
         return result;
             })
         .tooltip(
-            "変数を宣言するブロックです。\n"
-            "変数名：値を保存する場所につける名前です。\n"
-            "型：保存する値の種類です。\n"
-            "初期値：最初に入れておく値です。"
+            "値を保存する変数を宣言します\n"
+            "範囲：変数を使える範囲を指定します\n"
+            "基本：特別な指定をしません\n"
+            "ほかから使える：別のクラスからも使えます\n"
+            "この中だけ：宣言したクラス内で使えます\n"
+            "個別：オブジェクトごとに値を持ちます\n"
+            "共有：同じクラスのオブジェクト間で値を共有します\n"
+            "型：保存する値の種類です\n"
+            "変数名：変数の名前です\n"
+            "初期値：変数を作ったときの値です"
+
         );
 
 
@@ -120,7 +127,7 @@ ROBOCODE_BLOCKS(RobotVariable)
         .textField("NAME", "item")
         .valueInput("VALUE", "Number")
         .java("{NAME} = {VALUE};")
-        .tooltip("宣言した変数を選んで、新しい値を代入します。");
+        .tooltip("宣言した変数を選んで、新しい値を代入します");
 
     // ③ 変数の値を取得する
     Block("robot_variable_get")
@@ -129,14 +136,15 @@ ROBOCODE_BLOCKS(RobotVariable)
         .textField("NAME", "item")
         .output("Number")
         .java("{NAME}")
-        .tooltip("宣言した変数を選び、その変数の値を計算や比較に使います。");
+        .tooltip("変数に入っている値を、計算や条件判定に使います");
 
  
     // null（何も参照していない状態）
     Block("java_null")
         .category("変数")
-        .text("null")
+        .text("値なし")
         .output("String")
-        .tooltip("変数が何も参照していない状態を表します")
+        .tooltip("値を参照していない状態を表します\n"
+            "空文字や数値の0とは異なります")
         .java("null");
 }
