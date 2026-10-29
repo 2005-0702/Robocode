@@ -102,6 +102,9 @@
     <Image Include="Robocode.ico">
       <Filter>リソース ファイル</Filter>
     </Image>
+    <Image Include="..\..\Users\IS06\Downloads\Robocode_Icon.ico">
+      <Filter>リソース ファイル</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
