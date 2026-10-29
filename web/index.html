@@ -1415,8 +1415,10 @@
         }
         Blockly.defineBlocksWithJsonArray(msg.setup.blocks);
 
-        // 変数宣言ブロック：型に応じて初期値欄を切り替える。
-        // 数値型は値ブロック、String 型は直接入力欄、boolean 型は「はい／いいえ」のみ。
+        //----------------------------------------------------------------------------------------
+        // 変数宣言ブロック：公開範囲・static・型・変数名は常に表示し、初期値欄だけ切り替える。
+        // 数値型は数値ブロック、String 型は null / 文字列ブロック、boolean 型ははい／いいえ。
+        //-----------------------------------------------------------------------------------------
         const variableDefinition = Blockly.Blocks['robot_variable_declare'];
         if (variableDefinition && !variableDefinition._initialValueSwitchInstalled) {
           const originalVariableInit = variableDefinition.init;
@@ -1425,29 +1427,30 @@
             const block = this;
 
             const updateInitialValueControl = (type) => {
+              // 基本設定のフィールドは型変更後も必ず表示する。
+              ['ACCESS', 'STATIC', 'TYPE', 'NAME'].forEach((name) => {
+                const field = block.getField(name);
+                if (field && typeof field.setVisible === 'function') field.setVisible(true);
+              });
+
               const booleanField = block.getField('INITIAL_BOOLEAN');
-              const stringField = block.getField('INITIAL_STRING');
               const valueInput = block.getInput('INITIAL_VALUE_BLOCK');
               const isBoolean = type === 'boolean';
               const isString = type === 'String';
-              const showValueInput = !isBoolean && !isString;
-
               if (booleanField) booleanField.setVisible(isBoolean);
-              if (stringField) stringField.setVisible(isString);
               if (valueInput) {
-                valueInput.setVisible(showValueInput);
+                valueInput.setVisible(!isBoolean);
                 if (valueInput.connection) {
-                  valueInput.connection.setCheck('Number');
-                  if (showValueInput && !valueInput.connection.targetBlock()) {
-                    valueInput.connection.setShadowState({
-                      type: 'rb_number', fields: { NUM: 0 }
-                    });
-                  } else if (!showValueInput) {
+                  valueInput.connection.setCheck(isString ? 'String' : 'Number');
+                  if (isBoolean) {
                     valueInput.connection.setShadowState(null);
+                  } else if (!valueInput.connection.targetBlock()) {
+                    valueInput.connection.setShadowState(isString
+                      ? { type: 'java_null' }
+                      : { type: 'rb_number', fields: { NUM: 0 } });
                   }
                 }
               }
-
               if (isBoolean && booleanField) {
                 const value = booleanField.getValue();
                 if (value !== 'true' && value !== 'false') booleanField.setValue('false');

@@ -13,7 +13,7 @@ ROBOCODE_BLOCKS(RobotVariable)
 
     Block("robot_variable_declare")
         .category("変数")
-        .text("公開範囲 %1 %2 型 %3 変数名 %4 初期値 %5 %6 %7")
+        .text("公開範囲 %1 %2 型 %3 変数名 %4 初期値 %5 %6")
         .dropdown("ACCESS", {
             {"指定なし", ""},
             {"どこからでも使える", "public"},
@@ -32,8 +32,8 @@ ROBOCODE_BLOCKS(RobotVariable)
             {"真偽値", "boolean"}
             })
         .textField("NAME", "item")
-        // 数値型はブロック接続、文字列型は直接入力、真偽値型は「はい／いいえ」を使用する。
-        .textField("INITIAL_STRING", "")
+        // 数値型は数値ブロック、文字列型は null などの文字列ブロックを接続する。
+        // 真偽値型は「はい／いいえ」の選択肢を使う。
         .optionalValueInput("INITIAL_VALUE_BLOCK", "Number")
         .dropdown("INITIAL_BOOLEAN", {
             {"いいえ", "false"},
@@ -47,23 +47,14 @@ ROBOCODE_BLOCKS(RobotVariable)
         std::string initialValue = data.text("INITIAL_VALUE_BLOCK");
         const bool hasRealValueBlock = data.hasConnectedValue("INITIAL_VALUE_BLOCK");
         const std::string booleanInitialValue = data.text("INITIAL_BOOLEAN");
-        const std::string stringInitialValue = data.text("INITIAL_STRING");
-
-        // 実際の値ブロックが接続されている場合はそれを優先する。
-        // 接続されていない boolean 型では true/false の選択肢を使用する。
-        if (type == "boolean" && !hasRealValueBlock) {
+        // boolean 型は値ブロックではなく、はい／いいえの選択を使う。
+        if (type == "boolean") {
             initialValue = booleanInitialValue;
         }
-        // String 型は専用のテキスト欄から値を取得する。Java文字列として引用符を付ける。
-        else if (type == "String") {
-            std::string escaped;
-            for (char c : stringInitialValue) {
-                if (c == '\\' || c == '"') escaped += '\\';
-                if (c == '\n') { escaped += "\\n"; continue; }
-                if (c == '\r') { escaped += "\\r"; continue; }
-                escaped += c;
-            }
-            initialValue = stringInitialValue.empty() ? "\"\"" : "\"" + escaped + "\"";
+        // String 型で値ブロックが未接続なら null を初期値にする。
+        // java_null や文字列ブロックが接続されていれば、その Java 式をそのまま使う。
+        else if (type == "String" && !hasRealValueBlock) {
+            initialValue = "null";
         }
         // 初期値の shadow がない場合は型に応じた既定値を使う。
         if (initialValue.empty()) {
