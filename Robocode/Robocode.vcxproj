@@ -159,9 +159,12 @@
     <ClCompile Include="WorkFile.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="Robocode.rc" />
+    <ResourceCompile Include="Robocode.rc">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
+    <Image Include="..\..\Users\IS06\Downloads\Robocode_Icon.ico" />
     <Image Include="Robocode.ico" />
     <Image Include="small.ico" />
   </ItemGroup>
