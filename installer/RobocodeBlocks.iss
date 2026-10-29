@@ -19,6 +19,8 @@
 #define AppName "Robocode Blocks"
 #define AppVersion "1.0"
 #define AppExe "Robocode.exe"
+; アイコン：Robocode フォルダ（.vcxproj の横）の Robocode.ico
+#define AppIcon "Robocode_Icon.ico"
 
 [Setup]
 ; AppId はこのアプリの番号。バージョンを上げても変えないこと（変えると別のアプリとして入ってしまう）
@@ -38,7 +40,9 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 ArchitecturesAllowed=x64compatible
-UninstallDisplayIcon={app}\{#AppExe}
+UninstallDisplayIcon={app}\{#AppIcon}
+; インストーラー（RobocodeBlocks_Setup.exe）そのもののアイコン
+SetupIconFile=..\Robocode\{#AppIcon}
 
 [Languages]
 Name: "japanese"; MessagesFile: "compiler:Languages\Japanese.isl"
@@ -53,6 +57,8 @@ Name: "installrobocode"; Description: "Robocode もインストールする（�
 ; アプリ本体（Visual Studio の Release | x64 のビルド結果）
 Source: "..\x64\Release\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\x64\Release\WebView2Loader.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+; ショートカットに使うアイコン（exe の中のアイコンではなく、このファイルを直接使う）
+Source: "..\Robocode\{#AppIcon}"; DestDir: "{app}"; Flags: ignoreversion
 ; 画面（index.html など）
 Source: "..\web\*"; DestDir: "{app}\web"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; JDK（javac と java）。exe の横の jdk フォルダにあれば、アプリはそれを使う（JAVA_HOME・PATH の設定はいらない）
@@ -67,8 +73,9 @@ Source: "robocode-setup.jar"; DestDir: "{tmp}"; Flags: deleteafterinstall; Tasks
 #endif
 
 [Icons]
-Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
+; IconFilename：ショートカットのアイコンを、いっしょに入れた .ico から取る
+Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"; IconFilename: "{app}\{#AppIcon}"
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; IconFilename: "{app}\{#AppIcon}"; Tasks: desktopicon
 
 [Run]
 #if FileExists(AddBackslash(SourcePath) + "MicrosoftEdgeWebview2Setup.exe")
