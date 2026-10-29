@@ -1612,7 +1612,7 @@
       // 拡大・縮小
       zoom: {
         controls: true,                   // 右下に ＋ − ボタンを出す
-        wheel: true,                      // マウスホイールで拡大・縮小
+        wheel: true,                      // Ctrl + ホイール（タッチパッドは2本指でつまむ）で拡大・縮小
         startScale: 1.1,                  // 最初の大きさ（1 が標準）
         maxScale: 2,                      // 一番大きくしたとき
         minScale: 0.5,                    // 一番小さくしたとき
@@ -1623,7 +1623,7 @@
       move: {
         scrollbars: true,                 // スクロールバーを出す
         drag: true,                       // 何もないところをドラッグして動かせる
-        wheel: false                      // ホイールは拡大・縮小に使うので、スクロールには使わない
+        wheel: true                       // ホイール・タッチパッドの2本指でスクロール（Shift + ホイールで横）
       }
     });
 
@@ -3325,7 +3325,7 @@
       // 複製したブロックを選んだ状態にする（そのままドラッグしたり、Delete で消したりできる）
       clearBoxSelection();
       if (created.length === 1) {
-        created[0].select();
+        Blockly.common.setSelected(created[0]);   // select() は光らせるだけなので、Blockly に「選んだ」と伝える
       } else {
         created.forEach(b => { boxSelected.add(b); b.addSelect(); });
       }
@@ -3342,7 +3342,26 @@
     }, true);
 
     // ------------------------------------------------------------
-    // 選んだブロック（Shift で囲んだ・Ctrl + クリックした）を、まとめて動かす
+    // Ctrl + A：置いてあるブロックを全部選ぶ
+    document.addEventListener('keydown', (e) => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== 'a') return;
+      const tag = (document.activeElement && document.activeElement.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement && document.activeElement.isContentEditable)) return;   // 入力欄の文字の全選択はそのまま
+      if (document.querySelector('.rbDialogOverlay.open')) return;   // ダイアログを開いているとき
+      e.preventDefault();
+      e.stopPropagation();
+      clearBoxSelection();
+      workspace.getAllBlocks(false).forEach(block => {
+        if (block.isShadow() || !block.isDeletable() || (block.isInsertionMarker && block.isInsertionMarker())) return;
+        boxSelected.add(block);
+        block.addSelect();
+      });
+      if (boxSelected.size > 0) {
+        showStatus('', boxSelected.size + ' 個のブロックを全部選びました（Delete で消す／Ctrl + D で複製／ドラッグでまとめて動かす）');
+      }
+    }, true);
+
+    // 選んだブロック（Shift で囲んだ・Ctrl + A で全部選んだ・Ctrl + クリックした）を、まとめて動かす
     //   選んだブロックのどれかをドラッグすると、ほかの選んだブロックもいっしょに動く
     //   （つながっている途中のブロックは、そこからはずして動かす。下のブロックは上につめる）
     // ------------------------------------------------------------
@@ -4111,7 +4130,7 @@
           div.title = 'クリックするとブロックに移動します';
           div.addEventListener('click', () => {
             workspace.centerOnBlock(m.blockId);
-            workspace.getBlockById(m.blockId).select();
+            Blockly.common.setSelected(workspace.getBlockById(m.blockId));   // 前に選んでいたブロックの光は消える
           });
         }
         box.appendChild(div);
@@ -4505,6 +4524,9 @@
         ['<kbd>Ctrl</kbd> + <kbd>D</kbd>', '選んだブロックを複製する'],
         ['<kbd>Delete</kbd> / <kbd>Backspace</kbd>', '選んだブロックを消す'],
         ['<kbd>Shift</kbd> + ドラッグ（何もないところから）', '四角で囲んで、まとめて選ぶ（少しでもかかったブロック）'],
+        ['<kbd>Ctrl</kbd> + <kbd>A</kbd>', '置いてあるブロックを全部選ぶ'],
+        ['ホイール ／ タッチパッドを2本指でスライド', '画面を上下・左右にスクロール（Shift + ホイールで横）'],
+        ['<kbd>Ctrl</kbd> + ホイール ／ タッチパッドを2本指でつまむ', '拡大・縮小'],
         ['<kbd>Ctrl</kbd> + クリック', 'ブロックを1つずつ選ぶ・選ぶのをやめる'],
         ['選んだブロックをドラッグ', '選んだブロックをまとめて動かす（ゴミ箱に入れると、まとめて消す）'],
         ['<kbd>Ctrl</kbd> + <kbd>F</kbd>', '置いてあるブロックを、書いてある文字でさがして移動する（Enter で次、Shift + Enter で前）'],
