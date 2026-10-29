@@ -1948,7 +1948,7 @@
       try {
         loading = true;
         clearWorkspaceCompletely();
-        Blockly.serialization.workspaces.load(data.workspace, workspace);
+        Blockly.serialization.workspaces.load(addVariableTypes(data.workspace), workspace);
         workspace.clearUndo();
       } catch (err) {
         // 今のアプリにないブロックが入っていると、ここに来る
@@ -2056,7 +2056,7 @@
       try {
         loading = true;
         clearWorkspaceCompletely();
-        Blockly.serialization.workspaces.load(msg.workspace || {}, workspace);
+        Blockly.serialization.workspaces.load(addVariableTypes(msg.workspace || {}), workspace);
       } catch (err) {
         loading = false;
         clearWorkspaceCompletely();
@@ -2090,7 +2090,7 @@
       try {
         loading = true;
         clearWorkspaceCompletely();
-        Blockly.serialization.workspaces.load(work.workspace || {}, workspace);
+        Blockly.serialization.workspaces.load(addVariableTypes(work.workspace || {}), workspace);
       } catch (err) {
         // 今のアプリにないブロックが入っていると、ここに来る
         loading = false;
@@ -2252,6 +2252,14 @@
 
             // 既存の入力行を、最初から同じルールで組み直す。
             rebuildVariableDeclaration(saved.TYPE, false);
+
+            // 保存するときに型も書いておき、読みこむときは「初期値の穴」を先にその型に合わせる。
+            //   Blockly は、型（TYPE の欄）より先に穴を作るので、そのままだと
+            //   文字列の変数の初期値（java_null）が、数字の穴にはまらずにエラーになるため。
+            block.saveExtraState = () => ({ variableType: block.getFieldValue('TYPE') || 'int' });
+            block.loadExtraState = (state) => {
+              if (state && state.variableType) rebuildVariableDeclaration(state.variableType, false);
+            };
             block.setOnChange(function(event) {
               if (!event || event.type !== Blockly.Events.BLOCK_CHANGE ||
                   event.blockId !== this.id || event.name !== 'TYPE') return;
@@ -2433,6 +2441,14 @@
             if (type === 'robot_variable_assign') {
               // 選択中の変数の型に合わせて、入力欄を作り直す。
               rebuildVariableAssignment(this, getDeclaredVariableType(this, this.getFieldValue('NAME')), true);
+
+              // 保存するときに型も書いておき、読みこむときは「値の穴」を先にその型に合わせる。
+              //   作られた直後は「一番上の宣言の型」になっているので、そのままだと
+              //   ちがう型の変数への代入（例：int の変数に数字）を読みこめずにエラーになるため。
+              this.saveExtraState = function() { return { variableType: this.getFieldValue('VARIABLE_TYPE') || 'double' }; };
+              this.loadExtraState = function(state) {
+                if (state && state.variableType) rebuildVariableAssignment(this, state.variableType, true);
+              };
             }
 
             // 変数名を選び直した直後にも、入力欄の型を更新する。
@@ -2495,6 +2511,14 @@
           };
           definition._rgbHiddenOnInit = true;
         }
+        // 変数の宣言・代入ブロックは、作られたときに型に合う初期値（数字 or 文字列）を自分で入れる。
+        //   C++ が付けた「数字ブロック」を残すと、文字列の変数があるときに穴にはまらずエラーになり、
+        //   カテゴリの一覧がとちゅうで止まって、ブロックが1つしか出なくなるので外す。
+        ((msg.setup.toolbox && msg.setup.toolbox.contents) || []).forEach(cat => {
+          (cat.contents || []).forEach(item => {
+            if (item.type === 'robot_variable_assign' || item.type === 'robot_variable_declare') delete item.inputs;
+          });
+        });
         originalSetup = msg.setup;   // 画面の設定で、カテゴリやブロックをかくすときに使う
         workspace.updateToolbox(layoutToolbox(msg.setup.toolbox));
 
@@ -2713,6 +2737,27 @@
         searchBlocks('');
       }
     });
+
+    // ------------------------------------------------------------
+    // 読みこむブロックのデータに、変数の型を書き足す（extraState）
+    //   前に保存した作品や、Java から作ったブロックには型が書いていないので、
+    //   TYPE ／ VARIABLE_TYPE の欄から写しておく（loadExtraState で穴を先に型に合わせるため）
+    // ------------------------------------------------------------
+    function addVariableTypes(state) {
+      if (!state || !state.blocks || !Array.isArray(state.blocks.blocks)) return state;
+      const copy = JSON.parse(JSON.stringify(state));
+      const walk = (b) => {
+        if (!b || typeof b !== 'object') return;
+        const field = b.type === 'robot_variable_declare' ? 'TYPE' : b.type === 'robot_variable_assign' ? 'VARIABLE_TYPE' : null;
+        if (field && b.fields && b.fields[field] && !(b.extraState && b.extraState.variableType)) {
+          b.extraState = Object.assign({}, b.extraState || {}, { variableType: b.fields[field] });
+        }
+        Object.values(b.inputs || {}).forEach(input => { walk(input && input.block); walk(input && input.shadow); });
+        if (b.next) walk(b.next.block);
+      };
+      copy.blocks.blocks.forEach(walk);
+      return copy;
+    }
 
     // ------------------------------------------------------------
     // 囲んで消す
