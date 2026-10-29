@@ -120,14 +120,68 @@ ROBOCODE_BLOCKS(RobotVariable)
         );
 
 
-    // ② 変数に値を代入する
+    // ② 宣言した変数に値を代入する
     Block("robot_variable_assign")
         .category("変数")
-        .text("%1 に %2 を代入")
+        // NAME：代入先の変数名
+        // VALUE：数値や文字列を接続する入力欄
+        // VARIABLE_TYPE：選択した変数の型（画面では非表示）
+        // VALUE_BOOLEAN：真偽値の「はい／いいえ」
+        .text("%1 に %2 %3 %4 を代入")
         .textField("NAME", "item")
         .valueInput("VALUE", "Number")
-        .java("{NAME} = {VALUE};")
-        .tooltip("宣言した変数を選んで、新しい値を代入します");
+        .dropdown("VARIABLE_TYPE", {
+            {"整数", "int"},
+            {"小数", "float"},
+            {"倍精度の小数", "double"},
+            {"長整数", "long"},
+            {"文字列", "String"},
+            {"真偽値", "boolean"}
+        })
+        .dropdown("VALUE_BOOLEAN", {
+            {"いいえ", "false"},
+            {"はい", "true"}
+        })
+        .javaFunction([](BlockData& data) -> std::string {
+            // 代入先の変数名と、その変数の型を取得する。
+            const std::string name = data.text("NAME");
+            const std::string type = data.text("VARIABLE_TYPE");
+
+            std::string value;
+
+            // 真偽値の場合は、入力欄ではなく「はい／いいえ」の選択を使う。
+            if (type == "boolean") {
+                value = data.text("VALUE_BOOLEAN");
+                if (value != "true" && value != "false") {
+                    value = "false";
+                }
+            }
+            else {
+                // 数値や文字列の場合は、接続されたブロックの Java 式を取得する。
+                value = data.text("VALUE");
+
+                // 値が空の場合に備えて、型に合った既定値を設定する。
+                if (value.empty()) {
+                    if (type == "String") value = "null";
+                    else if (type == "float") value = "0.0f";
+                    else if (type == "double") value = "0.0";
+                    else if (type == "long") value = "0L";
+                    else value = "0";
+                }
+            }
+
+            // 例：score = 100;
+            //     enemyName = null;
+            //     isMoving = true;
+            return name + " = " + value + ";";
+        })
+        .tooltip(
+            "選んだ変数に新しい値を入れます。\n"
+            "整数や小数：数値ブロックをつなぎます。\n"
+            "文字列：文字列ブロックや「値なし」ブロックをつなぎます。\n"
+            "真偽値：「はい」か「いいえ」を選びます。\n"
+            "変数名を選ぶと、その変数の種類に合った入力欄に切り替わります。"
+        );
 
     // ③ 変数の値を取得する
     Block("robot_variable_get")
